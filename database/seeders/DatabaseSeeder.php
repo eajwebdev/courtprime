@@ -252,11 +252,11 @@ class DatabaseSeeder extends Seeder
          * CP-PLY identity on first sign-in.
          */
         foreach ([
-            ['Juan Santos', 'player1@eaj.test'],
-            ['Maria Cruz', 'player2@eaj.test'],
-            ['Carlo Reyes', 'player3@eaj.test'],
-        ] as [$playerName, $playerEmail]) {
-            User::query()->updateOrCreate(
+            ['Juan Santos', 'player1@eaj.test', 'male'],
+            ['Maria Cruz', 'player2@eaj.test', 'female'],
+            ['Carlo Reyes', 'player3@eaj.test', 'male'],
+        ] as [$playerName, $playerEmail, $playerGender]) {
+            $playerUser = User::query()->updateOrCreate(
                 ['email' => $playerEmail],
                 [
                     'organization_id' => null,
@@ -269,6 +269,15 @@ class DatabaseSeeder extends Seeder
                     'email_verified_at' => now(),
                 ],
             );
+
+            /*
+             * Gender drives which athlete artwork the identity card shows. It is
+             * set explicitly here rather than inferred from the name, because a
+             * name is not a reliable signal and a wrong guess misgenders someone.
+             */
+            PlayerProfile::query()
+                ->where('user_id', $playerUser->id)
+                ->update(['gender' => $playerGender]);
         }
 
         $players = collect([

@@ -9,7 +9,7 @@ import { currency, friendlyDate, statusLabel, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { Award, BadgeCheck, CalendarClock, IdCard, MapPin, QrCode, Trophy, Users } from 'lucide-react';
+import { Award, BadgeCheck, CalendarClock, ChevronRight, IdCard, MapPin, QrCode, Trophy, Users } from 'lucide-react';
 import { type ReactNode } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payloads come from PlayerPortalController. */
@@ -173,12 +173,25 @@ export default function PlayerPortal({
 
                 {/* ---- Actions. Primary first, full width on phones. ------------- */}
                 <section>
-                    <Button asChild size="touch" className="w-full">
-                        <Link href="/me/book">
-                            <CalendarClock className="size-4" />
-                            Book a court
-                        </Link>
-                    </Button>
+                    {/*
+                     * The primary action reads as a row in the same stack as the
+                     * bands below it rather than a floating pill: matched corner
+                     * radius, a leading icon tile echoing the identity avatar,
+                     * and a chevron so it is obviously a destination.
+                     */}
+                    <Link
+                        href="/me/book"
+                        className="bg-primary text-primary-foreground hover:bg-primary-hover flex min-h-16 items-center gap-3 rounded-xl px-4 transition-colors"
+                    >
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                            <CalendarClock className="size-4" aria-hidden />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="text-label block font-semibold">Book a court</span>
+                            <span className="block text-[0.6875rem] text-white/75">Any connected club, one account</span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-white/70" aria-hidden />
+                    </Link>
 
                     <div className="mt-2.5 grid grid-cols-2 gap-2.5">
                         <ActionButton href={qrIdentityUrl} icon={QrCode} label="Show QR ID" />

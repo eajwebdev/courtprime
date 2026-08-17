@@ -181,14 +181,16 @@ export default function PlayerPortal({
                      */}
                     <Link
                         href="/me/book"
-                        className="bg-primary text-primary-foreground hover:bg-primary-hover flex min-h-16 items-center gap-3 rounded-xl px-4 transition-colors"
+                        className="bg-primary text-primary-foreground hover:bg-primary-hover flex min-h-12 items-center gap-2.5 rounded-xl px-3.5 transition-colors sm:min-h-16 sm:gap-3 sm:px-4"
                     >
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/20">
-                            <CalendarClock className="size-4" aria-hidden />
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/20 sm:size-9 sm:rounded-lg">
+                            <CalendarClock className="size-3.5 sm:size-4" aria-hidden />
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="text-label block font-semibold">Book a court</span>
-                            <span className="block text-[0.6875rem] text-white/75">Any connected club, one account</span>
+                            {/* The strapline is the second line that made this tall,
+                                so it only appears where there is room for it. */}
+                            <span className="hidden text-[0.6875rem] text-white/75 sm:block">Any connected club, one account</span>
                         </span>
                         <ChevronRight className="size-4 shrink-0 text-white/70" aria-hidden />
                     </Link>
@@ -339,13 +341,13 @@ function ActionButton({ href, icon: Icon, label }: { href: string; icon: typeof 
     const external = href.startsWith('http');
     const inner = (
         <>
-            <Icon className="text-primary size-[18px]" aria-hidden />
+            <Icon className="text-primary size-4 sm:size-[18px]" aria-hidden />
             <span className="text-muted mt-1 w-full truncate text-center text-[0.6875rem] font-medium">{label}</span>
         </>
     );
     /* min-h-16 keeps the whole cell a comfortable tap target even though the
        icon and label are compact. */
-    const className = 'bg-surface hover:bg-surface-muted flex min-h-16 flex-col items-center justify-center px-1 transition-colors';
+    const className = 'bg-surface hover:bg-surface-muted flex min-h-14 flex-col items-center justify-center px-1 transition-colors sm:min-h-16';
 
     return external ? (
         <a href={href} className={className}>

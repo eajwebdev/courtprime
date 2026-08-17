@@ -1,0 +1,444 @@
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   COURTPRIME DESIGN SYSTEM
+   Premium sports technology with enterprise SaaS discipline.
+   Semantic tokens only — pages must never reach for a raw hex value.
+   ========================================================================== */
+
+@theme {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* ---- Radius scale -------------------------------------------------- */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.25rem;
+
+    /* ---- Elevation ----------------------------------------------------- */
+    /* e1 hover lift · e2 popover/dropdown · e3 drawer/modal. Nothing else. */
+    --shadow-e1: 0 1px 2px 0 rgb(7 19 47 / 0.06), 0 2px 8px -2px rgb(7 19 47 / 0.08);
+    --shadow-e2: 0 4px 12px -2px rgb(7 19 47 / 0.1), 0 12px 28px -8px rgb(7 19 47 / 0.14);
+    --shadow-e3: 0 8px 24px -4px rgb(7 19 47 / 0.14), 0 24px 56px -12px rgb(7 19 47 / 0.22);
+
+    /* ---- Typography scale ---------------------------------------------- */
+    --text-display: 3rem;
+    --text-display--line-height: 1.05;
+    --text-display--letter-spacing: -0.03em;
+    --text-display--font-weight: 600;
+
+    --text-h1: 1.75rem;
+    --text-h1--line-height: 1.2;
+    --text-h1--letter-spacing: -0.02em;
+    --text-h1--font-weight: 600;
+
+    --text-h2: 1.25rem;
+    --text-h2--line-height: 1.3;
+    --text-h2--letter-spacing: -0.015em;
+    --text-h2--font-weight: 600;
+
+    --text-h3: 1rem;
+    --text-h3--line-height: 1.4;
+    --text-h3--letter-spacing: -0.01em;
+    --text-h3--font-weight: 600;
+
+    --text-body: 0.9375rem;
+    --text-body--line-height: 1.6;
+
+    --text-label: 0.8125rem;
+    --text-label--line-height: 1.4;
+    --text-label--font-weight: 500;
+
+    --text-meta: 0.75rem;
+    --text-meta--line-height: 1.4;
+    --text-meta--letter-spacing: 0.01em;
+
+    --text-kpi: 1.875rem;
+    --text-kpi--line-height: 1.1;
+    --text-kpi--letter-spacing: -0.025em;
+    --text-kpi--font-weight: 600;
+
+    --text-eyebrow: 0.75rem;
+    --text-eyebrow--line-height: 1.2;
+    --text-eyebrow--letter-spacing: 0.09em;
+    --text-eyebrow--font-weight: 600;
+
+    /* ---- Motion -------------------------------------------------------- */
+    --ease-courtprime: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-micro: 150ms;
+    --duration-ui: 220ms;
+    --duration-overlay: 300ms;
+    --duration-reveal: 450ms;
+
+    /* ---- Surfaces ------------------------------------------------------ */
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-surface: var(--surface);
+    --color-surface-foreground: var(--surface-foreground);
+    --color-surface-raised: var(--surface-raised);
+    --color-surface-muted: var(--surface-muted);
+    --color-surface-deep: var(--surface-deep);
+    --color-surface-deep-foreground: var(--surface-deep-foreground);
+
+    /* ---- Text ----------------------------------------------------------
+       `secondary` and `muted` name the TEXT levels, so `text-secondary` and
+       `text-muted` resolve correctly. Recessed SURFACES are `surface-muted`.
+       Do not add a `--color-*` entry whose generated utility collides with one
+       of these names — the theme namespace beats `@utility`, silently. */
+    --color-secondary: var(--secondary-text);
+    --color-secondary-foreground: var(--foreground);
+    --color-muted: var(--muted-text);
+    --color-muted-foreground: var(--muted-text);
+
+    /* ---- Lines --------------------------------------------------------- */
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    /* ---- Brand --------------------------------------------------------- */
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary-hover: var(--primary-hover);
+    --color-primary-soft: var(--primary-soft);
+
+    /* Electric blue lives under `brand-blue`, NOT `secondary` — `secondary` is
+       reserved for the secondary TEXT level above. */
+    --color-brand-navy: var(--brand-navy);
+    --color-brand-blue: var(--brand-blue);
+    --color-brand-blue-foreground: var(--secondary-foreground);
+    --color-brand-blue-soft: var(--secondary-soft);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    /* ---- Status -------------------------------------------------------- */
+    --color-success: var(--success);
+    --color-success-soft: var(--success-soft);
+    --color-warning: var(--warning);
+    --color-warning-soft: var(--warning-soft);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --color-destructive: var(--danger);
+    --color-destructive-foreground: var(--primary-foreground);
+    --color-info: var(--info);
+    --color-info-soft: var(--info-soft);
+
+    /* ---- Domain status (courts) ---------------------------------------- */
+    --color-live: var(--live);
+    --color-live-soft: var(--live-soft);
+    --color-available: var(--available);
+    --color-available-soft: var(--available-soft);
+    --color-reserved: var(--reserved);
+    --color-reserved-soft: var(--reserved-soft);
+    --color-maintenance: var(--maintenance);
+    --color-maintenance-soft: var(--maintenance-soft);
+    --color-open-play: var(--open-play);
+    --color-open-play-soft: var(--open-play-soft);
+
+    /* ---- shadcn compatibility (do not use in new code) ------------------ */
+    --color-card: var(--surface);
+    --color-card-foreground: var(--surface-foreground);
+    --color-popover: var(--surface-raised);
+    --color-popover-foreground: var(--surface-foreground);
+
+    /* ---- Data visualisation -------------------------------------------- */
+    /* Ordered by priority. Navy/blue/pink first — no rainbow. */
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --color-chart-grid: var(--chart-grid);
+
+    /* ---- Sidebar / rail ------------------------------------------------ */
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ==========================================================================
+   LIGHT — calm, cool, operational. Navy ink on near-white.
+   ========================================================================== */
+
+:root {
+    --background: hsl(213, 43%, 97%);
+    --foreground: hsl(222, 76%, 11%);
+
+    --surface: hsl(0, 0%, 100%);
+    --surface-foreground: hsl(222, 76%, 11%);
+    --surface-raised: hsl(0, 0%, 100%);
+    --surface-muted: hsl(212, 38%, 95%);
+    --surface-deep: hsl(222, 76%, 11%);
+    --surface-deep-foreground: hsl(217, 55%, 97%);
+
+    --secondary-text: hsl(217, 22%, 36%);
+    /* L=45, not 50: at 50 this fell to 3.82:1 against surface-muted, under the
+       4.5 AA floor for small metadata text. */
+    --muted-text: hsl(217, 16%, 45%);
+
+    --border: hsl(213, 33%, 92%);
+    --border-strong: hsl(213, 33%, 84%);
+    --input: hsl(213, 33%, 88%);
+    --ring: hsl(341, 80%, 50%);
+
+    --primary: hsl(341, 80%, 50%);
+    --primary-foreground: hsl(0, 0%, 100%);
+    --primary-hover: hsl(343, 100%, 56%);
+    --primary-soft: hsl(341, 80%, 96%);
+
+    --secondary: hsl(216, 90%, 53%);
+    --secondary-foreground: hsl(0, 0%, 100%);
+    --secondary-soft: hsl(216, 90%, 96%);
+
+    --brand-navy: hsl(224, 71%, 37%);
+    --brand-blue: hsl(216, 90%, 53%);
+
+    --accent: hsl(341, 80%, 50%);
+    --accent-foreground: hsl(0, 0%, 100%);
+
+    --success: hsl(154, 84%, 30%);
+    --success-soft: hsl(154, 60%, 94%);
+    --warning: hsl(38, 82%, 40%);
+    --warning-soft: hsl(38, 88%, 94%);
+    --danger: hsl(354, 73%, 47%);
+    --danger-soft: hsl(354, 80%, 96%);
+    --info: hsl(216, 90%, 48%);
+    --info-soft: hsl(216, 90%, 96%);
+
+    --live: hsl(341, 80%, 50%);
+    --live-soft: hsl(341, 80%, 96%);
+    --available: hsl(154, 84%, 30%);
+    --available-soft: hsl(154, 60%, 94%);
+    --reserved: hsl(216, 90%, 48%);
+    --reserved-soft: hsl(216, 90%, 96%);
+    --maintenance: hsl(38, 82%, 40%);
+    --maintenance-soft: hsl(38, 88%, 94%);
+    --open-play: hsl(184, 84%, 29%);
+    --open-play-soft: hsl(184, 60%, 94%);
+
+    /* Validated with dataviz/scripts/validate_palette.js — ALL CHECKS PASS
+       against both the light (#ffffff) and dark (#0b1737) chart surfaces, so
+       one palette serves both modes. Fixed order, never cycled.
+       Blue↔pink tritan ΔE is 5.7, so series identity must ALWAYS carry a
+       legend plus direct labels — never colour alone. */
+    --chart-1: hsl(341, 92%, 48%);
+    --chart-2: hsl(216, 95%, 56%);
+    --chart-3: hsl(152, 93%, 31%);
+    --chart-4: hsl(277, 95%, 58%);
+    --chart-5: hsl(38, 90%, 36%);
+    --chart-grid: hsl(213, 33%, 90%);
+
+    --sidebar-background: hsl(222, 76%, 11%);
+    --sidebar-foreground: hsl(217, 30%, 78%);
+    --sidebar-primary: hsl(341, 80%, 50%);
+    --sidebar-primary-foreground: hsl(0, 0%, 100%);
+    --sidebar-accent: hsl(224, 58%, 17%);
+    --sidebar-accent-foreground: hsl(0, 0%, 100%);
+    --sidebar-border: hsl(224, 50%, 20%);
+    --sidebar-ring: hsl(341, 80%, 50%);
+}
+
+/* ==========================================================================
+   DARK — midnight navy, the same system inverted.
+   ========================================================================== */
+
+.dark {
+    --background: hsl(224, 72%, 7%);
+    --foreground: hsl(217, 55%, 97%);
+
+    --surface: hsl(224, 66%, 13%);
+    --surface-foreground: hsl(217, 55%, 97%);
+    --surface-raised: hsl(224, 58%, 17%);
+    --surface-muted: hsl(224, 61%, 11%);
+    --surface-deep: hsl(224, 72%, 5%);
+    --surface-deep-foreground: hsl(217, 55%, 97%);
+
+    --secondary-text: hsl(217, 30%, 74%);
+    --muted-text: hsl(217, 18%, 60%);
+
+    --border: hsl(224, 50%, 20%);
+    --border-strong: hsl(222, 45%, 30%);
+    --input: hsl(224, 50%, 24%);
+    --ring: hsl(343, 100%, 60%);
+
+    --primary: hsl(343, 100%, 56%);
+    --primary-foreground: hsl(0, 0%, 100%);
+    --primary-hover: hsl(343, 100%, 63%);
+    --primary-soft: hsl(341, 60%, 18%);
+
+    --secondary: hsl(216, 95%, 62%);
+    --secondary-foreground: hsl(224, 72%, 7%);
+    --secondary-soft: hsl(216, 70%, 18%);
+
+    --brand-navy: hsl(224, 71%, 48%);
+    --brand-blue: hsl(216, 95%, 62%);
+
+    --accent: hsl(343, 100%, 56%);
+    --accent-foreground: hsl(0, 0%, 100%);
+
+    --success: hsl(154, 71%, 46%);
+    --success-soft: hsl(154, 50%, 15%);
+    --warning: hsl(38, 90%, 60%);
+    --warning-soft: hsl(38, 60%, 16%);
+    --danger: hsl(354, 85%, 62%);
+    --danger-soft: hsl(354, 55%, 18%);
+    --info: hsl(216, 95%, 62%);
+    --info-soft: hsl(216, 70%, 17%);
+
+    --live: hsl(343, 100%, 60%);
+    --live-soft: hsl(341, 60%, 18%);
+    --available: hsl(154, 71%, 46%);
+    --available-soft: hsl(154, 50%, 15%);
+    --reserved: hsl(216, 95%, 62%);
+    --reserved-soft: hsl(216, 70%, 17%);
+    --maintenance: hsl(38, 90%, 60%);
+    --maintenance-soft: hsl(38, 60%, 16%);
+    --open-play: hsl(184, 70%, 50%);
+    --open-play-soft: hsl(184, 55%, 15%);
+
+    /* Same validated steps as light — they sit inside the dark band too. */
+    --chart-1: hsl(341, 92%, 48%);
+    --chart-2: hsl(216, 95%, 56%);
+    --chart-3: hsl(152, 93%, 31%);
+    --chart-4: hsl(277, 95%, 58%);
+    --chart-5: hsl(38, 90%, 36%);
+    --chart-grid: hsl(224, 50%, 18%);
+
+    --sidebar-background: hsl(224, 72%, 5%);
+    --sidebar-foreground: hsl(217, 30%, 74%);
+    --sidebar-primary: hsl(343, 100%, 56%);
+    --sidebar-primary-foreground: hsl(0, 0%, 100%);
+    --sidebar-accent: hsl(224, 58%, 15%);
+    --sidebar-accent-foreground: hsl(0, 0%, 100%);
+    --sidebar-border: hsl(224, 50%, 18%);
+    --sidebar-ring: hsl(343, 100%, 60%);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--border);
+    }
+
+    html {
+        -webkit-text-size-adjust: 100%;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        background-color: var(--background);
+        color: var(--foreground);
+        font-size: var(--text-body);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Every interactive element gets a visible, consistent focus ring. */
+    :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+    }
+
+    /* Numeric surfaces never jitter. */
+    th,
+    td:has(> [data-numeric]),
+    [data-numeric] {
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+@layer base {
+    @media (prefers-reduced-motion: reduce) {
+        html {
+            scroll-behavior: auto;
+        }
+
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+/* Z-index ladder — nav 30, sticky 40, drawer 50, modal 60, toast 70. */
+@utility z-nav {
+    z-index: 30;
+}
+@utility z-sticky {
+    z-index: 40;
+}
+@utility z-drawer {
+    z-index: 50;
+}
+@utility z-modal {
+    z-index: 60;
+}
+@utility z-toast {
+    z-index: 70;
+}
+
+/* `text-secondary` and `text-muted` are generated from the theme colours above.
+   They are deliberately NOT declared here: a theme colour and an `@utility` of
+   the same name collide, and the theme wins silently. */
+
+/* Athlete artwork carries matting fringe that only shows on light grounds.
+   This backdrop kills it. See courtprime-brand-assets. */
+@utility athlete-backdrop {
+    position: relative;
+    isolation: isolate;
+
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -12%;
+        z-index: -1;
+        background: radial-gradient(60% 55% at 50% 45%, var(--surface-deep) 0%, transparent 72%);
+    }
+}
+
+/* Horizontal chip rows scroll without an OS scrollbar cutting into the row. */
+@utility no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Below-the-fold marketing sections skip render work while offscreen. */
+@utility content-defer {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 640px;
+}

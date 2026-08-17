@@ -1,0 +1,26 @@
+{
+    "name": "EAJ CourtPrime",
+    "short_name": "CourtPrime",
+    "description": "CourtPrime court operations, player network, booking, POS, tournaments, and live scoring.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#e61b5b",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/cp.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/cp3.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ],
+    "categories": ["business", "sports", "productivity"]
+}

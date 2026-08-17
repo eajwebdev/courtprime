@@ -1,0 +1,415 @@
+import { StatusBadge } from '@/components/status-badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
+import { currency } from '@/lib/format';
+import { type BreadcrumbItem } from '@/types';
+import { Head, useForm } from '@inertiajs/react';
+import { Building2, CreditCard } from 'lucide-react';
+import { type FormEvent } from 'react';
+
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Tenant Subscriptions', href: '/tenant-subscriptions' }];
+
+export default function TenantSubscriptions({ organizations, plans }: { organizations: any[]; plans: any[] }) {
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Tenant Subscriptions" />
+            <div className="space-y-6 p-4 md:p-6">
+                <div>
+                    <p className="text-sm font-semibold text-pink-600">EAJ Superadmin</p>
+                    <h1 className="mt-2 text-2xl font-semibold">Tenant Subscriptions</h1>
+                    <p className="text-muted-foreground mt-2 text-sm">
+                        Manage plan assignment, billing cycle, trials, renewals, suspensions, and cancellations.
+                    </p>
+                </div>
+
+                <div className="grid gap-4">
+                    {organizations.map((organization) => (
+                        <TenantSubscriptionCard key={organization.id} organization={organization} plans={plans} />
+                    ))}
+                    {organizations.length === 0 && (
+                        <Card>
+                            <CardContent className="text-muted-foreground p-6 text-sm">No organizations are available yet.</CardContent>
+                        </Card>
+                    )}
+                </div>
+            </div>
+        </AppLayout>
+    );
+}
+
+function TenantSubscriptionCard({ organization, plans }: { organization: any; plans: any[] }) {
+    const subscription = organization.subscription;
+    const form = useForm({
+        subscription_plan_id: subscription?.subscription_plan_id ?? plans[0]?.id ?? '',
+        status: subscription?.status ?? organization.status ?? 'trial',
+        billing_cycle: subscription?.billing_cycle ?? 'monthly',
+        trial_ends_at: subscription?.trial_ends_at ? subscription.trial_ends_at.slice(0, 10) : '',
+        current_period_ends_at: subscription?.current_period_ends_at ? subscription.current_period_ends_at.slice(0, 10) : '',
+    });
+    const invoiceForm = useForm({
+        period_starts_on: subscription?.current_period_starts_at ? subscription.current_period_starts_at.slice(0, 10) : '',
+        period_ends_on: subscription?.current_period_ends_at ? subscription.current_period_ends_at.slice(0, 10) : '',
+        issued_on: new Date().toISOString().slice(0, 10),
+        due_on: '',
+        subtotal: '',
+        tax_amount: 0,
+        discount_amount: 0,
+        notes: '',
+    });
+    const paymentForm = useForm({
+        subscription_invoice_id: subscription?.invoices?.[0]?.id ?? '',
+        amount: subscription?.invoices?.[0] ? Number(subscription.invoices[0].total_amount) - Number(subscription.invoices[0].amount_paid) : 0,
+        method: 'manual',
+        external_reference: '',
+        paid_at: new Date().toISOString().slice(0, 16),
+        notes: '',
+    });
+
+    const selectedPlan = plans.find((plan) => Number(plan.id) === Number(form.data.subscription_plan_id));
+    const invoices = subscription?.invoices ?? [];
+    const payments = subscription?.payments ?? [];
+    const events = subscription?.events ?? [];
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            subscription_plan_id: Number(data.subscription_plan_id),
+            trial_ends_at: data.trial_ends_at || null,
+            current_period_ends_at: data.current_period_ends_at || null,
+        })).post(`/tenant-subscriptions/${organization.id}`, { preserveScroll: true });
+    };
+
+    const issueInvoice = (event: FormEvent) => {
+        event.preventDefault();
+        invoiceForm
+            .transform((data) => ({
+                ...data,
+                period_starts_on: data.period_starts_on || null,
+                period_ends_on: data.period_ends_on || null,
+                due_on: data.due_on || null,
+                subtotal: data.subtotal === '' ? null : Number(data.subtotal),
+                tax_amount: Number(data.tax_amount),
+                discount_amount: Number(data.discount_amount),
+            }))
+            .post(`/tenant-subscriptions/${organization.id}/invoices`, { preserveScroll: true, onSuccess: () => invoiceForm.reset('notes') });
+    };
+
+    const recordPayment = (event: FormEvent) => {
+        event.preventDefault();
+        paymentForm
+            .transform((data) => ({
+                ...data,
+                subscription_invoice_id: data.subscription_invoice_id ? Number(data.subscription_invoice_id) : null,
+                amount: Number(data.amount),
+                paid_at: data.paid_at || null,
+            }))
+            .post(`/tenant-subscriptions/${organization.id}/payments`, {
+                preserveScroll: true,
+                onSuccess: () => paymentForm.reset('external_reference', 'notes'),
+            });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex flex-wrap items-start justify-between gap-3 text-base">
+                    <div className="flex items-start gap-3">
+                        <Building2 className="mt-1 size-5 text-pink-600" />
+                        <div>
+                            <p>{organization.name}</p>
+                            <p className="text-muted-foreground mt-1 text-sm font-normal">
+                                {organization.owner_name ?? organization.email ?? 'No owner contact'}
+                            </p>
+                        </div>
+                    </div>
+                    <StatusBadge status={organization.status} />
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-5">
+                    <Info label="Current Plan" value={subscription?.plan?.name ?? 'Unassigned'} />
+                    <Info label="Branches" value={organization.branches_count} />
+                    <Info label="Courts" value={organization.courts_count} />
+                    <Info label="Users" value={organization.users_count} />
+                    <Info label="Monthly" value={selectedPlan ? currency(selectedPlan.monthly_price) : '-'} />
+                </div>
+
+                <form onSubmit={submit} className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end">
+                    <div className="space-y-2">
+                        <Label>Plan</Label>
+                        <select
+                            className="bg-background h-10 w-full rounded-md border px-3 text-sm"
+                            value={form.data.subscription_plan_id}
+                            onChange={(event) => form.setData('subscription_plan_id', Number(event.target.value))}
+                        >
+                            {plans.map((plan) => (
+                                <option key={plan.id} value={plan.id}>
+                                    {plan.name} - {currency(plan.monthly_price)}
+                                </option>
+                            ))}
+                        </select>
+                        {form.errors.subscription_plan_id && <p className="text-xs text-red-600">{form.errors.subscription_plan_id}</p>}
+                    </div>
+                    <Select
+                        label="Status"
+                        value={form.data.status}
+                        options={['trial', 'active', 'grace_period', 'expired', 'suspended', 'cancelled']}
+                        onChange={(value) => form.setData('status', value)}
+                    />
+                    <Select
+                        label="Cycle"
+                        value={form.data.billing_cycle}
+                        options={['monthly', 'quarterly', 'annual', 'manual']}
+                        onChange={(value) => form.setData('billing_cycle', value)}
+                    />
+                    <Field
+                        label="Trial Ends"
+                        type="date"
+                        value={form.data.trial_ends_at}
+                        onChange={(value) => form.setData('trial_ends_at', value)}
+                        error={form.errors.trial_ends_at}
+                    />
+                    <Field
+                        label="Period Ends"
+                        type="date"
+                        value={form.data.current_period_ends_at}
+                        onChange={(value) => form.setData('current_period_ends_at', value)}
+                        error={form.errors.current_period_ends_at}
+                    />
+                    <Button disabled={form.processing || plans.length === 0}>
+                        <CreditCard className="mr-2 size-4" />
+                        Save
+                    </Button>
+                </form>
+
+                {subscription && (
+                    <div className="grid gap-4 xl:grid-cols-2">
+                        <form onSubmit={issueInvoice} className="space-y-3 rounded-lg border p-3">
+                            <p className="text-sm font-semibold">Issue Platform Invoice</p>
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <Field
+                                    label="Period Starts"
+                                    type="date"
+                                    value={invoiceForm.data.period_starts_on}
+                                    onChange={(value) => invoiceForm.setData('period_starts_on', value)}
+                                    error={invoiceForm.errors.period_starts_on}
+                                />
+                                <Field
+                                    label="Period Ends"
+                                    type="date"
+                                    value={invoiceForm.data.period_ends_on}
+                                    onChange={(value) => invoiceForm.setData('period_ends_on', value)}
+                                    error={invoiceForm.errors.period_ends_on}
+                                />
+                                <Field
+                                    label="Issued"
+                                    type="date"
+                                    value={invoiceForm.data.issued_on}
+                                    onChange={(value) => invoiceForm.setData('issued_on', value)}
+                                    error={invoiceForm.errors.issued_on}
+                                />
+                                <Field
+                                    label="Due"
+                                    type="date"
+                                    value={invoiceForm.data.due_on}
+                                    onChange={(value) => invoiceForm.setData('due_on', value)}
+                                    error={invoiceForm.errors.due_on}
+                                />
+                                <Field
+                                    label="Subtotal Override"
+                                    type="number"
+                                    value={invoiceForm.data.subtotal}
+                                    onChange={(value) => invoiceForm.setData('subtotal', value)}
+                                    error={invoiceForm.errors.subtotal}
+                                />
+                                <Field
+                                    label="Tax"
+                                    type="number"
+                                    value={invoiceForm.data.tax_amount}
+                                    onChange={(value) => invoiceForm.setData('tax_amount', Number(value))}
+                                    error={invoiceForm.errors.tax_amount}
+                                />
+                                <Field
+                                    label="Discount"
+                                    type="number"
+                                    value={invoiceForm.data.discount_amount}
+                                    onChange={(value) => invoiceForm.setData('discount_amount', Number(value))}
+                                    error={invoiceForm.errors.discount_amount}
+                                />
+                            </div>
+                            <Field
+                                label="Notes"
+                                value={invoiceForm.data.notes}
+                                onChange={(value) => invoiceForm.setData('notes', value)}
+                                error={invoiceForm.errors.notes}
+                            />
+                            <Button disabled={invoiceForm.processing}>Issue Invoice</Button>
+                        </form>
+
+                        <form onSubmit={recordPayment} className="space-y-3 rounded-lg border p-3">
+                            <p className="text-sm font-semibold">Record Platform Payment</p>
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Invoice</Label>
+                                    <select
+                                        className="bg-background h-10 w-full rounded-md border px-3 text-sm"
+                                        value={paymentForm.data.subscription_invoice_id}
+                                        onChange={(event) =>
+                                            paymentForm.setData('subscription_invoice_id', event.target.value ? Number(event.target.value) : '')
+                                        }
+                                    >
+                                        <option value="">Unapplied payment</option>
+                                        {invoices.map((invoice: any) => (
+                                            <option key={invoice.id} value={invoice.id}>
+                                                {invoice.invoice_number} - {currency(Number(invoice.total_amount) - Number(invoice.amount_paid))}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {paymentForm.errors.subscription_invoice_id && (
+                                        <p className="text-xs text-red-600">{paymentForm.errors.subscription_invoice_id}</p>
+                                    )}
+                                </div>
+                                <Field
+                                    label="Amount"
+                                    type="number"
+                                    value={paymentForm.data.amount}
+                                    onChange={(value) => paymentForm.setData('amount', Number(value))}
+                                    error={paymentForm.errors.amount}
+                                />
+                                <Select
+                                    label="Method"
+                                    value={paymentForm.data.method}
+                                    options={['manual', 'cash', 'bank_transfer', 'gcash', 'maya', 'card', 'check', 'other']}
+                                    onChange={(value) => paymentForm.setData('method', value)}
+                                />
+                                <Field
+                                    label="Paid At"
+                                    type="datetime-local"
+                                    value={paymentForm.data.paid_at}
+                                    onChange={(value) => paymentForm.setData('paid_at', value)}
+                                    error={paymentForm.errors.paid_at}
+                                />
+                                <Field
+                                    label="External Ref"
+                                    value={paymentForm.data.external_reference}
+                                    onChange={(value) => paymentForm.setData('external_reference', value)}
+                                    error={paymentForm.errors.external_reference}
+                                />
+                            </div>
+                            <Field
+                                label="Notes"
+                                value={paymentForm.data.notes}
+                                onChange={(value) => paymentForm.setData('notes', value)}
+                                error={paymentForm.errors.notes}
+                            />
+                            <Button disabled={paymentForm.processing}>Record Payment</Button>
+                        </form>
+                    </div>
+                )}
+
+                <div className="grid gap-4 xl:grid-cols-3">
+                    <Ledger title="Invoices" rows={invoices} empty="No platform invoices yet." />
+                    <Ledger title="Payments" rows={payments} empty="No subscription payments yet." />
+                    <Ledger title="Events" rows={events} empty="No subscription events yet." />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function Field({
+    label,
+    value,
+    onChange,
+    error,
+    type = 'text',
+}: {
+    label: string;
+    value: string | number;
+    onChange: (value: string) => void;
+    error?: string;
+    type?: string;
+}) {
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+            {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+    );
+}
+
+function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+    return (
+        <div className="space-y-2">
+            <Label>{label}</Label>
+            <select
+                className="bg-background h-10 w-full rounded-md border px-3 text-sm capitalize"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+            >
+                {options.map((option) => (
+                    <option key={option} value={option}>
+                        {option.replaceAll('_', ' ')}
+                    </option>
+                ))}
+            </select>
+        </div>
+    );
+}
+
+function Info({ label, value }: { label: string; value: string | number }) {
+    return (
+        <div className="rounded-lg border p-3">
+            <p className="text-muted-foreground text-xs">{label}</p>
+            <p className="mt-1 font-semibold">{value}</p>
+        </div>
+    );
+}
+
+function Ledger({ title, rows, empty }: { title: string; rows: any[]; empty: string }) {
+    return (
+        <div className="space-y-2 rounded-lg border p-3">
+            <p className="text-sm font-semibold">{title}</p>
+            {rows.map((row) => (
+                <div key={`${title}-${row.id}`} className="bg-surface-muted/40 rounded-md p-3 text-sm">
+                    {'invoice_number' in row && (
+                        <>
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="font-medium">{row.invoice_number}</p>
+                                <StatusBadge status={row.status} />
+                            </div>
+                            <p className="text-muted-foreground mt-1">
+                                {currency(row.amount_paid)} / {currency(row.total_amount)}
+                            </p>
+                        </>
+                    )}
+                    {'reference' in row && (
+                        <>
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="font-medium">{row.reference}</p>
+                                <StatusBadge status={row.status} />
+                            </div>
+                            <p className="text-muted-foreground mt-1">
+                                {currency(row.amount)} - {row.method}
+                            </p>
+                        </>
+                    )}
+                    {'event_type' in row && (
+                        <>
+                            <p className="font-medium">{row.event_type}</p>
+                            <p className="text-muted-foreground mt-1">
+                                {row.actor_name ?? 'CourtPrime'} - {row.occurred_at}
+                            </p>
+                        </>
+                    )}
+                </div>
+            ))}
+            {rows.length === 0 && <p className="bg-surface-muted/40 text-muted-foreground rounded-md p-3 text-sm">{empty}</p>}
+        </div>
+    );
+}

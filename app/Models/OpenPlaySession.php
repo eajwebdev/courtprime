@@ -18,6 +18,8 @@ class OpenPlaySession extends Model
         'name',
         'session_code',
         'session_key',
+        'organizer_token',
+        'organizer_claimed_at',
         'current_round',
         'auto_rotate',
         'session_date',
@@ -34,6 +36,7 @@ class OpenPlaySession extends Model
     protected function casts(): array
     {
         return [
+            'organizer_claimed_at' => 'datetime',
             'session_date' => 'date',
             'auto_rotate' => 'boolean',
             'min_rating' => 'decimal:2',

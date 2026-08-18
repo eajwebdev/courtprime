@@ -12,6 +12,7 @@ use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -50,6 +51,7 @@ class PublicOpenPlayBoardController extends Controller
         $session = $openPlay->sessionForCode($request->string('code')->toString(), $request->string('key')->toString());
 
         $request->session()->put($this->grantKey($session->id), true);
+        $this->claimOrganizer($request, $session);
 
         return to_route('open-play.board.public', ['code' => $session->session_code]);
     }
@@ -74,6 +76,8 @@ class PublicOpenPlayBoardController extends Controller
                 'current_round' => $session->current_round,
                 'branch' => $session->branch?->name,
             ],
+            /* Drives whether the board renders controls or just the score. */
+            'isOrganizer' => $this->isOrganizer($request, $session),
             'courts' => $session->courts()->orderBy('court_number')->get(['courts.id', 'name']),
             'liveMatches' => $this->liveMatches($session),
             'waiting' => $this->waiting($session),
@@ -90,6 +94,7 @@ class PublicOpenPlayBoardController extends Controller
         PlayerIdentityService $identity,
     ): RedirectResponse {
         $session = $this->requireGrant($request, $code, $openPlay);
+        $this->requireOrganizer($request, $session);
 
         $player = $identity->findOrCreateLocalPlayer((int) $session->organization_id, [
             'name' => $request->string('name')->toString(),
@@ -107,6 +112,7 @@ class PublicOpenPlayBoardController extends Controller
     public function score(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
         $session = $this->requireGrant($request, $code, $openPlay);
+        $this->requireOrganizer($request, $session);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['team' => ['required', 'in:team_one,team_two']]);
@@ -119,6 +125,7 @@ class PublicOpenPlayBoardController extends Controller
     public function undo(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
         $session = $this->requireGrant($request, $code, $openPlay);
+        $this->requireOrganizer($request, $session);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $scoring->undo($clubMatch);
@@ -141,6 +148,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
         $session = $this->requireGrant($request, $code, $openPlay);
+        $this->requireOrganizer($request, $session);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['winner' => ['nullable', 'in:one,two']]);
@@ -306,5 +314,61 @@ class PublicOpenPlayBoardController extends Controller
                 'last_round' => (int) $row->last_round,
             ]])
             ->all();
+    }
+
+    /**
+     * First device through the gate takes the controls.
+     *
+     * Wrapped in a transaction with the row locked: two people can enter the key
+     * in the same instant, and a plain read-then-write would let both see an
+     * unclaimed session and both become organiser. The lock serialises the
+     * claim so exactly one wins and the rest fall through to a read-only board.
+     */
+    private function claimOrganizer(Request $request, OpenPlaySession $session): void
+    {
+        $token = DB::transaction(function () use ($session): ?string {
+            $locked = OpenPlaySession::query()
+                ->withoutGlobalScope('organization')
+                ->lockForUpdate()
+                ->find($session->id);
+
+            if (! $locked || $locked->organizer_token) {
+                return null;
+            }
+
+            $fresh = Str::random(48);
+
+            $locked->update([
+                'organizer_token' => hash('sha256', $fresh),
+                'organizer_claimed_at' => now(),
+            ]);
+
+            return $fresh;
+        });
+
+        if ($token) {
+            $request->session()->put($this->organizerKey($session->id), $token);
+        }
+    }
+
+    /** The stored token is hashed, so the raw value never sits in the database. */
+    private function isOrganizer(Request $request, OpenPlaySession $session): bool
+    {
+        $token = $request->session()->get($this->organizerKey($session->id));
+
+        return is_string($token)
+            && is_string($session->organizer_token)
+            && hash_equals($session->organizer_token, hash('sha256', $token));
+    }
+
+    /** Controls that change the board are the organiser's alone. */
+    private function requireOrganizer(Request $request, OpenPlaySession $session): void
+    {
+        abort_unless($this->isOrganizer($request, $session), 403, 'Only the session organiser can change the board.');
+    }
+
+    private function organizerKey(int $sessionId): string
+    {
+        return "open-play.organizer.{$sessionId}";
     }
 }

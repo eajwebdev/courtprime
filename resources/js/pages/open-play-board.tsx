@@ -3,14 +3,14 @@ import { BrandWordmarkAuto } from '@/components/marketing-artwork';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Check, Copy, Loader2, Minus, Trophy, UserPlus, Users } from 'lucide-react';
+import { Check, Copy, Eye, Loader2, Minus, ShieldCheck, Trophy, UserPlus, Users } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
 
-type Props = { session: any; courts: any[]; liveMatches: any[]; waiting: any[]; results: any[] };
+type Props = { session: any; isOrganizer: boolean; courts: any[]; liveMatches: any[]; waiting: any[]; results: any[] };
 
-export default function OpenPlayBoard({ session, courts, liveMatches, waiting, results }: Props) {
+export default function OpenPlayBoard({ session, isOrganizer, courts, liveMatches, waiting, results }: Props) {
     const [copied, setCopied] = useState(false);
     const base = `/open-play/${session.session_code}`;
 
@@ -67,8 +67,21 @@ export default function OpenPlayBoard({ session, courts, liveMatches, waiting, r
                         <p data-numeric className="text-[1.75rem] leading-none font-semibold tracking-tight text-white sm:text-[2.25rem]">
                             {session.session_code ?? '—'}
                         </p>
-                        <p className="text-meta mt-1 truncate text-white/55">
-                            round <span data-numeric>{session.current_round}</span> · anyone here can add players and keep score
+                        <p className="text-meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-white/55">
+                            <span>
+                                round <span data-numeric>{session.current_round}</span>
+                            </span>
+                            {/* Says plainly which device is running the session, so
+                                nobody waits for a button that will never appear. */}
+                            <span
+                                className={cn(
+                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold',
+                                    isOrganizer ? 'bg-primary text-primary-foreground' : 'bg-white/10 text-white/70',
+                                )}
+                            >
+                                {isOrganizer ? <ShieldCheck className="size-3" aria-hidden /> : <Eye className="size-3" aria-hidden />}
+                                {isOrganizer ? 'You run this session' : 'View only'}
+                            </span>
                         </p>
                     </div>
 
@@ -89,7 +102,7 @@ export default function OpenPlayBoard({ session, courts, liveMatches, waiting, r
                     {/* ---- Courts ------------------------------------------- */}
                     <div className="grid content-start gap-4 lg:grid-cols-2">
                         {liveMatches.map((match) => (
-                            <CourtCard key={match.id} match={match} base={base} post={post} />
+                            <CourtCard key={match.id} match={match} base={base} post={post} canScore={isOrganizer} />
                         ))}
 
                         {idle.map((court) => (
@@ -113,7 +126,7 @@ export default function OpenPlayBoard({ session, courts, liveMatches, waiting, r
 
                     {/* ---- Add, queue, standings ---------------------------- */}
                     <aside className="flex flex-col gap-4">
-                        <AddPlayer base={base} />
+                        {isOrganizer && <AddPlayer base={base} />}
 
                         <div className="border-border bg-surface overflow-hidden rounded-xl border">
                             <div className="border-border bg-surface-muted flex items-center justify-between gap-3 border-b px-4 py-2">
@@ -192,7 +205,17 @@ export default function OpenPlayBoard({ session, courts, liveMatches, waiting, r
  * the scoreboard is the whole story, so a game called on court is recorded the
  * same way as one played out to eleven.
  */
-function CourtCard({ match, base, post }: { match: any; base: string; post: (url: string, data?: Record<string, string>) => void }) {
+function CourtCard({
+    match,
+    base,
+    post,
+    canScore,
+}: {
+    match: any;
+    base: string;
+    post: (url: string, data?: Record<string, string>) => void;
+    canScore: boolean;
+}) {
     const [confirming, setConfirming] = useState(false);
 
     const one = match.teams?.one ?? [];
@@ -212,11 +235,13 @@ function CourtCard({ match, base, post }: { match: any; base: string; post: (url
                 <TeamScore
                     players={one}
                     score={match.team_one_score}
+                    canScore={canScore}
                     onScore={() => post(`${base}/matches/${match.id}/score`, { team: 'team_one' })}
                 />
                 <TeamScore
                     players={two}
                     score={match.team_two_score}
+                    canScore={canScore}
                     onScore={() => post(`${base}/matches/${match.id}/score`, { team: 'team_two' })}
                 />
             </div>
@@ -248,7 +273,7 @@ function CourtCard({ match, base, post }: { match: any; base: string; post: (url
                         Cancel
                     </Button>
                 </div>
-            ) : (
+            ) : !canScore ? null : (
                 <div className="border-border flex gap-2 border-t px-3 py-3">
                     <Button
                         type="button"
@@ -270,20 +295,25 @@ function CourtCard({ match, base, post }: { match: any; base: string; post: (url
     );
 }
 
-function TeamScore({ players, score, onScore }: { players: any[]; score: number; onScore: () => void }) {
+function TeamScore({ players, score, onScore, canScore }: { players: any[]; score: number; onScore: () => void; canScore: boolean }) {
     return (
         <button
             type="button"
-            onClick={onScore}
+            onClick={canScore ? onScore : undefined}
+            disabled={!canScore}
+            aria-label={canScore ? `Add a point for ${players.map((player: any) => player.name).join(' and ')}` : undefined}
             /* The whole half scores: a small "+1" is a miss on a tablet at
                arm's length across a court. */
-            className="bg-surface hover:bg-primary-soft active:bg-primary-soft flex min-h-36 flex-col items-center justify-center gap-1 px-3 py-4 transition-colors"
+            className={cn(
+                'bg-surface flex min-h-32 flex-col items-center justify-center gap-1 px-3 py-4 transition-colors sm:min-h-36',
+                canScore ? 'hover:bg-primary-soft active:bg-primary-soft' : 'cursor-default',
+            )}
         >
             <span className="text-meta text-secondary line-clamp-2 text-center">{players.map((player: any) => player.name).join(' / ')}</span>
-            <span data-numeric className="text-foreground text-[3rem] leading-none font-semibold">
+            <span data-numeric className="text-foreground text-[2.5rem] leading-none font-semibold sm:text-[3rem]">
                 {score}
             </span>
-            <span className="text-meta text-muted">tap to score</span>
+            {canScore && <span className="text-meta text-muted">tap to score</span>}
         </button>
     );
 }

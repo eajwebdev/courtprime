@@ -10,12 +10,14 @@ use App\Models\OpenPlayMatch;
 use App\Models\OpenPlayPlayer;
 use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
+use App\Models\Player;
 use App\Services\MatchScoringService;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
 use App\Support\OpenPlayBoardAccess;
 use App\Support\OpenPlaySessionLog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -130,11 +132,25 @@ class PublicOpenPlayBoardController extends Controller
     ): RedirectResponse {
         $session = $this->requireGrant($request, $code, $openPlay);
 
-        $player = $identity->findOrCreateLocalPlayer((int) $session->organization_id, [
-            'name' => $request->string('name')->toString(),
-            'mobile_number' => $request->input('mobile_number'),
-            'home_branch_id' => $session->branch_id,
-        ]);
+        /*
+         * An id means they were picked from the club's own members, so they are
+         * used as they are. A name means somebody new at the desk, and the
+         * identity service issues them a real record.
+         *
+         * Typing the name of an existing member used to create a second profile
+         * for them: matching only ever looked at email or mobile, never a name,
+         * so their games landed on a duplicate.
+         */
+        $player = $request->filled('player_id')
+            ? Player::query()
+                ->withoutGlobalScope('organization')
+                ->where('organization_id', $session->organization_id)
+                ->findOrFail($request->integer('player_id'))
+            : $identity->findOrCreateLocalPlayer((int) $session->organization_id, [
+                'name' => $request->string('name')->toString(),
+                'mobile_number' => $request->input('mobile_number'),
+                'home_branch_id' => $session->branch_id,
+            ]);
 
         $openPlay->join($session, $player);
         $openPlay->checkIn($session, $player);
@@ -145,7 +161,7 @@ class PublicOpenPlayBoardController extends Controller
 
         $this->log($request, $session, 'open_play.player_added', 'Added '.$player->name);
 
-        return back()->with('success', $request->string('name')->toString().' is in the rotation.');
+        return back()->with('success', $player->name.' is in the rotation.');
     }
 
     public function score(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
@@ -322,6 +338,46 @@ class PublicOpenPlayBoardController extends Controller
         }
 
         return back()->with('success', 'Session updated.');
+    }
+
+    /**
+     * Members of this club, by name, for the board's add field.
+     *
+     * Only the club running the session, and only what the board needs to show
+     * a name and tell two Marcos apart. Anyone already checked in is dropped,
+     * so the list is people who could be added rather than people who are here.
+     */
+    public function searchPlayers(Request $request, string $code, OpenPlayService $openPlay): JsonResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+        $term = trim((string) $request->query('q', ''));
+
+        if (mb_strlen($term) < 2) {
+            return response()->json(['players' => []]);
+        }
+
+        $alreadyIn = $session->players()->pluck('player_id');
+
+        $players = Player::query()
+            ->withoutGlobalScope('organization')
+            ->where('organization_id', $session->organization_id)
+            ->whereNotIn('id', $alreadyIn)
+            ->where('name', 'like', '%'.$term.'%')
+            ->orderBy('name')
+            ->limit(8)
+            ->get(['id', 'name', 'skill_level', 'rating', 'mobile_number']);
+
+        return response()->json([
+            'players' => $players->map(fn (Player $player) => [
+                'id' => $player->id,
+                'name' => $player->name,
+                'skill_level' => $player->skill_level,
+                'rating' => $player->rating,
+                /* Enough to tell two people with the same name apart, without
+                   publishing a phone number to a shared tablet. */
+                'hint' => $player->mobile_number ? '···'.substr((string) $player->mobile_number, -3) : null,
+            ])->all(),
+        ]);
     }
 
     /** Take someone out, for a typo or for somebody who went home. */

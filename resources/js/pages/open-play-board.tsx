@@ -157,6 +157,14 @@ function LiveBoard({
     const idle = courts.filter((court) => !busy.includes(court.name));
     const needed = Math.max(0, 4 - waiting.length);
 
+    /*
+     * The grid follows the number of courts rather than the breakpoint. A club
+     * running one court was getting a half width card with a big empty space
+     * beside it, on the tablet where the score has to be readable and tappable
+     * from the net post.
+     */
+    const courtGrid = courts.length <= 1 ? 'grid-cols-1' : courts.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 2xl:grid-cols-3';
+
     return (
         <div className="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="flex min-h-0 flex-col gap-3">
@@ -184,9 +192,9 @@ function LiveBoard({
                     </span>
                 </div>
 
-                <div className="grid content-start gap-4 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:overflow-y-auto 2xl:grid-cols-3">
+                <div className={cn('grid content-start gap-4 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:overflow-y-auto', courtGrid)}>
                     {liveMatches.map((match) => (
-                        <CourtCard key={match.id} match={match} base={base} post={post} />
+                        <CourtCard key={match.id} match={match} base={base} post={post} target={session.target_score} winByTwo={session.win_by_two} />
                     ))}
 
                     {idle.map((court) => (

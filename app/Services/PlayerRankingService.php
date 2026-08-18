@@ -9,15 +9,36 @@ use Illuminate\Support\Collection;
 
 class PlayerRankingService
 {
+    public function __construct(private readonly MatchResultService $results) {}
+
+    /**
+     * Rebuild club rankings from games actually played.
+     *
+     * These numbers used to be invented: wins were `total_reservations * 0.58`,
+     * which is a fraction of how often someone booked a court and has nothing
+     * to do with whether they won anything. A player who booked twenty courts
+     * and lost every game outranked one who turned up once and won.
+     *
+     * They now come from recorded match results. Players with no completed
+     * games are still ranked, on rating, with a clean zero record rather than a
+     * fabricated one.
+     */
     public function refresh(?int $organizationId = null): void
     {
+        $tally = $this->results->tallyByPlayer($organizationId);
+
         $players = Player::query()
             ->when($organizationId, fn ($query) => $query->where('organization_id', $organizationId))
-            ->orderByDesc('rating')
-            ->orderByDesc('total_reservations')
-            ->get();
+            ->get()
+            ->sortByDesc(fn (Player $player) => [
+                $tally[$player->id]['wins'] ?? 0,
+                (float) $player->rating,
+            ])
+            ->values();
 
         foreach ($players as $index => $player) {
+            $row = $tally[$player->id] ?? ['games' => 0, 'wins' => 0, 'losses' => 0, 'points_for' => 0, 'points_against' => 0];
+
             PlayerRanking::query()->updateOrCreate(
                 [
                     'organization_id' => $player->organization_id,
@@ -27,10 +48,10 @@ class PlayerRankingService
                 [
                     'rank' => $index + 1,
                     'rating' => $player->rating,
-                    'wins' => max((int) floor($player->total_reservations * 0.58), 0),
-                    'losses' => max((int) floor($player->total_reservations * 0.42), 0),
-                    'points_for' => $player->total_reservations * 11,
-                    'points_against' => $player->total_reservations * 8,
+                    'wins' => $row['wins'],
+                    'losses' => $row['losses'],
+                    'points_for' => $row['points_for'],
+                    'points_against' => $row['points_against'],
                     'ranked_at' => now(),
                 ],
             );

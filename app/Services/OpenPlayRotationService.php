@@ -34,6 +34,8 @@ use Illuminate\Support\Facades\DB;
  */
 class OpenPlayRotationService
 {
+    public function __construct(private readonly MatchResultService $results) {}
+
     /** Weightings for the pairing score. Repeating a partner is the worst of the three. */
     private const PARTNER_PENALTY = 10.0;
 
@@ -102,7 +104,28 @@ class OpenPlayRotationService
     public function completeMatch(OpenPlayMatch $match): Collection
     {
         DB::transaction(function () use ($match) {
-            $match->update(['status' => 'completed', 'completed_at' => now()]);
+            /*
+             * Locked and re-read before anything is counted.
+             *
+             * Anyone holding the session key can finish a match, and on a
+             * tablet passed between people two taps on Finish land within the
+             * same second. Without this the second one credits every player
+             * with the win a second time.
+             */
+            $locked = OpenPlayMatch::query()
+                ->withoutGlobalScope('organization')
+                ->lockForUpdate()
+                ->find($match->id);
+
+            if (! $locked || $locked->status === 'completed') {
+                return;
+            }
+
+            $locked->update(['status' => 'completed', 'completed_at' => now()]);
+            $match->setAttribute('status', 'completed');
+
+            /* The result reaches the players' records here, and only here. */
+            $this->results->recordOpenPlay($locked);
 
             /* Back to waiting, at the tail, so the queue reflects reality. */
             $playerIds = $match->participants()->pluck('player_id')->all();

@@ -15,7 +15,14 @@ class OpenPlayAddPlayerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'min:2', 'max:120'],
+            /*
+             * Either an existing member, picked from the board's search, or a
+             * name for someone who has never played here. Picking the member
+             * is what keeps their games on their own record instead of on a
+             * duplicate created from a typed name.
+             */
+            'player_id' => ['nullable', 'integer'],
+            'name' => ['required_without:player_id', 'nullable', 'string', 'min:2', 'max:120'],
             'mobile_number' => ['nullable', 'string', 'max:32'],
         ];
     }

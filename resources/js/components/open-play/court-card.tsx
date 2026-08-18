@@ -12,7 +12,19 @@ import { useState } from 'react';
  * the scoreboard is the whole story, so a game called on court is recorded the
  * same way as one played out to the target.
  */
-export function CourtCard({ match, base, post }: { match: any; base: string; post: (url: string, data?: Record<string, string>) => void }) {
+export function CourtCard({
+    match,
+    base,
+    post,
+    target,
+    winByTwo,
+}: {
+    match: any;
+    base: string;
+    post: (url: string, data?: Record<string, string>) => void;
+    target?: number;
+    winByTwo?: boolean;
+}) {
     const [confirming, setConfirming] = useState(false);
 
     const one = match.teams?.one ?? [];
@@ -24,6 +36,16 @@ export function CourtCard({ match, base, post }: { match: any; base: string; pos
             <div className="border-border bg-surface-muted flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2">
                 <p className="text-label text-foreground font-semibold">{match.court}</p>
                 <p className="text-meta text-muted">
+                    {target ? (
+                        <>
+                            to{' '}
+                            <span data-numeric className="text-foreground font-semibold">
+                                {target}
+                            </span>
+                            {winByTwo ? ' by 2' : ''}
+                            <span className="mx-1.5">·</span>
+                        </>
+                    ) : null}
                     round <span data-numeric>{match.round}</span>
                 </p>
             </div>
@@ -80,7 +102,7 @@ export function CourtCard({ match, base, post }: { match: any; base: string; pos
                     >
                         <Minus className="size-4" />
                     </Button>
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirming(true)}>
+                    <Button type="button" variant="outline" size="touch" className="flex-1" onClick={() => setConfirming(true)}>
                         <Trophy className="size-4" />
                         Finish match
                     </Button>
@@ -100,11 +122,15 @@ function TeamScore({ players, score, onScore }: { players: any[]; score: number;
                arm's length across a court. */
             className="bg-surface hover:bg-primary-soft active:bg-primary-soft flex min-h-32 flex-col items-center justify-center gap-1 px-3 py-4 transition-colors sm:min-h-36 lg:min-h-40"
         >
-            <span className="text-meta text-secondary line-clamp-2 text-center">{players.map((player: any) => player.name).join(' / ')}</span>
-            <span data-numeric className={cn('text-foreground text-[2.5rem] leading-none font-semibold sm:text-[3rem] lg:text-[3.5rem]')}>
+            <span className="text-label text-secondary line-clamp-2 px-1 text-center leading-snug font-medium">
+                {players.map((player: any) => player.name).join(' / ')}
+            </span>
+            <span data-numeric className="text-foreground text-[3rem] leading-none font-semibold sm:text-[4rem] lg:text-[5rem]">
                 {score}
             </span>
-            <span className="text-meta text-muted">tap to score</span>
+            {/* Only while it is still nil all: once there are points on the
+                board the instruction is noise. */}
+            <span className={cn('text-meta text-muted transition-opacity', score > 0 && 'opacity-0')}>tap to score</span>
         </button>
     );
 }

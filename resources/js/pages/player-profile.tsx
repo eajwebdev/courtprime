@@ -1,12 +1,14 @@
+import { AthleteArtwork } from '@/components/marketing-artwork';
 import { PhotoUploadField } from '@/components/photo-upload-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { athleteFor } from '@/lib/athlete';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Check, IdCard, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { Head, useForm } from '@inertiajs/react';
+import { Check, Loader2, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- profile payload comes from PlayerProfileController. */
@@ -135,7 +137,11 @@ export default function PlayerProfile({ profile }: { profile: any }) {
 
             <form onSubmit={submit} className="pb-32 lg:pb-8">
                 {/* ---- Identity + completeness --------------------------------- */}
-                <section className="bg-surface-deep text-surface-deep-foreground relative overflow-hidden rounded-2xl px-5 py-5 sm:px-7 sm:py-6">
+                {/* The same identity band as /me and /me/book: eyebrow, name,
+                    then the metadata line. It carried the CP ID as the headline
+                    and the player's own name nowhere, which read as a different
+                    product. The artwork follows the gender field live. */}
+                <section className="bg-surface-deep text-surface-deep-foreground relative overflow-hidden rounded-2xl px-4 py-5 sm:px-7 sm:py-6">
                     <div
                         aria-hidden
                         className="pointer-events-none absolute inset-0"
@@ -144,27 +150,42 @@ export default function PlayerProfile({ profile }: { profile: any }) {
                                 'radial-gradient(20rem 14rem at 90% 12%, color-mix(in srgb, var(--primary) 24%, transparent) 0%, transparent 62%)',
                         }}
                     />
+                    <AthleteArtwork
+                        asset={athleteFor(form.data.gender)}
+                        decorative
+                        sizes="(max-width: 640px) 34vw, 200px"
+                        className="pointer-events-none absolute -right-3 bottom-0 h-full w-auto max-w-[34%] object-contain object-bottom opacity-60 sm:-right-6 sm:max-w-[30%]"
+                    />
+                    <div
+                        aria-hidden
+                        className="from-surface-deep via-surface-deep/92 pointer-events-none absolute inset-0 bg-gradient-to-r to-transparent"
+                    />
+
                     <div className="relative">
-                        <div className="flex items-center gap-4">
-                            <div className="border-primary/40 size-14 shrink-0 overflow-hidden rounded-full border-2 bg-white/10 sm:size-16">
+                        <div className="flex max-w-[70%] items-center gap-3 sm:max-w-none sm:gap-3.5">
+                            <div className="border-primary/40 size-11 shrink-0 overflow-hidden rounded-full border-2 bg-white/10 sm:size-14">
                                 {profile.avatar_url ? (
                                     <img src={profile.avatar_url} alt="" className="size-full object-cover" />
                                 ) : (
-                                    <span className="text-h2 flex size-full items-center justify-center font-semibold text-white">
+                                    <span className="flex size-full items-center justify-center text-base font-semibold text-white">
                                         {initials(profile.display_name ?? '')}
                                     </span>
                                 )}
                             </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-eyebrow text-primary uppercase">CourtPrime player ID</p>
-                                <p data-numeric className="truncate text-lg font-semibold text-white sm:text-xl">
+                            <div className="min-w-0">
+                                <p className="text-eyebrow text-primary uppercase">Your profile</p>
+                                <h1 className="mt-0.5 truncate text-[1.25rem] leading-tight font-semibold tracking-tight text-white sm:text-[1.75rem]">
+                                    {profile.display_name}
+                                </h1>
+                                <p data-numeric className="text-meta mt-0.5 truncate text-white/55">
                                     {profile.courtprime_player_id}
                                 </p>
-                                <p className="text-meta truncate text-white/55">{profile.email ?? 'Managed in account settings'}</p>
                             </div>
                         </div>
 
-                        <div className="mt-5">
+                        {/* Kept clear of the athlete so the bar does not run
+                            behind her. */}
+                        <div className="mt-4 max-w-[70%] sm:max-w-sm">
                             <div className="flex items-baseline justify-between gap-3">
                                 <p className="text-meta text-white/55">Profile completeness</p>
                                 <p data-numeric className="text-label font-semibold text-white">
@@ -188,8 +209,10 @@ export default function PlayerProfile({ profile }: { profile: any }) {
                     </div>
                 </section>
 
-                {/* ---- Tabs. One short panel at a time beats one long scroll. --- */}
-                <div role="tablist" aria-label="Profile sections" className="no-scrollbar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+                {/* A segmented control, not four pills in a scrolling row. The
+                    fourth tab was clipped off the right edge at phone width, so
+                    Privacy was effectively hidden. */}
+                <div role="tablist" aria-label="Profile sections" className="bg-surface-muted mt-5 grid grid-cols-4 gap-1 rounded-xl p-1">
                     {TABS.map((entry) => {
                         const active = entry.id === tab;
                         const errors = errorsFor(entry.id);
@@ -202,20 +225,13 @@ export default function PlayerProfile({ profile }: { profile: any }) {
                                 aria-selected={active}
                                 onClick={() => setTab(entry.id)}
                                 className={cn(
-                                    'text-label relative min-h-11 shrink-0 rounded-lg border px-4 font-medium whitespace-nowrap transition-colors',
-                                    active
-                                        ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'border-border bg-surface text-secondary hover:text-foreground',
+                                    'text-meta relative min-h-9 truncate rounded-lg px-1 font-medium transition-colors',
+                                    active ? 'border-border bg-surface text-foreground border' : 'text-muted hover:text-foreground',
                                 )}
                             >
                                 {entry.label}
                                 {errors > 0 && (
-                                    <span
-                                        className="bg-danger absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full"
-                                        aria-label={`${errors} problems`}
-                                    >
-                                        <TriangleAlert className="size-2.5 text-white" />
-                                    </span>
+                                    <span aria-label={`${errors} problems`} className="bg-danger absolute top-1 right-1 size-1.5 rounded-full" />
                                 )}
                             </button>
                         );
@@ -347,19 +363,20 @@ export default function PlayerProfile({ profile }: { profile: any }) {
                     )}
                 </div>
 
-                <div className="mt-6">
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href="/me">
-                            <IdCard className="size-4" />
-                            Back to home
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* Sticky save. Sits above the tab bar on phones. */}
-                <div className="border-border bg-background/95 z-sticky fixed inset-x-0 bottom-16 border-t p-3 backdrop-blur-md md:bottom-0 lg:sticky lg:mt-6 lg:rounded-xl lg:border lg:p-4">
-                    <div className="mx-auto flex max-w-3xl items-center gap-3">
-                        <p className="text-meta min-w-0 flex-1 truncate" aria-live="polite">
+                {/*
+                 * Sticky save, and only once there is something to save. A
+                 * permanently disabled full-width pink bar is not feedback, it
+                 * is a dead control sitting in the thumb zone.
+                 */}
+                <div
+                    hidden={!form.isDirty && !form.processing && !form.recentlySuccessful}
+                    className="border-border bg-background/95 z-sticky fixed inset-x-0 bottom-16 border-t p-3 backdrop-blur-md md:bottom-0 lg:sticky lg:mt-6 lg:rounded-xl lg:border lg:p-4"
+                >
+                    {/* Full width on a phone, a right-aligned pair from sm up. A
+                        small button floating in a wide bar was the one control
+                        the player had to aim for. */}
+                    <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        <p className="text-meta min-w-0 truncate sm:flex-1" aria-live="polite">
                             {form.recentlySuccessful ? (
                                 <span className="text-success flex items-center gap-1.5">
                                     <Check className="size-4 shrink-0" /> Saved
@@ -369,7 +386,7 @@ export default function PlayerProfile({ profile }: { profile: any }) {
                             ) : null}
                         </p>
 
-                        <Button type="submit" size="touch" disabled={form.processing || !form.isDirty} className="shrink-0 px-8">
+                        <Button type="submit" size="touch" disabled={form.processing || !form.isDirty} className="w-full sm:w-auto sm:px-8">
                             {form.processing ? (
                                 <>
                                     <Loader2 className="size-4 animate-spin" /> Saving
@@ -385,9 +402,12 @@ export default function PlayerProfile({ profile }: { profile: any }) {
     );
 }
 
+/* No card. A form is not an individually navigable object, and the inputs carry
+   their own borders — wrapping them in one more rounded rectangle just adds a
+   box around a box. */
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
     return (
-        <section className="border-border bg-surface space-y-6 rounded-xl border p-4 sm:p-5">
+        <section className="space-y-5">
             <div>
                 <h2 className="text-h3 text-foreground">{title}</h2>
                 {description && <p className="text-meta text-muted mt-1">{description}</p>}
@@ -423,13 +443,19 @@ function ChoiceRow({
     onChange: (value: string) => void;
     required?: boolean;
 }) {
+    /* Three options in a two-column grid leaves an orphan half-tile. Fill the
+       row instead: three across when there are three, two across otherwise, and
+       one row of everything once there is desktop width. */
+    const phone = options.length === 3 ? 'grid-cols-3' : 'grid-cols-2';
+    const wide = options.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-4';
+
     return (
         <div>
             <Label className="text-label">
                 {label}
                 {!required && <span className="text-muted ml-1 font-normal">(optional)</span>}
             </Label>
-            <div className="mt-2.5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <div className={cn('mt-2.5 grid gap-2', phone, wide)}>
                 {options.map((option) => {
                     const selected = value === option.value;
                     return (
@@ -439,7 +465,8 @@ function ChoiceRow({
                             aria-pressed={selected}
                             onClick={() => onChange(selected && !required ? '' : option.value)}
                             className={cn(
-                                'text-label min-h-11 rounded-lg border px-3 font-medium transition-colors sm:px-5',
+                                /* No truncate: long options like 'Prefer not to say' wrap to a second line and the row equalises, rather than clipping to 'Prefer not t...'. */
+                                'text-label flex min-h-11 items-center justify-center rounded-lg border px-2 py-1.5 text-center leading-tight font-medium transition-colors sm:px-3',
                                 selected
                                     ? 'border-primary bg-primary text-primary-foreground'
                                     : 'border-border bg-surface text-secondary hover:border-border-strong hover:text-foreground',
@@ -464,10 +491,16 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (nex
             onClick={() => onChange(!checked)}
             className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', checked ? 'bg-primary' : 'bg-border-strong')}
         >
+            {/*
+             * `left-0.5` is load-bearing. Without it the knob has no horizontal
+             * anchor and falls back to its static position at the end of the
+             * track, so the "on" state pushed the knob 20px past the track and
+             * 3px outside the list itself.
+             */}
             <span
                 className={cn(
-                    'absolute top-0.5 size-5 rounded-full bg-white transition-transform',
-                    checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5',
+                    'absolute top-0.5 left-0.5 size-5 rounded-full bg-white transition-transform',
+                    checked ? 'translate-x-5' : 'translate-x-0',
                 )}
             />
         </button>

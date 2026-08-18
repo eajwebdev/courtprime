@@ -1,3 +1,4 @@
+import { FlashToast } from '@/components/flash-toast';
 import { CommandMenu } from '@/components/global-search';
 import { BrandWordmarkAuto } from '@/components/marketing-artwork';
 import { PlayerBottomNav } from '@/components/player-bottom-nav';
@@ -70,6 +71,10 @@ export default function PlayerShell({ children, width = 'default' }: { children:
             <main className={cn('mx-auto w-full px-4 pt-5 pb-28 md:pb-12', width === 'wide' ? 'max-w-6xl' : 'max-w-3xl')}>{children}</main>
 
             <PlayerBottomNav />
+
+            {/* Players never saw a single flash message: the toast was mounted
+                only in the workspace shell. */}
+            <FlashToast />
         </div>
     );
 }

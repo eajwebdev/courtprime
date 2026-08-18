@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OpenPlaySession extends Model
@@ -15,6 +16,10 @@ class OpenPlaySession extends Model
         'organization_id',
         'branch_id',
         'name',
+        'session_code',
+        'session_key',
+        'current_round',
+        'auto_rotate',
         'session_date',
         'start_time',
         'end_time',
@@ -30,6 +35,7 @@ class OpenPlaySession extends Model
     {
         return [
             'session_date' => 'date',
+            'auto_rotate' => 'boolean',
             'min_rating' => 'decimal:2',
             'max_rating' => 'decimal:2',
             'entry_fee' => 'decimal:2',
@@ -49,5 +55,21 @@ class OpenPlaySession extends Model
     public function queue(): HasMany
     {
         return $this->hasMany(OpenPlayQueueEntry::class);
+    }
+
+    /** Only the courts the owner allocated to this session. */
+    public function sessionCourts(): HasMany
+    {
+        return $this->hasMany(OpenPlaySessionCourt::class);
+    }
+
+    public function courts(): BelongsToMany
+    {
+        return $this->belongsToMany(Court::class, 'open_play_session_courts')->withTimestamps();
+    }
+
+    public function matches(): HasMany
+    {
+        return $this->hasMany(OpenPlayMatch::class);
     }
 }

@@ -122,7 +122,9 @@ export function DiscoveryHero({
                     <h1 className="mt-3 text-[1.75rem] leading-[1.1] font-semibold tracking-tight text-white sm:mt-4 sm:text-[2.25rem] lg:text-[2.75rem]">
                         {title}
                     </h1>
-                    <p className="text-label mt-3 max-w-xl text-white/65 sm:mt-4 sm:text-base">{description}</p>
+                    {/* Four lines of strapline in a 62%-wide column pushed the
+                        first result a screen and a half down on a phone. */}
+                    <p className="text-label mt-3 line-clamp-2 max-w-xl text-white/65 sm:mt-4 sm:line-clamp-none sm:text-base">{description}</p>
                 </div>
                 <div className="relative">{children}</div>
             </div>

@@ -180,10 +180,21 @@ class PlayerIdentityService
 
     private function nextLocalPlayerNumber(int $organizationId): string
     {
-        $next = OrganizationPlayer::query()
+        /*
+         * Derived from the highest number issued, not from the row count.
+         * Counting reissues a number the moment any player is removed, and the
+         * column is unique per organization — so the next walk-in added after
+         * any deletion failed with a duplicate key. The numbers are zero padded
+         * to a fixed width, so MAX() on the string is the highest number and
+         * stays portable across MySQL and the SQLite used in tests.
+         */
+        $highest = OrganizationPlayer::query()
             ->withoutGlobalScope('organization')
             ->where('organization_id', $organizationId)
-            ->count() + 1;
+            ->where('local_player_number', 'like', 'LOC-%')
+            ->max('local_player_number');
+
+        $next = $highest ? ((int) substr((string) $highest, 4)) + 1 : 1;
 
         return 'LOC-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }

@@ -1,4 +1,5 @@
 import { DiscoveryFooter, DiscoveryHeader } from '@/components/discovery/discovery-chrome';
+import { FlashToast } from '@/components/flash-toast';
 import { PlayerBottomNav } from '@/components/player-bottom-nav';
 import { shellForWorkspace } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,10 @@ export function DiscoveryPage({ current, children }: { current: string; children
             </div>
 
             {isPlayer && <PlayerBottomNav />}
+
+            {/* Joining an open play session happens on this page now, so the
+                confirmation has to be able to land here. */}
+            <FlashToast />
         </div>
     );
 }

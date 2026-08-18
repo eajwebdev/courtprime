@@ -80,7 +80,8 @@ export function SectionLiveNetwork({ clubs = [] }: { clubs?: { name: string }[] 
                 <div className="grid gap-4 sm:grid-cols-2">
                     {matches.map((match, index) => (
                         <motion.article
-                            key={match.org}
+                            /* Club names are not unique across organizations. */
+                            key={`${match.org}-${index}`}
                             {...revealProps(reduce, { delay: index * 0.07, y: 18 })}
                             className="rounded-xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm"
                         >

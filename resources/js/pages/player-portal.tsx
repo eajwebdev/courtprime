@@ -1,6 +1,7 @@
 import { EmptyState } from '@/components/empty-state';
 import { Section } from '@/components/layout-primitives';
 import { AthleteArtwork } from '@/components/marketing-artwork';
+import { OpenPlayJoin } from '@/components/open-play-join';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -130,9 +131,15 @@ export default function PlayerPortal({
                  * header bar used to, at zero vertical cost, and the two status
                  * pills collapse into one muted line.
                  */}
-                <section>
-                    <h2 className="text-h3 text-foreground mb-3">Next up</h2>
-                    {next ? (
+                {/*
+                 * Only rendered when there is something to show. The empty state
+                 * used to sit here with its own pink "Book a court" button
+                 * directly above the pink "Book a court" row below it — the same
+                 * action twice, and 250px of screen to say "nothing yet".
+                 */}
+                {next && (
+                    <section>
+                        <h2 className="text-h3 text-foreground mb-3">Next up</h2>
                         <div className="border-border bg-surface relative flex items-center gap-3 overflow-hidden rounded-xl border py-3 pr-4 pl-4">
                             <span aria-hidden className="bg-primary absolute inset-y-0 left-0 w-1" />
 
@@ -157,42 +164,37 @@ export default function PlayerPortal({
                                 {currency(next.amount_due)}
                             </p>
                         </div>
-                    ) : (
-                        <EmptyState
-                            title="Nothing booked yet"
-                            description="Find a connected club and reserve your next court."
-                            artwork="/cp-paddle.png"
-                            action={
-                                <Button asChild size="touch">
-                                    <Link href="/me/book">Book a court</Link>
-                                </Button>
-                            }
-                        />
-                    )}
-                </section>
+                    </section>
+                )}
 
                 {/* ---- Actions. Primary first, full width on phones. ------------- */}
                 <section>
                     {/*
-                     * The primary action reads as a row in the same stack as the
-                     * bands below it rather than a floating pill: matched corner
-                     * radius, a leading icon tile echoing the identity avatar,
-                     * and a chevron so it is obviously a destination.
+                     * Navy, not a pink slab. This row navigates — the chevron says
+                     * so — and a solid `primary` fill is the commit treatment,
+                     * spent once at the end of the flow on "Confirm booking".
+                     * Sharing the identity band's surface reads as the top of the
+                     * player's own stack, and confines the pink to one icon tile
+                     * so it is an accent rather than the sixth pink on the screen.
                      */}
                     <Link
                         href="/me/book"
-                        className="bg-primary text-primary-foreground hover:bg-primary-hover flex min-h-12 items-center gap-2.5 rounded-xl px-3.5 transition-colors sm:min-h-16 sm:gap-3 sm:px-4"
+                        /* In dark mode `surface-deep` is darker than the page, so
+                           the primary action would sit lower than everything
+                           around it. It raises there instead — prominent in both
+                           themes rather than navy in both. */
+                        className="bg-surface-deep dark:bg-surface-raised hover:border-primary/50 flex min-h-14 items-center gap-3 rounded-xl border border-white/10 px-3.5 transition-colors sm:min-h-16 sm:px-4"
                     >
-                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-white/20 sm:size-9 sm:rounded-lg">
-                            <CalendarClock className="size-3.5 sm:size-4" aria-hidden />
+                        <span className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+                            <CalendarClock className="size-4" aria-hidden />
                         </span>
                         <span className="min-w-0 flex-1">
-                            <span className="text-label block font-semibold">Book a court</span>
+                            <span className="text-label block font-semibold text-white">Book a court</span>
                             {/* The strapline is the second line that made this tall,
                                 so it only appears where there is room for it. */}
-                            <span className="hidden text-[0.6875rem] text-white/75 sm:block">Any connected club, one account</span>
+                            <span className="hidden text-[0.6875rem] text-white/60 sm:block">Any connected club, one account</span>
                         </span>
-                        <ChevronRight className="size-4 shrink-0 text-white/70" aria-hidden />
+                        <ChevronRight className="text-primary size-4 shrink-0" aria-hidden />
                     </Link>
 
                     <div className="mt-2.5 grid grid-cols-2 gap-2.5">
@@ -201,6 +203,10 @@ export default function PlayerPortal({
                         <ActionButton href="/find-open-play" icon={Users} label="Open play" />
                         <ActionButton href="/find-tournaments" icon={Trophy} label="Tournaments" />
                     </div>
+
+                    {/* Open play is now code-first: the club shares one, the
+                        player types it, the rotation does the rest. */}
+                    <OpenPlayJoin className="border-border bg-surface mt-2.5 rounded-xl border p-4" />
                 </section>
 
                 {/* ---- Upcoming ------------------------------------------------- */}

@@ -1,17 +1,17 @@
 <?php
 
-use App\Http\Controllers\BranchController;
 use App\Http\Controllers\AccountReceivableController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ApiCredentialController;
+use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CashierSessionController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\CoachController;
-use App\Http\Controllers\CourtDiscoveryController;
 use App\Http\Controllers\CourtController;
+use App\Http\Controllers\CourtDiscoveryController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\DemoPipelineController;
+use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\DuplicateIdentityController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\GlobalSearchController;
@@ -27,29 +27,32 @@ use App\Http\Controllers\OpenPlayController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PlatformAuditController;
 use App\Http\Controllers\PlayerBookingController;
-use App\Http\Controllers\PlayerIdentityController;
-use App\Http\Controllers\PlayerProfileController;
-use App\Http\Controllers\PlayerPortalController;
-use App\Http\Controllers\PlayerWalletController;
 use App\Http\Controllers\PlayerController;
+use App\Http\Controllers\PlayerIdentityController;
+use App\Http\Controllers\PlayerOpenPlayController;
+use App\Http\Controllers\PlayerPortalController;
+use App\Http\Controllers\PlayerProfileController;
+use App\Http\Controllers\PlayerWalletController;
 use App\Http\Controllers\POSController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\PlatformAuditController;
 use App\Http\Controllers\PublicClubController;
 use App\Http\Controllers\PublicLiveMatchController;
+use App\Http\Controllers\PublicOpenPlayBoardController;
 use App\Http\Controllers\PublicOpenPlayController;
+use App\Http\Controllers\PublicOpenPlayJoinController;
 use App\Http\Controllers\PublicRankingController;
 use App\Http\Controllers\PublicTournamentController;
 use App\Http\Controllers\RankingController;
-use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\StaffController;
-use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SubscriptionPlanController;
+use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\TeamRoleController;
 use App\Http\Controllers\TenantSubscriptionController;
 use App\Http\Controllers\TournamentController;
@@ -68,6 +71,30 @@ Route::get('player-identities/{courtprimePlayerId}', [PlayerIdentityController::
 Route::get('player-qr/{courtprimePlayerId}', [PlayerIdentityController::class, 'qrProfile'])->middleware('signed')->name('player-identities.qr');
 Route::get('find-courts', CourtDiscoveryController::class)->name('courts.discovery');
 Route::get('find-open-play', PublicOpenPlayController::class)->name('open-play.discovery');
+/* Walk-ins join with the club's code and a name, no account. Throttled because
+   it creates player records from unauthenticated input. */
+Route::post('open-play/join', [PublicOpenPlayJoinController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('open-play.guest-join');
+
+/*
+ * The players' board. Owners create the session; the people on the court run
+ * it. The session code is the access boundary and every action re-checks that
+ * the match belongs to it, so none of this needs a staff account.
+ */
+/* The gate. Nothing about a session is revealed until both halves are right. */
+Route::get('open-play/board', [PublicOpenPlayBoardController::class, 'gate'])->name('open-play.gate');
+Route::post('open-play/board', [PublicOpenPlayBoardController::class, 'enter'])
+    ->middleware('throttle:10,1')
+    ->name('open-play.enter');
+
+Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function () {
+    Route::get('board', [PublicOpenPlayBoardController::class, 'show'])->name('open-play.board.public');
+    Route::post('players', [PublicOpenPlayBoardController::class, 'addPlayer'])->name('open-play.board.players');
+    Route::post('matches/{match}/score', [PublicOpenPlayBoardController::class, 'score'])->name('open-play.board.score');
+    Route::post('matches/{match}/undo', [PublicOpenPlayBoardController::class, 'undo'])->name('open-play.board.undo');
+    Route::post('matches/{match}/finish', [PublicOpenPlayBoardController::class, 'complete'])->name('open-play.board.finish');
+});
 Route::get('find-tournaments', [PublicTournamentController::class, 'index'])->name('tournaments.discovery');
 Route::post('find-tournaments/{tournamentId}/register', [PublicTournamentController::class, 'register'])->name('tournaments.discovery.register');
 Route::get('leaderboards', PublicRankingController::class)->name('rankings.public');
@@ -81,6 +108,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('me/book', [PlayerBookingController::class, 'index'])->name('me.book');
     Route::post('me/book', [PlayerBookingController::class, 'store'])->name('me.book.store');
     Route::get('me/wallet', PlayerWalletController::class)->name('me.wallet');
+    /* Players join an open play session with the code the club shared. */
+    Route::post('me/open-play/join', [PlayerOpenPlayController::class, 'store'])->name('me.open-play.join');
     Route::get('demo-pipeline', [DemoPipelineController::class, 'index'])->name('demo-pipeline.index');
     Route::post('demo-pipeline/{demoRequest}', [DemoPipelineController::class, 'update'])->name('demo-pipeline.update');
     Route::post('demo-pipeline/{demoRequest}/convert', [DemoPipelineController::class, 'convert'])->name('demo-pipeline.convert');
@@ -136,6 +165,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('open-play/{session}/groups', [OpenPlayController::class, 'group'])->name('open-play.groups.store');
     Route::post('open-play/{session}/players/{player}', [OpenPlayController::class, 'join'])->name('open-play.join');
     Route::post('open-play/{session}/players/{player}/check-in', [OpenPlayController::class, 'checkIn'])->name('open-play.check-in');
+    Route::post('open-play/{session}/matches/{match}/complete', [OpenPlayController::class, 'completeMatch'])->name('open-play.matches.complete');
     Route::get('rankings', [RankingController::class, 'index'])->name('rankings.index');
     Route::get('players/rankings', [RankingController::class, 'index'])->name('players.rankings');
     Route::get('tournaments', [TournamentController::class, 'index'])->name('tournaments.index');

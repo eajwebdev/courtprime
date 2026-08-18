@@ -5,7 +5,14 @@ import { SectionNetworkStats, type NetworkStat } from '@/components/marketing/se
 import { SectionBusinessOS, SectionBusinessTransition } from '@/components/marketing/sections-business';
 import { MarketingFooter, SectionFinalCta, SectionPricing, type Plan } from '@/components/marketing/sections-close';
 import { SectionLiveNetwork, SectionRankings } from '@/components/marketing/sections-network';
-import { SectionBooking, SectionDiscover, SectionIdentity, SectionRecord, type NetworkClub } from '@/components/marketing/sections-player';
+import {
+    SectionBooking,
+    SectionDiscover,
+    SectionIdentity,
+    SectionPoweredCourts,
+    SectionRecord,
+    type NetworkClub,
+} from '@/components/marketing/sections-player';
 import { type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import { lazy, Suspense } from 'react';
@@ -55,7 +62,8 @@ export default function Welcome({
 
                 {/* Player story */}
                 <SectionIdentity clubs={networkClubs} />
-                <SectionDiscover clubs={networkClubs} />
+                <SectionDiscover />
+                <SectionPoweredCourts clubs={networkClubs} />
                 <SectionBooking />
                 <SectionRecord clubs={networkClubs} />
                 <SectionLiveNetwork clubs={networkClubs} />

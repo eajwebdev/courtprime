@@ -1,13 +1,12 @@
-import { AthleteArtwork, EquipmentArtwork } from '@/components/marketing-artwork';
+import { AthleteArtwork } from '@/components/marketing-artwork';
 import { MarketingSection } from '@/components/marketing/marketing-section';
-import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { currency } from '@/lib/format';
 import { EASE, revealProps, usePathDraw, useReveal, VIEWPORT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { motion, useReducedMotion, useScroll } from 'framer-motion';
-import { ArrowRight, Clock, MapPin, Search, Sun, Wind } from 'lucide-react';
+import { ArrowRight, Clock, Lock, MapPin, Search, Sun, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export type NetworkClub = {
@@ -35,7 +34,9 @@ function buildOrbit(clubs: NetworkClub[]) {
         const club = clubs[index];
 
         return {
-            key: club?.name ?? `placeholder-${index}`,
+            /* Two organizations can each run a branch called "Dumaguete
+               Pickleball Hub", so the name alone is not a key. */
+            key: `${club?.name ?? 'placeholder'}-${index}`,
             name: club?.name ?? `Connected club ${index + 1}`,
             city: club?.city ?? 'Joining the network',
             placeholder: !club,
@@ -157,13 +158,9 @@ export function SectionIdentity({ clubs = [] }: { clubs?: NetworkClub[] }) {
 /* SECTION 2, Discover courts                                                */
 /* ========================================================================== */
 
-export function SectionDiscover({ clubs = [] }: { clubs?: NetworkClub[] }) {
+export function SectionDiscover() {
     const reduce = useReducedMotion();
     const reveal = revealProps(reduce);
-
-    /* Real venues only. If nothing is connected yet the list is empty and the
-       section shows the search composition without inventing listings. */
-    const venues = clubs.slice(0, 3);
 
     return (
         <MarketingSection
@@ -213,53 +210,81 @@ export function SectionDiscover({ clubs = [] }: { clubs?: NetworkClub[] }) {
                     </span>
                 ))}
             </div>
+        </MarketingSection>
+    );
+}
 
-            {/* Horizontal media rows, venue listings, not admin cards. */}
-            {venues.length > 0 && (
-                <div className="divide-border border-border bg-surface mt-8 divide-y overflow-hidden rounded-xl border">
-                    {venues.map((venue, index) => (
-                        <motion.article
-                            key={venue.name}
-                            {...revealProps(reduce, { delay: index * 0.06, y: 16 })}
-                            className="group hover:bg-surface-muted flex flex-col gap-4 p-4 transition-colors sm:flex-row sm:items-center sm:gap-6 sm:p-5"
+/* ========================================================================== */
+/* Courts powered by CourtPrime                                              */
+/* ========================================================================== */
+
+/**
+ * The real, connected venues — the one place on the landing page that names
+ * live clubs and links straight into their availability.
+ *
+ * Anyone can open a venue and see what is free today; the booking itself is
+ * behind sign-in, and the court rows on the destination page say so rather
+ * than bouncing a visitor to a login form with no explanation.
+ */
+export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) {
+    const reduce = useReducedMotion();
+
+    if (clubs.length === 0) return null;
+
+    return (
+        <MarketingSection
+            id="powered-courts"
+            eyebrow="Courts powered by CourtPrime"
+            title="Every connected court, open to browse."
+            description="Real venues running on CourtPrime right now. Open one to see today's availability and rates — no account needed until you book."
+        >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {clubs.map((venue, index) => (
+                    <motion.div key={`${venue.name}-${index}`} {...revealProps(reduce, { delay: Math.min(index, 5) * 0.05, y: 16 })}>
+                        {/* The whole card is the link; a card with one button in the
+                            corner makes people hunt for the 40px that works. */}
+                        <Link
+                            href={`/find-courts?search=${encodeURIComponent(venue.name)}`}
+                            className="border-border bg-surface hover:border-border-strong hover:shadow-e1 group flex h-full flex-col rounded-xl border p-4 transition-all sm:p-5"
                         >
-                            <div className="bg-surface-deep flex size-16 shrink-0 items-center justify-center rounded-lg sm:size-20">
-                                <EquipmentArtwork
-                                    asset="/cp-paddle4.png"
-                                    decorative
-                                    width={96}
-                                    height={96}
-                                    sizes="72px"
-                                    className="size-12 sm:size-14"
-                                />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="text-h3 text-foreground">{venue.name}</h3>
-                                    <StatusBadge status="active" label="open" />
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="text-h3 text-foreground truncate">{venue.name}</h3>
+                                    {venue.city && (
+                                        <p className="text-meta text-muted mt-1 flex items-center gap-1.5">
+                                            <MapPin className="size-3.5 shrink-0" aria-hidden />
+                                            <span className="truncate">{venue.city}</span>
+                                        </p>
+                                    )}
                                 </div>
-                                {venue.city && <p className="text-label text-secondary mt-1">{venue.city}</p>}
-                                <p className="text-meta text-muted mt-1">
-                                    <span data-numeric>{venue.courts}</span> {venue.courts === 1 ? 'court' : 'courts'} available to book
-                                </p>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
                                 {Number(venue.rate ?? 0) > 0 && (
-                                    <div className="text-right">
-                                        <p data-numeric className="text-h3 text-foreground">
+                                    <div className="shrink-0 text-right">
+                                        <p data-numeric className="text-label text-foreground font-semibold">
                                             {currency(venue.rate)}
                                         </p>
-                                        <p className="text-meta text-muted">per hour</p>
+                                        <p className="text-meta text-muted">from / hr</p>
                                     </div>
                                 )}
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={venue.slug ? `/clubs/${venue.slug}` : '/find-courts'}>View club</Link>
-                                </Button>
                             </div>
-                        </motion.article>
-                    ))}
-                </div>
-            )}
+
+                            <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-3">
+                                <p className="text-meta text-muted">
+                                    <span data-numeric>{venue.courts}</span> {venue.courts === 1 ? 'court' : 'courts'}
+                                </p>
+                                <span className="text-meta text-primary flex items-center gap-1 font-medium">
+                                    See availability
+                                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                                </span>
+                            </div>
+                        </Link>
+                    </motion.div>
+                ))}
+            </div>
+
+            <p className="text-meta text-muted mt-4 flex items-center gap-2">
+                <Lock className="size-3.5 shrink-0" aria-hidden />
+                Browsing is open to everyone. Signing in is only needed to confirm a booking.
+            </p>
         </MarketingSection>
     );
 }

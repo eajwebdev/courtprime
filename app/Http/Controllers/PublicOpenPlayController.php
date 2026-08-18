@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\OpenPlaySession;
-use Illuminate\Http\Request;
 use App\Support\NetworkClock;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,7 +19,7 @@ class PublicOpenPlayController extends Controller
         $sessions = OpenPlaySession::query()
             ->withoutGlobalScope('organization')
             ->with(['branch.organization'])
-            ->withCount(['players', 'queue'])
+            ->withCount(['players', 'queue', 'sessionCourts'])
             ->whereDate('session_date', '>=', $date)
             ->whereIn('status', ['scheduled', 'open', 'live'])
             ->whereHas('branch.organization', fn ($query) => $query->whereIn('status', ['trial', 'active']))
@@ -36,6 +36,14 @@ class PublicOpenPlayController extends Controller
             ->through(fn (OpenPlaySession $session) => [
                 'id' => $session->id,
                 'name' => $session->name,
+                /*
+                  * Deliberately no session_code or session_key. Listing them
+                  * publicly would make the credentials pointless — anyone could
+                  * read a session's pair off the discovery page and walk into
+                  * it. The listing says a session exists; the club decides who
+                  * gets in.
+                  */
+                'courts_count' => $session->session_courts_count,
                 'session_date' => $session->session_date?->toDateString(),
                 'start_time' => substr((string) $session->start_time, 0, 5),
                 'end_time' => substr((string) $session->end_time, 0, 5),

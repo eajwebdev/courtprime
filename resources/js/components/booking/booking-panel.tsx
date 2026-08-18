@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label';
 import { currency } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
-import { Check, Clock, Loader2, MapPin, Minus, Plus, TriangleAlert, Users } from 'lucide-react';
+import { Check, Clock, Loader2, MapPin, Minus, Plus, TriangleAlert, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export type Slot = { start_time: string; end_time: string; available: boolean };
@@ -24,12 +24,26 @@ export type BookableCourt = {
     slots: Slot[];
 };
 
+/*
+ * Courts are sold in 30-minute slots and the server puts no ceiling on a
+ * booking, so neither does this. Two hours covers a normal game; a group that
+ * has taken a court for the afternoon needs four, and capping the UI at two
+ * forced them to book twice.
+ */
 const DURATIONS = [
     { label: '30m', minutes: 30 },
     { label: '1h', minutes: 60 },
     { label: '1h 30m', minutes: 90 },
     { label: '2h', minutes: 120 },
+    { label: '2h 30m', minutes: 150 },
+    { label: '3h', minutes: 180 },
+    { label: '3h 30m', minutes: 210 },
+    { label: '4h', minutes: 240 },
 ];
+
+/* Always offered, so a short booking never has to hunt. Anything longer only
+   appears when the court can actually honour it. */
+const CORE_MINUTES = 120;
 
 const toMinutes = (time: string) => {
     const [hour, minute] = time.split(':').map(Number);
@@ -63,22 +77,44 @@ function durationFits(slots: Slot[], start: string, minutes: number) {
     return true;
 }
 
-export function BookingPanel({ court, date, onClose }: { court: BookableCourt; date: string; onClose?: () => void }) {
+export function BookingPanel({
+    court,
+    date,
+    initialStart = null,
+    initialMinutes = null,
+    onClose,
+}: {
+    court: BookableCourt;
+    date: string;
+    /** A start time tapped straight from the court list. */
+    initialStart?: string | null;
+    /** A block length dragged out on the grid. */
+    initialMinutes?: number | null;
+    onClose?: () => void;
+}) {
     const rate = Number(court.has_membership_rate && court.member_hourly_rate ? court.member_hourly_rate : court.standard_hourly_rate);
 
     const availableSlots = useMemo(() => court.slots.filter((slot) => slot.available), [court.slots]);
-    const [start, setStart] = useState<string | null>(availableSlots[0]?.start_time ?? null);
-    const [minutes, setMinutes] = useState(60);
+
+    const [start, setStart] = useState<string | null>(initialStart ?? availableSlots[0]?.start_time ?? null);
+    const [minutes, setMinutes] = useState(initialMinutes ?? 60);
 
     /* Reset the selection whenever the court or date changes underneath us. */
     useEffect(() => {
-        setStart(court.slots.find((slot) => slot.available)?.start_time ?? null);
-        setMinutes(60);
-    }, [court.id, date, court.slots]);
+        setStart(initialStart ?? court.slots.find((slot) => slot.available)?.start_time ?? null);
+        setMinutes(initialMinutes ?? 60);
+    }, [court.id, date, court.slots, initialStart, initialMinutes]);
 
     const allowedDurations = useMemo(
         () => (start ? DURATIONS.filter((duration) => durationFits(court.slots, start, duration.minutes)) : []),
         [court.slots, start],
+    );
+
+    /* Eight chips where six are dead is noise. The long tail is only rendered
+       when this start time can actually reach it. */
+    const offeredDurations = useMemo(
+        () => DURATIONS.filter((duration) => duration.minutes <= CORE_MINUTES || allowedDurations.some((item) => item.minutes === duration.minutes)),
+        [allowedDurations],
     );
 
     /* Keep the chosen duration legal for the chosen start time. */
@@ -136,7 +172,10 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
 
     return (
         <form onSubmit={submit} className="flex h-full flex-col">
-            <div className="border-border flex items-start justify-between gap-3 border-b px-5 py-4">
+            {/* Only the bottom sheet passes onClose, so the grabber only shows there. */}
+            {onClose && <span aria-hidden className="bg-border mx-auto mt-2 h-1 w-9 shrink-0 rounded-full" />}
+
+            <div className="border-border flex items-start justify-between gap-3 border-b px-4 py-3.5 sm:px-5 sm:py-4">
                 <div className="min-w-0">
                     <p className="text-meta text-primary truncate font-semibold tracking-wide uppercase">{court.branch.organization}</p>
                     <h2 className="text-h2 text-foreground truncate">{court.name}</h2>
@@ -146,13 +185,18 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
                     </p>
                 </div>
                 {onClose && (
-                    <Button type="button" variant="ghost" size="sm" onClick={onClose} className="lg:hidden">
-                        Close
-                    </Button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close booking"
+                        className="bg-surface-muted text-secondary hover:text-foreground -mt-0.5 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-full transition-colors lg:hidden"
+                    >
+                        <X className="size-4" />
+                    </button>
                 )}
             </div>
 
-            <div className="flex-1 space-y-7 overflow-y-auto px-5 py-5">
+            <div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:space-y-7 sm:px-5">
                 {form.errors.court_id && (
                     <p
                         role="alert"
@@ -162,43 +206,29 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
                         {form.errors.court_id}
                     </p>
                 )}
-                {/* Time, a real grid of taps rather than a time input. */}
+                {/*
+                 * The time comes from the grid. A second full picker of every
+                 * 30-minute slot in the day sat directly under it and did the
+                 * same job twice, so this states what was dragged and leaves
+                 * changing it to the grid.
+                 */}
                 <section>
-                    <div className="flex items-baseline justify-between gap-3">
-                        <Label className="text-label">Start time</Label>
-                        <span className="text-meta text-muted">
-                            <span data-numeric>{availableSlots.length}</span> slots open
-                        </span>
-                    </div>
+                    <Label className="text-label">Your slot</Label>
 
-                    {availableSlots.length === 0 ? (
-                        <p className="border-border text-label text-muted mt-3 rounded-lg border border-dashed px-4 py-6 text-center">
-                            No open slots on this date. Try another day.
-                        </p>
-                    ) : (
-                        <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                            {court.slots.map((slot) => {
-                                const selected = slot.start_time === start;
-                                return (
-                                    <button
-                                        key={slot.start_time}
-                                        type="button"
-                                        disabled={!slot.available}
-                                        aria-pressed={selected}
-                                        onClick={() => setStart(slot.start_time)}
-                                        className={cn(
-                                            'text-meta min-h-11 rounded-lg border px-1 font-medium transition-colors',
-                                            selected && 'border-primary bg-primary text-primary-foreground',
-                                            !selected && slot.available && 'border-border bg-surface text-foreground hover:border-border-strong',
-                                            !slot.available && 'border-border bg-surface-muted text-muted cursor-not-allowed line-through opacity-60',
-                                        )}
-                                    >
-                                        {label12h(slot.start_time)}
-                                    </button>
-                                );
-                            })}
+                    {start ? (
+                        <div className="border-border bg-surface-muted mt-3 flex items-center gap-3 rounded-lg border px-4 py-3">
+                            <Clock className="text-primary size-4 shrink-0" aria-hidden />
+                            <p data-numeric className="text-h3 text-foreground">
+                                {label12h(start)}
+                                {end && <span className="text-secondary font-normal"> to {label12h(end)}</span>}
+                            </p>
                         </div>
+                    ) : (
+                        <p className="border-border text-label text-muted mt-3 rounded-lg border border-dashed px-4 py-6 text-center">
+                            Drag a block on the grid to choose a time.
+                        </p>
                     )}
+
                     {form.errors.start_time && <p className="text-meta text-danger mt-2">{form.errors.start_time}</p>}
                 </section>
 
@@ -206,8 +236,10 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
                 {start && (
                     <section>
                         <Label className="text-label">Duration</Label>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {DURATIONS.map((duration) => {
+                        {/* A fixed four-up grid rather than a wrapping row: eight
+                            options wrap into ragged lines of different widths. */}
+                        <div className="mt-3 grid grid-cols-4 gap-2">
+                            {offeredDurations.map((duration) => {
                                 const allowed = allowedDurations.some((item) => item.minutes === duration.minutes);
                                 const selected = duration.minutes === minutes;
                                 return (
@@ -218,7 +250,7 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
                                         aria-pressed={selected}
                                         onClick={() => setMinutes(duration.minutes)}
                                         className={cn(
-                                            'text-label min-h-11 flex-1 rounded-lg border px-3 font-medium transition-colors sm:flex-none sm:px-5',
+                                            'text-meta min-h-11 truncate rounded-lg border px-1 font-medium transition-colors',
                                             selected && allowed && 'border-primary bg-primary text-primary-foreground',
                                             !selected && allowed && 'border-border bg-surface text-foreground hover:border-border-strong',
                                             !allowed && 'border-border bg-surface-muted text-muted cursor-not-allowed opacity-60',
@@ -229,8 +261,10 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
                                 );
                             })}
                         </div>
-                        {allowedDurations.length < DURATIONS.length && (
-                            <p className="text-meta text-muted mt-2">Longer sessions are unavailable from this start time.</p>
+                        {allowedDurations.length > 0 && allowedDurations.length < offeredDurations.length && (
+                            <p className="text-meta text-muted mt-2">
+                                Longest available from this start time is {allowedDurations[allowedDurations.length - 1].label}.
+                            </p>
                         )}
                         {form.errors.end_time && <p className="text-meta text-danger mt-2">{form.errors.end_time}</p>}
                     </section>
@@ -285,7 +319,8 @@ export function BookingPanel({ court, date, onClose }: { court: BookableCourt; d
             </div>
 
             {/* Sticky summary. Always visible, never scrolled away from. */}
-            <div className="border-border bg-surface-muted border-t px-5 py-4">
+            {/* Sticky summary. pb clears the phone home indicator; env() is 0 elsewhere. */}
+            <div className="border-border bg-surface-muted border-t px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-5">
                 <dl className="space-y-1.5">
                     <div className="flex items-center justify-between gap-3">
                         <dt className="text-meta text-muted flex items-center gap-1.5">

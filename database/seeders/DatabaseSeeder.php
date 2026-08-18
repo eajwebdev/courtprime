@@ -15,6 +15,7 @@ use App\Models\MatchGame;
 use App\Models\OpenPlayPlayer;
 use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
+use App\Models\OpenPlaySessionCourt;
 use App\Models\Organization;
 use App\Models\OrganizationPlayer;
 use App\Models\OrganizationUserRole;
@@ -34,7 +35,6 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -481,9 +481,24 @@ class DatabaseSeeder extends Seeder
             'min_rating' => 2.50,
             'max_rating' => 4.50,
             'entry_fee' => 200,
-            'status' => 'active',
-            'notes' => 'Seeded open play queue for Phase 4.',
+            /*
+             * 'open' rather than 'active': the public discovery filter and the
+             * rotation both work in scheduled/open/live, and a seeded session
+             * that no page will list is not demo data, it is a dead row.
+             */
+            'status' => 'open',
+            'session_code' => 'OP-DEMO01',
+            'notes' => 'Seeded open play session. Players join with the code.',
         ]);
+
+        /* Without allocated courts the rotation has nowhere to put anyone. */
+        foreach ($branches->first()->courts()->orderBy('court_number')->take(2)->get() as $openPlayCourt) {
+            OpenPlaySessionCourt::query()->create([
+                'organization_id' => $organization->id,
+                'open_play_session_id' => $openPlay->id,
+                'court_id' => $openPlayCourt->id,
+            ]);
+        }
 
         foreach ($players as $index => $player) {
             OpenPlayPlayer::query()->create([
@@ -710,7 +725,7 @@ class DatabaseSeeder extends Seeder
                 ],
             );
 
-            collect($tenant['branches'])->each(function (array $branchData, int $branchIndex) use ($tenantOrganization, $playerProfiles, $superadmin) {
+            collect($tenant['branches'])->each(function (array $branchData, int $branchIndex) use ($tenantOrganization, $playerProfiles) {
                 [$name, $code, $address] = $branchData;
                 $branch = Branch::query()->updateOrCreate(
                     ['organization_id' => $tenantOrganization->id, 'code' => $code],

@@ -23,12 +23,19 @@ export function FlashToast() {
     }
 
     return (
-        <div className="bg-background fixed top-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-lg border p-4 text-sm shadow-lg">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
-            <div>
-                <p className="text-foreground font-semibold">CourtPrime updated</p>
-                <p className="text-muted-foreground mt-1">{flash.success}</p>
-            </div>
+        /*
+         * Bottom on a phone, above the tab bar and inside the thumb's line of
+         * sight; top-right on a desktop where the eye is already. It used to sit
+         * top-right everywhere, which on a phone is the one corner a player
+         * holding a paddle never looks at.
+         */
+        <div
+            role="status"
+            aria-live="polite"
+            className="border-border bg-surface-raised shadow-e3 z-toast fixed inset-x-4 bottom-24 flex items-start gap-3 rounded-xl border p-4 sm:inset-x-auto sm:top-4 sm:right-4 sm:bottom-auto sm:max-w-sm"
+        >
+            <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" />
+            <p className="text-label text-foreground">{flash.success}</p>
         </div>
     );
 }

@@ -77,12 +77,14 @@ export function PhotoUploadField({ label, hint, currentUrl, shape = 'avatar', er
     const isAvatar = shape === 'avatar';
 
     return (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        /* A row at every width. Stacking on a phone spent ~450px of screen on
+           one optional field, so the second photo was always below the fold. */
+        <div className="flex items-start gap-3 sm:gap-4">
             {/* Preview */}
             <div
                 className={cn(
                     'bg-surface-muted border-border relative shrink-0 overflow-hidden border',
-                    isAvatar ? 'size-24 rounded-full' : 'h-40 w-32 rounded-xl',
+                    isAvatar ? 'size-20 rounded-full sm:size-24' : 'h-28 w-20 rounded-xl sm:h-40 sm:w-32',
                 )}
             >
                 {shown ? (

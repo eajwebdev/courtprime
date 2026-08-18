@@ -131,3 +131,24 @@ export function localIsoDate(offsetDays = 0) {
 
     return `${date.getFullYear()}-${month}-${day}`;
 }
+
+/**
+ * "just now", "4m ago", "2h ago", then the clock time.
+ *
+ * Used by the open play activity log, where the useful question is almost
+ * always "did that happen this game or an hour ago", not the exact timestamp.
+ */
+export function timeAgo(value?: string | null) {
+    if (!value) return '';
+
+    const then = new Date(value).getTime();
+    if (Number.isNaN(then)) return '';
+
+    const seconds = Math.round((Date.now() - then) / 1000);
+
+    if (seconds < 45) return 'just now';
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+    if (seconds < 21600) return `${Math.round(seconds / 3600)}h ago`;
+
+    return new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}

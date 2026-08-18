@@ -79,6 +79,14 @@ class OpenPlayController extends Controller
         abort_if($courtIds->count() !== count($validated['court_ids']), 403);
 
         $session = DB::transaction(function () use ($validated, $branch, $courtIds, $openPlay) {
+            /*
+             * One open play per branch, covering whichever courts it runs on.
+             *
+             * The ID and key belong to the session, not to a court: a club
+             * hands out one pair for tonight's open play and the rotation
+             * spreads everyone who turns up across every court it was given.
+             * Splitting the pair per court would split the queue with it.
+             */
             $session = OpenPlaySession::query()->create([
                 ...collect($validated)->except('court_ids', 'session_code')->all(),
                 'organization_id' => $branch->organization_id,

@@ -6,6 +6,8 @@ use App\Http\Requests\OpenPlayGuestJoinRequest;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
+use App\Support\OpenPlayBoardAccess;
+use App\Support\OpenPlaySessionLog;
 use Illuminate\Http\RedirectResponse;
 
 /**
@@ -38,8 +40,26 @@ class PublicOpenPlayJoinController extends Controller
 
         $openPlay->join($session, $player);
         $openPlay->checkIn($session, $player);
-        $rotation->generate($session);
 
-        return back()->with('success', "You are in {$session->name}. Watch the board for your court.");
+        if ($session->status === 'live') {
+            $rotation->generate($session);
+        }
+
+        /* Same pair the board gate asks for, so it opens the board as well. */
+        OpenPlayBoardAccess::grant($request, $session, $player->name);
+        $first = ! $session->organizer_token;
+        OpenPlayBoardAccess::claimHost($request, $session);
+
+        OpenPlaySessionLog::record(
+            $request,
+            $session,
+            'open_play.player_joined',
+            'Joined the session',
+            $first ? 'First one in, running the board' : null,
+        );
+
+        return back()
+            ->with('success', "You are in {$session->name}.")
+            ->with('boardUrl', route('open-play.board.public', ['code' => $session->session_code]));
     }
 }

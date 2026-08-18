@@ -12,7 +12,7 @@ import { type FormEvent } from 'react';
  * is shown until both are right.
  */
 export default function OpenPlayGate() {
-    const form = useForm({ code: '', key: '' });
+    const form = useForm({ code: '', key: '', who: '' });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -68,6 +68,23 @@ export default function OpenPlayGate() {
                                 autoComplete="off"
                                 spellCheck={false}
                                 className="border-border bg-surface text-foreground placeholder:text-muted mt-1.5 h-12 w-full rounded-xl border px-3.5 text-center text-base tracking-[0.35em] uppercase"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="who" className="text-label text-foreground font-medium">
+                                Your name <span className="text-muted font-normal">(optional)</span>
+                            </label>
+                            {/* Only ever used to sign entries in the session
+                                history, so "who added that player" has an
+                                answer when the tablet gets passed around. */}
+                            <p className="text-meta text-muted mt-0.5">Shown against anything you change on the board.</p>
+                            <input
+                                id="who"
+                                value={form.data.who}
+                                onChange={(event) => form.setData('who', event.target.value)}
+                                placeholder="Who is on this device"
+                                autoComplete="name"
+                                className="border-border bg-surface text-foreground placeholder:text-muted mt-1.5 h-12 w-full rounded-xl border px-3.5 text-base"
                             />
                         </div>
                     </div>

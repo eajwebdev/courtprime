@@ -61,6 +61,9 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'api_token_once' => fn () => $request->session()->get('api_token_once'),
+                /* Set when joining an open play session grants board access,
+                   so the page can offer to open the board. */
+                'board_url' => fn () => $request->session()->get('boardUrl'),
             ],
         ]);
     }

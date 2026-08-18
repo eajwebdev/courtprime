@@ -10,6 +10,14 @@ use Inertia\Response;
 
 class PublicOpenPlayController extends Controller
 {
+    /**
+     * Every open play session running across the network.
+     *
+     * Listing them is the point: a player deciding where to go tonight needs to
+     * see what is on, the same way they would on any other open play board.
+     * What is never listed is the ID and key. That pair is what lets you into a
+     * session's board and rotation, and it is handed out at the club.
+     */
     public function __invoke(Request $request): Response
     {
         /* Club-local today, not UTC today. See NetworkClock. */
@@ -19,7 +27,8 @@ class PublicOpenPlayController extends Controller
         $sessions = OpenPlaySession::query()
             ->withoutGlobalScope('organization')
             ->with(['branch.organization'])
-            ->withCount(['players', 'queue', 'sessionCourts'])
+            ->withCount('sessionCourts')
+            ->withCount(['players', 'queue'])
             ->whereDate('session_date', '>=', $date)
             ->whereIn('status', ['scheduled', 'open', 'live'])
             ->whereHas('branch.organization', fn ($query) => $query->whereIn('status', ['trial', 'active']))
@@ -37,12 +46,11 @@ class PublicOpenPlayController extends Controller
                 'id' => $session->id,
                 'name' => $session->name,
                 /*
-                  * Deliberately no session_code or session_key. Listing them
-                  * publicly would make the credentials pointless — anyone could
-                  * read a session's pair off the discovery page and walk into
-                  * it. The listing says a session exists; the club decides who
-                  * gets in.
-                  */
+                 * Deliberately no session_code or session_key. Listing them
+                 * would make the credentials pointless, anyone could read the
+                 * pair off a public page and walk into the board. The listing
+                 * says a session is on; the club decides who gets in.
+                 */
                 'courts_count' => $session->session_courts_count,
                 'session_date' => $session->session_date?->toDateString(),
                 'start_time' => substr((string) $session->start_time, 0, 5),

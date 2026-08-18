@@ -468,6 +468,7 @@ class DatabaseSeeder extends Seeder
         }
 
         OpenPlaySession::query()->where('organization_id', $organization->id)->delete();
+
         $openPlay = OpenPlaySession::query()->create([
             'organization_id' => $organization->id,
             'branch_id' => $branches->first()->id,
@@ -486,7 +487,8 @@ class DatabaseSeeder extends Seeder
              */
             'status' => 'open',
             'session_code' => 'OP-DEMO01',
-            /* Organiser key: first device to enter this pair runs the board. */
+            /* One pair for the branch's open play. Anyone entering it can run
+               the board, and the activity log records who did what. */
             'session_key' => '1234',
             'notes' => 'Seeded open play session. Starts empty; players are added at the board.',
         ]);

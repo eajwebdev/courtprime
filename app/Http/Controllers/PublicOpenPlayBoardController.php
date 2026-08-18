@@ -3,16 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\OpenPlayAddPlayerRequest;
+use App\Models\ActivityTimelineEvent;
 use App\Models\ClubMatch;
+use App\Models\Court;
 use App\Models\OpenPlayMatch;
+use App\Models\OpenPlayPlayer;
+use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
 use App\Services\MatchScoringService;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
+use App\Support\OpenPlayBoardAccess;
+use App\Support\OpenPlaySessionLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,12 +51,19 @@ class PublicOpenPlayBoardController extends Controller
         $request->validate([
             'code' => ['required', 'string', 'max:32'],
             'key' => ['required', 'string', 'max:32'],
+            /* Optional, and only ever used to sign entries in the activity log
+               so "who added that player" has an answer. */
+            'who' => ['nullable', 'string', 'max:60'],
         ]);
 
         $session = $openPlay->sessionForCode($request->string('code')->toString(), $request->string('key')->toString());
 
-        $request->session()->put($this->grantKey($session->id), true);
-        $this->claimOrganizer($request, $session);
+        OpenPlayBoardAccess::grant($request, $session, $request->input('who'));
+
+        $first = ! $session->organizer_token;
+        OpenPlayBoardAccess::claimHost($request, $session);
+
+        $this->log($request, $session, 'open_play.board_opened', $first ? 'Opened the board' : 'Joined the board');
 
         return to_route('open-play.board.public', ['code' => $session->session_code]);
     }
@@ -64,7 +76,15 @@ class PublicOpenPlayBoardController extends Controller
             return to_route('open-play.gate')->with('success', 'Enter the session ID and key to open the board.');
         }
 
-        $rotation->generate($session);
+        /*
+         * Only a started session draws matches. Before that the board is a
+         * setup screen, and generating a rotation underneath it would put
+         * people on court while the person setting up is still adding them.
+         */
+        if ($session->status === 'live') {
+            $rotation->generate($session);
+        }
+
         $session->refresh()->load('branch');
 
         return Inertia::render('open-play-board', [
@@ -72,16 +92,31 @@ class PublicOpenPlayBoardController extends Controller
                 'id' => $session->id,
                 'name' => $session->name,
                 'session_code' => $session->session_code,
+                'session_key' => $session->session_key,
                 'status' => $session->status,
+                'started' => $session->status === 'live',
                 'current_round' => $session->current_round,
+                'target_score' => (int) $session->target_score,
+                'win_by_two' => (bool) $session->win_by_two,
+                'max_players' => $session->max_players,
                 'branch' => $session->branch?->name,
+                'starts_at' => substr((string) $session->start_time, 0, 5),
+                'ends_at' => substr((string) $session->end_time, 0, 5),
             ],
-            /* Drives whether the board renders controls or just the score. */
+            /* A label now, not a permission. Anyone here can run the board. */
             'isOrganizer' => $this->isOrganizer($request, $session),
+            'you' => $this->actorName($request, $session),
             'courts' => $session->courts()->orderBy('court_number')->get(['courts.id', 'name']),
+            'branchCourts' => Court::query()
+                ->withoutGlobalScope('organization')
+                ->where('branch_id', $session->branch_id)
+                ->orderBy('court_number')
+                ->get(['id', 'name', 'status']),
+            'roster' => $this->roster($session),
             'liveMatches' => $this->liveMatches($session),
             'waiting' => $this->waiting($session),
             'results' => $this->results($session),
+            'activity' => $this->activity($session),
         ]);
     }
 
@@ -94,7 +129,6 @@ class PublicOpenPlayBoardController extends Controller
         PlayerIdentityService $identity,
     ): RedirectResponse {
         $session = $this->requireGrant($request, $code, $openPlay);
-        $this->requireOrganizer($request, $session);
 
         $player = $identity->findOrCreateLocalPlayer((int) $session->organization_id, [
             'name' => $request->string('name')->toString(),
@@ -104,7 +138,12 @@ class PublicOpenPlayBoardController extends Controller
 
         $openPlay->join($session, $player);
         $openPlay->checkIn($session, $player);
-        $rotation->generate($session);
+
+        if ($session->status === 'live') {
+            $rotation->generate($session);
+        }
+
+        $this->log($request, $session, 'open_play.player_added', 'Added '.$player->name);
 
         return back()->with('success', $request->string('name')->toString().' is in the rotation.');
     }
@@ -112,7 +151,6 @@ class PublicOpenPlayBoardController extends Controller
     public function score(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
         $session = $this->requireGrant($request, $code, $openPlay);
-        $this->requireOrganizer($request, $session);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['team' => ['required', 'in:team_one,team_two']]);
@@ -125,7 +163,6 @@ class PublicOpenPlayBoardController extends Controller
     public function undo(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
         $session = $this->requireGrant($request, $code, $openPlay);
-        $this->requireOrganizer($request, $session);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $scoring->undo($clubMatch);
@@ -148,7 +185,6 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
         $session = $this->requireGrant($request, $code, $openPlay);
-        $this->requireOrganizer($request, $session);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['winner' => ['nullable', 'in:one,two']]);
@@ -170,14 +206,236 @@ class PublicOpenPlayBoardController extends Controller
 
         $rotation->completeMatch($match);
 
+        $won = $winner === 'one' ? $clubMatch->team_one_name : $clubMatch->team_two_name;
+
+        $this->log(
+            $request,
+            $session,
+            'open_play.match_finished',
+            'Recorded a result',
+            trim(($match->court?->name ? $match->court->name.' | ' : '')
+                .($won ? $won.' won' : 'called a draw')
+                .' ('.$clubMatch->team_one_score.'-'.$clubMatch->team_two_score.')'),
+        );
+
         return back()->with('success', 'Result saved. Next match is up.');
+    }
+
+    /**
+     * Start play.
+     *
+     * Until this runs the board is a setup screen: courts get chosen, people
+     * get added, and nobody is put on a court. Starting flips the session live
+     * and draws the first round.
+     */
+    public function start(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        if ($session->status === 'live') {
+            return back();
+        }
+
+        $courts = $session->courts()->count();
+        $players = $session->players()->count();
+
+        /* The same two conditions the button shows, re-checked here: the
+           checklist is a convenience, this is the rule. */
+        if ($courts < 1 || $players < 4) {
+            return back()->withErrors([
+                'start' => $courts < 1
+                    ? 'Pick at least one court before starting.'
+                    : 'Four players are needed for the first match.',
+            ]);
+        }
+
+        $session->update(['status' => 'live', 'auto_rotate' => true]);
+        $rotation->generate($session);
+
+        $this->log($request, $session, 'open_play.started', 'Started the session', $players.' players, '.$courts.' courts');
+
+        return back()->with('success', 'Session started. First round is on.');
+    }
+
+    /** Name, scoring and which courts are in play. */
+    public function settings(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'target_score' => ['required', 'integer', 'min:7', 'max:31'],
+            'win_by_two' => ['required', 'boolean'],
+            'max_players' => ['nullable', 'integer', 'min:4', 'max:200'],
+            'court_ids' => ['array'],
+            'court_ids.*' => ['integer'],
+        ]);
+
+        /*
+         * Courts are re-resolved against the session's own branch rather than
+         * trusted from the payload. The board is reachable with a shared code,
+         * so an id from another club must not be attachable to this session.
+         */
+        $courtIds = Court::query()
+            ->withoutGlobalScope('organization')
+            ->where('branch_id', $session->branch_id)
+            ->whereIn('id', $data['court_ids'] ?? [])
+            ->pluck('id')
+            ->all();
+
+        $changes = [];
+
+        if ($session->name !== $data['name']) {
+            $changes[] = 'renamed to '.$data['name'];
+        }
+
+        if ((int) $session->target_score !== (int) $data['target_score'] || (bool) $session->win_by_two !== (bool) $data['win_by_two']) {
+            $changes[] = 'games to '.$data['target_score'].($data['win_by_two'] ? ', win by 2' : '');
+        }
+
+        $existing = $session->courts()->pluck('courts.id')->sort()->values()->all();
+
+        if ($existing !== collect($courtIds)->sort()->values()->all()) {
+            $changes[] = count($courtIds).' '.(count($courtIds) === 1 ? 'court' : 'courts').' in play';
+        }
+
+        $session->update([
+            'name' => $data['name'],
+            'target_score' => $data['target_score'],
+            'win_by_two' => $data['win_by_two'],
+            'max_players' => $data['max_players'],
+        ]);
+
+        /* The pivot carries organization_id and the column has no default, so
+           a bare sync() of ids fails on insert. */
+        $session->courts()->sync(
+            collect($courtIds)->mapWithKeys(fn (int $id) => [$id => ['organization_id' => $session->organization_id]])->all()
+        );
+
+        if ($changes !== []) {
+            $this->log($request, $session, 'open_play.settings_updated', 'Updated the session', implode(', ', $changes));
+        }
+
+        /* A court added mid-session should get a match on it straight away. */
+        if ($session->status === 'live') {
+            $rotation->generate($session->refresh());
+        }
+
+        return back()->with('success', 'Session updated.');
+    }
+
+    /** Take someone out, for a typo or for somebody who went home. */
+    public function removePlayer(Request $request, string $code, int $player, OpenPlayService $openPlay): RedirectResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        $onCourt = OpenPlayMatch::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->where('status', 'live')
+            ->whereHas('participants', fn ($query) => $query->where('player_id', $player))
+            ->exists();
+
+        /* Pulling someone out of a live match would leave three on the court
+           and a result nobody can record. Finish the game first. */
+        if ($onCourt) {
+            return back()->withErrors(['roster' => 'They are on court. Finish that match first.']);
+        }
+
+        $name = OpenPlayPlayer::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->where('player_id', $player)
+            ->with('player:id,name')
+            ->first()?->player?->name;
+
+        OpenPlayQueueEntry::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->where('player_id', $player)
+            ->delete();
+
+        OpenPlayPlayer::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->where('player_id', $player)
+            ->delete();
+
+        $this->log($request, $session, 'open_play.player_removed', 'Removed '.($name ?? 'a player'));
+
+        return back()->with('success', ($name ?? 'Player').' removed.');
     }
 
     /* ------------------------------------------------------------------ */
 
+    /**
+     * Everyone checked in, whether they are playing, waiting or sitting out.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function roster(OpenPlaySession $session): array
+    {
+        $stats = $this->stats($session);
+
+        return $session->players()
+            ->withoutGlobalScope('organization')
+            ->with('player:id,name,skill_level')
+            ->get()
+            ->map(fn (OpenPlayPlayer $entry) => [
+                'player_id' => $entry->player_id,
+                'name' => $entry->player?->name ?? 'Player',
+                'skill_level' => $entry->player?->skill_level,
+                'games' => $stats[$entry->player_id]['games'] ?? 0,
+                'wins' => $stats[$entry->player_id]['wins'] ?? 0,
+            ])
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * What happened on this board, newest first.
+     *
+     * Anyone with the code can change the session, so the answer to "who added
+     * that player" or "who changed the target score" has to live somewhere.
+     * This is that record.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function activity(OpenPlaySession $session): array
+    {
+        return ActivityTimelineEvent::query()
+            ->withoutGlobalScope('organization')
+            ->where('subject_type', OpenPlaySession::class)
+            ->where('subject_id', $session->id)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->map(fn (ActivityTimelineEvent $event) => [
+                'id' => $event->id,
+                'type' => $event->event_type,
+                'title' => $event->title,
+                'description' => $event->description,
+                'actor' => $event->metadata['actor_name'] ?? 'Someone',
+                'at' => $event->occurred_at?->toIso8601String(),
+            ])
+            ->all();
+    }
+
+    private function log(Request $request, OpenPlaySession $session, string $type, string $title, ?string $description = null): void
+    {
+        OpenPlaySessionLog::record($request, $session, $type, $title, $description);
+    }
+
+    private function actorName(Request $request, OpenPlaySession $session): string
+    {
+        return OpenPlaySessionLog::actor($request, $session);
+    }
+
     private function grantKey(int $sessionId): string
     {
-        return "open_play_grant.{$sessionId}";
+        return OpenPlayBoardAccess::grantKey($sessionId);
     }
 
     /** The session behind the code, but only if this browser passed the gate. */
@@ -317,58 +575,17 @@ class PublicOpenPlayBoardController extends Controller
     }
 
     /**
-     * First device through the gate takes the controls.
+     * Whether this device claimed the session first.
      *
-     * Wrapped in a transaction with the row locked: two people can enter the key
-     * in the same instant, and a plain read-then-write would let both see an
-     * unclaimed session and both become organiser. The lock serialises the
-     * claim so exactly one wins and the rest fall through to a read-only board.
+     * This used to gate every control. It no longer does: on a real court the
+     * tablet gets put down and whoever is next to it keeps score, and locking
+     * that to one browser session meant a dead battery ended the session.
+     * Anyone holding the ID and key can run the board, and every action is
+     * signed in the activity log instead, so it is traceable rather than
+     * restricted.
      */
-    private function claimOrganizer(Request $request, OpenPlaySession $session): void
-    {
-        $token = DB::transaction(function () use ($session): ?string {
-            $locked = OpenPlaySession::query()
-                ->withoutGlobalScope('organization')
-                ->lockForUpdate()
-                ->find($session->id);
-
-            if (! $locked || $locked->organizer_token) {
-                return null;
-            }
-
-            $fresh = Str::random(48);
-
-            $locked->update([
-                'organizer_token' => hash('sha256', $fresh),
-                'organizer_claimed_at' => now(),
-            ]);
-
-            return $fresh;
-        });
-
-        if ($token) {
-            $request->session()->put($this->organizerKey($session->id), $token);
-        }
-    }
-
-    /** The stored token is hashed, so the raw value never sits in the database. */
     private function isOrganizer(Request $request, OpenPlaySession $session): bool
     {
-        $token = $request->session()->get($this->organizerKey($session->id));
-
-        return is_string($token)
-            && is_string($session->organizer_token)
-            && hash_equals($session->organizer_token, hash('sha256', $token));
-    }
-
-    /** Controls that change the board are the organiser's alone. */
-    private function requireOrganizer(Request $request, OpenPlaySession $session): void
-    {
-        abort_unless($this->isOrganizer($request, $session), 403, 'Only the session organiser can change the board.');
-    }
-
-    private function organizerKey(int $sessionId): string
-    {
-        return "open-play.organizer.{$sessionId}";
+        return OpenPlayBoardAccess::isHost($request, $session);
     }
 }

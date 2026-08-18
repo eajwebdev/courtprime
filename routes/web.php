@@ -92,6 +92,9 @@ Route::post('open-play/board', [PublicOpenPlayBoardController::class, 'enter'])
 Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function () {
     Route::get('board', [PublicOpenPlayBoardController::class, 'show'])->name('open-play.board.public');
     Route::post('players', [PublicOpenPlayBoardController::class, 'addPlayer'])->name('open-play.board.players');
+    Route::delete('players/{player}', [PublicOpenPlayBoardController::class, 'removePlayer'])->name('open-play.board.players.remove');
+    Route::post('settings', [PublicOpenPlayBoardController::class, 'settings'])->name('open-play.board.settings');
+    Route::post('start', [PublicOpenPlayBoardController::class, 'start'])->name('open-play.board.start');
     Route::post('matches/{match}/score', [PublicOpenPlayBoardController::class, 'score'])->name('open-play.board.score');
     Route::post('matches/{match}/undo', [PublicOpenPlayBoardController::class, 'undo'])->name('open-play.board.undo');
     Route::post('matches/{match}/finish', [PublicOpenPlayBoardController::class, 'complete'])->name('open-play.board.finish');

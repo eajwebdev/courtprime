@@ -1,18 +1,48 @@
 import { FlashToast } from '@/components/flash-toast';
-import { BrandWordmarkAuto } from '@/components/marketing-artwork';
+import { ActivityFeed, type ActivityEntry } from '@/components/open-play/activity-feed';
+import { BoardHeader } from '@/components/open-play/board-header';
+import { BoardRail } from '@/components/open-play/board-rail';
+import { CourtCard } from '@/components/open-play/court-card';
+import { RosterPanel, type RosterEntry } from '@/components/open-play/roster-panel';
+import { SessionSetup, type BoardCourt } from '@/components/open-play/session-setup';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Check, Copy, Eye, Loader2, Minus, ShieldCheck, Trophy, UserPlus, Users } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Check, Circle, Loader2, Play, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
 
-type Props = { session: any; isOrganizer: boolean; courts: any[]; liveMatches: any[]; waiting: any[]; results: any[] };
+type Props = {
+    session: any;
+    isOrganizer: boolean;
+    you: string;
+    courts: BoardCourt[];
+    branchCourts: BoardCourt[];
+    roster: RosterEntry[];
+    liveMatches: any[];
+    waiting: any[];
+    results: any[];
+    activity: ActivityEntry[];
+};
 
-export default function OpenPlayBoard({ session, isOrganizer, courts, liveMatches, waiting, results }: Props) {
-    const [copied, setCopied] = useState(false);
+/**
+ * The board the players run.
+ *
+ * Two screens in one, decided by whether the session has started. Before:
+ * choose courts, set what a win is, add everyone who turned up. After: the
+ * courts, the queue and the scores.
+ *
+ * Sized for a tablet propped up at the net post, which is the device this is
+ * actually used on. Nothing important is behind a menu, targets are at least
+ * 48px, and the layout gets wider rather than taller as the screen grows, so a
+ * tablet in landscape shows the whole session without scrolling.
+ */
+export default function OpenPlayBoard({ session, isOrganizer, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
+    const [showActivity, setShowActivity] = useState(false);
+    const { errors } = usePage().props as any;
     const base = `/open-play/${session.session_code}`;
+    const started = Boolean(session.started);
 
     /*
      * Several phones and a tablet can all be looking at this at once, so the
@@ -24,7 +54,7 @@ export default function OpenPlayBoard({ session, isOrganizer, courts, liveMatche
             /* A partial reload: `reload` already preserves component state and
                scroll, so a refresh landing while someone is half way through
                typing a name leaves what they have typed alone. */
-            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session'] });
+            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session', 'roster', 'activity'] });
         }, 8000);
 
         return () => window.clearInterval(timer);
@@ -32,340 +62,235 @@ export default function OpenPlayBoard({ session, isOrganizer, courts, liveMatche
 
     const post = (url: string, data: Record<string, string> = {}) => router.post(url, data, { preserveScroll: true, preserveState: true });
 
-    const copyCode = async () => {
-        await navigator.clipboard?.writeText(session.session_code ?? '');
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 2000);
-    };
-
-    const busy = liveMatches.map((match) => match.court);
-    const idle = courts.filter((court) => !busy.includes(court.name));
-    const needed = Math.max(0, 4 - waiting.length);
-
     return (
         /*
          * Deliberately not the staff shell. The people running this are the
          * players on the court, reached by the session code, so there is no
          * workspace sidebar and nothing to navigate away into.
          */
-        <div className="bg-background text-foreground min-h-svh">
+        /*
+         * One screen, no page scroll.
+         *
+         * From lg up the shell is exactly the viewport height and every list
+         * scrolls inside its own card, so the courts, the roster and the queue
+         * stay where they were put. A phone cannot honour that without hiding
+         * something, so below lg the page scrolls normally.
+         */
+        <div className="bg-background text-foreground flex min-h-svh flex-col lg:h-svh lg:overflow-hidden">
             <Head title={`${session.session_code} · ${session.name} | CourtPrime`} />
 
-            <header className="border-border bg-background/95 z-nav sticky top-0 border-b backdrop-blur-md">
-                <div className="mx-auto flex h-14 w-full max-w-[110rem] items-center justify-between gap-3 px-4">
-                    <BrandWordmarkAuto height={28} className="h-7" />
-                    <p className="text-meta text-muted truncate">
-                        {session.name} · {session.branch}
-                    </p>
-                </div>
-            </header>
+            <BoardHeader
+                session={session}
+                you={you}
+                isHost={isOrganizer}
+                activityCount={activity.length}
+                onShowActivity={() => setShowActivity(true)}
+            />
 
-            <main className="mx-auto flex w-full max-w-[110rem] flex-col gap-4 px-4 py-4">
-                <section className="bg-surface-deep text-surface-deep-foreground flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-4 sm:px-6">
-                    <div className="min-w-0">
-                        <p className="text-eyebrow text-primary uppercase">Session code</p>
-                        <p data-numeric className="text-[1.75rem] leading-none font-semibold tracking-tight text-white sm:text-[2.25rem]">
-                            {session.session_code ?? '—'}
-                        </p>
-                        <p className="text-meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-white/55">
-                            <span>
-                                round <span data-numeric>{session.current_round}</span>
-                            </span>
-                            {/* Says plainly which device is running the session, so
-                                nobody waits for a button that will never appear. */}
-                            <span
-                                className={cn(
-                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold',
-                                    isOrganizer ? 'bg-primary text-primary-foreground' : 'bg-white/10 text-white/70',
-                                )}
-                            >
-                                {isOrganizer ? <ShieldCheck className="size-3" aria-hidden /> : <Eye className="size-3" aria-hidden />}
-                                {isOrganizer ? 'You run this session' : 'View only'}
-                            </span>
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <dl className="flex gap-4">
-                            <Stat label="On court" value={liveMatches.length * 4} />
-                            <Stat label="Waiting" value={waiting.length} />
-                            <Stat label="Courts" value={courts.length} />
-                        </dl>
-                        <Button type="button" variant="onDeep" size="touch" onClick={copyCode} className="shrink-0">
-                            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                            {copied ? 'Copied' : 'Copy'}
-                        </Button>
-                    </div>
-                </section>
-
-                <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
-                    {/* ---- Courts ------------------------------------------- */}
-                    <div className="grid content-start gap-4 lg:grid-cols-2">
-                        {liveMatches.map((match) => (
-                            <CourtCard key={match.id} match={match} base={base} post={post} canScore={isOrganizer} />
-                        ))}
-
-                        {idle.map((court) => (
-                            <article
-                                key={court.id}
-                                className="border-border flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed px-4 py-8 text-center"
-                            >
-                                <p className="text-label text-foreground font-semibold">{court.name}</p>
-                                <p className="text-meta text-muted mt-1">
-                                    {needed === 0 ? 'Assigning next match…' : `Idle · ${needed} more ${needed === 1 ? 'player' : 'players'} needed`}
-                                </p>
-                            </article>
-                        ))}
-
-                        {courts.length === 0 && (
-                            <p className="border-border text-label text-muted col-span-full rounded-xl border border-dashed px-5 py-10 text-center">
-                                No courts allocated to this session.
-                            </p>
-                        )}
-                    </div>
-
-                    {/* ---- Add, queue, standings ---------------------------- */}
-                    <aside className="flex flex-col gap-4">
-                        {isOrganizer && <AddPlayer base={base} />}
-
-                        <div className="border-border bg-surface overflow-hidden rounded-xl border">
-                            <div className="border-border bg-surface-muted flex items-center justify-between gap-3 border-b px-4 py-2">
-                                <p className="text-label text-foreground flex items-center gap-1.5 font-semibold">
-                                    <Users className="size-4 shrink-0" aria-hidden />
-                                    Up next
-                                </p>
-                                <p className="text-meta text-muted">
-                                    <span data-numeric>{waiting.length}</span> waiting
-                                </p>
+            <main
+                className={cn(
+                    'mx-auto w-full max-w-[120rem] flex-1 px-4 py-5 sm:px-6 lg:min-h-0 lg:overflow-hidden lg:px-8',
+                    started ? 'pb-10 lg:pb-5' : 'pb-32 lg:pb-5',
+                )}
+            >
+                {started ? (
+                    <LiveBoard
+                        base={base}
+                        session={session}
+                        courts={courts}
+                        roster={roster}
+                        liveMatches={liveMatches}
+                        waiting={waiting}
+                        results={results}
+                        activity={activity}
+                        post={post}
+                    />
+                ) : (
+                    <SessionSetup
+                        base={base}
+                        session={session}
+                        branchCourts={branchCourts}
+                        selectedCourtIds={courts.map((court) => court.id)}
+                        history={
+                            <div className="border-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
+                                <ActivityFeed entries={activity} />
                             </div>
-
-                            {waiting.length === 0 ? (
-                                <p className="text-meta text-muted px-4 py-8 text-center">Nobody waiting yet. Add whoever turns up.</p>
-                            ) : (
-                                <ul className="divide-border max-h-72 divide-y overflow-y-auto">
-                                    {waiting.map((entry, index) => (
-                                        <li key={entry.player_id} className="flex items-center gap-3 px-4 py-2.5">
-                                            <span
-                                                data-numeric
-                                                className={cn(
-                                                    'text-meta flex size-7 shrink-0 items-center justify-center rounded-full font-semibold',
-                                                    needed === 0 && index < 4 ? 'bg-primary text-primary-foreground' : 'bg-surface-muted text-muted',
-                                                )}
-                                            >
-                                                {index + 1}
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-label text-foreground truncate font-medium">{entry.name}</p>
-                                                <p className="text-meta text-muted">
-                                                    <span data-numeric>{entry.games}</span> {entry.games === 1 ? 'game' : 'games'} ·{' '}
-                                                    <span data-numeric>{entry.wins}</span> won
-                                                </p>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-
-                        {results.length > 0 && (
-                            <div className="border-border bg-surface overflow-hidden rounded-xl border">
-                                <div className="border-border bg-surface-muted flex items-center gap-1.5 border-b px-4 py-2">
-                                    <Trophy className="text-primary size-4 shrink-0" aria-hidden />
-                                    <p className="text-label text-foreground font-semibold">Standings</p>
-                                </div>
-                                <ul className="divide-border max-h-64 divide-y overflow-y-auto">
-                                    {results.map((row) => (
-                                        <li key={row.player_id} className="flex items-center justify-between gap-3 px-4 py-2">
-                                            <p className="text-label text-foreground min-w-0 truncate">{row.name}</p>
-                                            <p className="text-meta text-muted shrink-0">
-                                                <span data-numeric className="text-foreground font-semibold">
-                                                    {row.wins}
-                                                </span>
-                                                <span className="text-muted">/</span>
-                                                <span data-numeric>{row.games}</span>
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </aside>
-                </div>
+                        }
+                    >
+                        <RosterPanel base={base} roster={roster} />
+                    </SessionSetup>
+                )}
             </main>
+
+            {!started && <StartBar base={base} courts={courts.length} players={roster.length} error={errors?.start} />}
+
+            <ActivityPanel open={showActivity} onClose={() => setShowActivity(false)} entries={activity} />
 
             <FlashToast />
         </div>
     );
 }
 
-/**
- * One court.
- *
- * Tapping a team adds their point. Finishing asks who won rather than assuming
- * the scoreboard is the whole story, so a game called on court is recorded the
- * same way as one played out to eleven.
- */
-function CourtCard({
-    match,
+/** Courts, queue and standings, once the session is running. */
+function LiveBoard({
     base,
+    session,
+    courts,
+    roster,
+    liveMatches,
+    waiting,
+    results,
+    activity,
     post,
-    canScore,
 }: {
-    match: any;
     base: string;
+    session: any;
+    courts: BoardCourt[];
+    roster: RosterEntry[];
+    liveMatches: any[];
+    waiting: any[];
+    results: any[];
+    activity: ActivityEntry[];
     post: (url: string, data?: Record<string, string>) => void;
-    canScore: boolean;
 }) {
-    const [confirming, setConfirming] = useState(false);
-
-    const one = match.teams?.one ?? [];
-    const two = match.teams?.two ?? [];
-    const label = (players: any[]) => players.map((player: any) => player.name).join(' / ');
+    const busy = liveMatches.map((match) => match.court);
+    const idle = courts.filter((court) => !busy.includes(court.name));
+    const needed = Math.max(0, 4 - waiting.length);
 
     return (
-        <article className="border-border bg-surface overflow-hidden rounded-xl border">
-            <div className="border-border bg-surface-muted flex items-center justify-between gap-3 border-b px-4 py-2">
-                <p className="text-label text-foreground font-semibold">{match.court}</p>
-                <p className="text-meta text-muted">
-                    round <span data-numeric>{match.round}</span>
-                </p>
+        <div className="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="flex min-h-0 flex-col gap-3">
+                {/* The status line is its own row. Left inside the court grid it
+                    was handed an equal-height track and floated in mid air. */}
+                <div className="text-meta text-muted flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1">
+                    <span>
+                        Round{' '}
+                        <span data-numeric className="text-foreground font-semibold">
+                            {session.current_round}
+                        </span>
+                    </span>
+                    <span>
+                        Games to{' '}
+                        <span data-numeric className="text-foreground font-semibold">
+                            {session.target_score}
+                        </span>
+                        {session.win_by_two ? ', win by 2' : ''}
+                    </span>
+                    <span>
+                        <span data-numeric className="text-foreground font-semibold">
+                            {roster.length}
+                        </span>{' '}
+                        checked in
+                    </span>
+                </div>
+
+                <div className="grid content-start gap-4 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:overflow-y-auto 2xl:grid-cols-3">
+                    {liveMatches.map((match) => (
+                        <CourtCard key={match.id} match={match} base={base} post={post} />
+                    ))}
+
+                    {idle.map((court) => (
+                        <article
+                            key={court.id}
+                            className="border-border flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed px-4 py-8 text-center"
+                        >
+                            <p className="text-label text-foreground font-semibold">{court.name}</p>
+                            <p className="text-meta text-muted mt-1">
+                                {needed === 0 ? 'Assigning next match…' : `Idle · ${needed} more ${needed === 1 ? 'player' : 'players'} needed`}
+                            </p>
+                        </article>
+                    ))}
+
+                    {courts.length === 0 && (
+                        <p className="border-border text-label text-muted col-span-full rounded-xl border border-dashed px-5 py-10 text-center">
+                            No courts in play.
+                        </p>
+                    )}
+                </div>
             </div>
 
-            <div className="bg-border grid grid-cols-2 gap-px">
-                <TeamScore
-                    players={one}
-                    score={match.team_one_score}
-                    canScore={canScore}
-                    onScore={() => post(`${base}/matches/${match.id}/score`, { team: 'team_one' })}
-                />
-                <TeamScore
-                    players={two}
-                    score={match.team_two_score}
-                    canScore={canScore}
-                    onScore={() => post(`${base}/matches/${match.id}/score`, { team: 'team_two' })}
-                />
-            </div>
-
-            {confirming ? (
-                <div className="border-border border-t px-3 py-3">
-                    <p className="text-meta text-muted mb-2 text-center">Who won?</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button
-                            type="button"
-                            size="touch"
-                            data-winner="one"
-                            className="min-w-0"
-                            onClick={() => post(`${base}/matches/${match.id}/finish`, { winner: 'one' })}
-                        >
-                            <span className="truncate">{label(one)}</span>
-                        </Button>
-                        <Button
-                            type="button"
-                            size="touch"
-                            data-winner="two"
-                            className="min-w-0"
-                            onClick={() => post(`${base}/matches/${match.id}/finish`, { winner: 'two' })}
-                        >
-                            <span className="truncate">{label(two)}</span>
-                        </Button>
-                    </div>
-                    <Button type="button" variant="ghost" className="mt-2 w-full" onClick={() => setConfirming(false)}>
-                        Cancel
-                    </Button>
-                </div>
-            ) : !canScore ? null : (
-                <div className="border-border flex gap-2 border-t px-3 py-3">
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="iconTouch"
-                        aria-label="Undo last point"
-                        className="shrink-0"
-                        onClick={() => post(`${base}/matches/${match.id}/undo`)}
-                    >
-                        <Minus className="size-4" />
-                    </Button>
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirming(true)}>
-                        <Trophy className="size-4" />
-                        Finish match
-                    </Button>
-                </div>
-            )}
-        </article>
+            <BoardRail base={base} roster={roster} waiting={waiting} results={results} activity={activity} needed={needed} />
+        </div>
     );
 }
 
-function TeamScore({ players, score, onScore, canScore }: { players: any[]; score: number; onScore: () => void; canScore: boolean }) {
-    return (
-        <button
-            type="button"
-            onClick={canScore ? onScore : undefined}
-            disabled={!canScore}
-            aria-label={canScore ? `Add a point for ${players.map((player: any) => player.name).join(' and ')}` : undefined}
-            /* The whole half scores: a small "+1" is a miss on a tablet at
-               arm's length across a court. */
-            className={cn(
-                'bg-surface flex min-h-32 flex-col items-center justify-center gap-1 px-3 py-4 transition-colors sm:min-h-36',
-                canScore ? 'hover:bg-primary-soft active:bg-primary-soft' : 'cursor-default',
-            )}
-        >
-            <span className="text-meta text-secondary line-clamp-2 text-center">{players.map((player: any) => player.name).join(' / ')}</span>
-            <span data-numeric className="text-foreground text-[2.5rem] leading-none font-semibold sm:text-[3rem]">
-                {score}
-            </span>
-            {canScore && <span className="text-meta text-muted">tap to score</span>}
-        </button>
-    );
-}
+/**
+ * What is still missing before the first match can be drawn.
+ *
+ * Fixed to the bottom because on a tablet the person setting up is looking at
+ * the list of names, not at the top of the page, and the answer to "why can't I
+ * start" has to be where their eyes already are.
+ */
+function StartBar({ base, courts, players, error }: { base: string; courts: number; players: number; error?: string }) {
+    const [starting, setStarting] = useState(false);
+    const ready = courts >= 1 && players >= 4;
 
-function AddPlayer({ base }: { base: string }) {
-    const form = useForm({ name: '' });
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        form.post(`${base}/players`, { preserveScroll: true, onSuccess: () => form.reset() });
+    const start = () => {
+        setStarting(true);
+        router.post(`${base}/start`, {}, { preserveScroll: true, onFinish: () => setStarting(false) });
     };
 
     return (
-        <form onSubmit={submit} className="border-border bg-surface rounded-xl border p-4">
-            <label htmlFor="add-player" className="text-label text-foreground font-medium">
-                Add a player
-            </label>
-            <p className="text-meta text-muted mt-0.5">Anyone who turns up. No account needed.</p>
+        <div className="border-border bg-surface/95 z-sticky sticky bottom-0 border-t backdrop-blur-md">
+            <div className="mx-auto flex w-full max-w-[120rem] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+                <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <Requirement met={courts >= 1} label={courts === 1 ? '1 court' : `${courts} courts`} />
+                    <Requirement met={players >= 4} label={`${players}/4 players`} />
+                </ul>
 
-            <div className="mt-3 flex gap-2">
-                <div className="relative min-w-0 flex-1">
-                    <UserPlus className="text-muted pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" aria-hidden />
-                    <input
-                        id="add-player"
-                        value={form.data.name}
-                        onChange={(event) => form.setData('name', event.target.value)}
-                        placeholder="Player name"
-                        autoComplete="off"
-                        className="border-border bg-surface text-foreground placeholder:text-muted sm:text-label h-12 w-full rounded-xl border pr-3 pl-10 text-base"
-                    />
+                <div className="flex items-center gap-3">
+                    {error && (
+                        <p role="alert" className="text-meta text-danger">
+                            {error}
+                        </p>
+                    )}
+                    <Button type="button" size="touch" onClick={start} disabled={!ready || starting} className="min-w-40">
+                        {starting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+                        Start session
+                    </Button>
                 </div>
-                <Button type="submit" size="touch" disabled={form.processing || form.data.name.trim().length < 2} className="shrink-0">
-                    {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Add'}
-                </Button>
             </div>
-
-            {form.errors.name && (
-                <p role="alert" className="text-meta text-danger mt-2">
-                    {form.errors.name}
-                </p>
-            )}
-        </form>
+        </div>
     );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Requirement({ met, label }: { met: boolean; label: string }) {
     return (
-        <div className="text-center">
-            <dt className="text-[0.6875rem] tracking-wide text-white/45 uppercase">{label}</dt>
-            <dd data-numeric className="text-lg leading-none font-semibold text-white">
-                {value}
-            </dd>
+        <li className={cn('text-meta flex items-center gap-1.5 font-medium', met ? 'text-success' : 'text-muted')}>
+            {met ? <Check className="size-3.5" aria-hidden /> : <Circle className="size-3.5" aria-hidden />}
+            <span data-numeric>{label}</span>
+        </li>
+    );
+}
+
+/** History, as a slide-over so it costs no width until someone asks for it. */
+function ActivityPanel({ open, onClose, entries }: { open: boolean; onClose: () => void; entries: ActivityEntry[] }) {
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
+        window.addEventListener('keydown', onKey);
+
+        return () => window.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
+    if (!open) return null;
+
+    return (
+        <div className="z-drawer fixed inset-0">
+            <button type="button" aria-label="Close history" onClick={onClose} className="absolute inset-0 bg-black/50" />
+            <div className="bg-surface shadow-e3 absolute inset-y-0 right-0 flex w-full max-w-md flex-col">
+                <div className="border-border flex items-center justify-between gap-3 border-b px-4 py-3">
+                    <p className="text-h3 text-foreground">Session history</p>
+                    <Button type="button" variant="ghost" size="iconSm" aria-label="Close" onClick={onClose}>
+                        <X className="size-4" />
+                    </Button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                    <ActivityFeed entries={entries} hideHeader />
+                </div>
+                <p className="border-border text-meta text-muted border-t px-4 py-3">
+                    Everyone with the session ID and key can run this board. Every change is listed here.
+                </p>
+            </div>
         </div>
     );
 }

@@ -10,8 +10,8 @@ import { currency, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ExternalLink, MapPin, Search, Users, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { MapPin, Search, Users, X } from 'lucide-react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- paginator payload is
    shaped by PublicOpenPlayController. */
@@ -52,45 +52,16 @@ function skillLabel(min: number | null, max: number | null) {
     if (min === null && max === null) return 'All levels';
     if (min !== null && max !== null) return `${Number(min).toFixed(1)}–${Number(max).toFixed(1)}`;
     if (min !== null) return `${Number(min).toFixed(1)}+`;
-
     return `Up to ${Number(max).toFixed(1)}`;
 }
 
-/**
- * Every open play session running, and the way into one.
- *
- * The listing is public because that is what a player needs to decide where to
- * go. The ID and key are not: one pair per session, handed out at the club, and
- * it is what opens the board.
- */
 export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
-    const { auth, flash } = usePage<SharedData>().props;
+    const { auth } = usePage<SharedData>().props;
     const signedIn = Boolean(auth?.user);
 
     const [filters, setFilters] = useState({ date, search });
     const [freeOnly, setFreeOnly] = useState(false);
     const [spotsOnly, setSpotsOnly] = useState(false);
-
-    /*
-     * Joining proves the same pair the board gate asks for, so the server grants
-     * board access on the way through and hands back its URL. The board belongs
-     * in its own tab: it is the thing propped up at the net for the next two
-     * hours, and losing it by tapping back would be the whole session.
-     */
-    const boardUrl = typeof flash?.board_url === 'string' ? flash.board_url : null;
-    const [blocked, setBlocked] = useState(false);
-    const opened = useRef<string | null>(null);
-
-    useEffect(() => {
-        if (!boardUrl || opened.current === boardUrl) return;
-
-        opened.current = boardUrl;
-
-        /* Returns null when the browser blocks it, which is common on iOS
-           because this runs after the request rather than inside the tap. The
-           link below is the fallback, and it is always rendered. */
-        setBlocked(!window.open(boardUrl, '_blank', 'noopener'));
-    }, [boardUrl]);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -123,7 +94,6 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
         return rows.filter((session) => {
             if (freeOnly && Number(session.entry_fee ?? 0) > 0) return false;
             if (spotsOnly && session.max_players !== null && session.players_count >= session.max_players) return false;
-
             return true;
         });
     }, [sessions?.data, freeOnly, spotsOnly]);
@@ -143,7 +113,7 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
             <Head title="Find open play | CourtPrime">
                 <meta
                     name="description"
-                    content="Drop-in pickleball sessions across every connected CourtPrime club. Join with the session ID and key and the rotation assigns your court, partner and opponents."
+                    content="Drop-in pickleball sessions across every connected CourtPrime club. Join with the club's session code and the rotation assigns your court, partner and opponents."
                 />
             </Head>
 
@@ -197,27 +167,11 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
                 </DiscoveryHero>
 
                 <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-                    {boardUrl && (
-                        <div className="border-success/30 bg-success-soft mb-6 rounded-xl border p-4 sm:p-5">
-                            <p className="text-label text-foreground font-semibold">You are in.</p>
-                            <p className="text-meta text-secondary mt-0.5">
-                                {blocked
-                                    ? 'Your browser blocked the new tab. Open the board here.'
-                                    : 'The session board opened in a new tab. Keep it open at the court.'}
-                            </p>
-                            <Button asChild size="touch" className="mt-3 w-full sm:w-auto">
-                                <a href={boardUrl} target="_blank" rel="noopener noreferrer">
-                                    Open session board
-                                    <ExternalLink className="size-4" />
-                                </a>
-                            </Button>
-                        </div>
-                    )}
-
                     {/*
-                     * The pair is the way in, so it leads. A player handed one at
-                     * the desk does not have to find their court in the list
-                     * first, and a court that is not listed can still be joined.
+                     * The code is the way in now, so it leads. A player handed one
+                     * at the desk does not have to find their session in a list
+                     * first — and a session that is not listed publicly can still
+                     * be joined.
                      */}
                     {signedIn ? (
                         <OpenPlayJoin className="border-border bg-surface mb-8 rounded-xl border p-4 sm:p-5" />
@@ -294,10 +248,12 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
 }
 
 /**
- * One court running open play.
+ * One session.
  *
- * The facts a player decides on are which court, when, what level, what it
- * costs and whether there is room. The way in is the pair, which is not here.
+ * A card is right here — each session is individually actionable — but it was
+ * three stacked bands, a progress bar, a queue line and two buttons. The facts
+ * a player decides on are when, level, cost and whether there is room; the
+ * action is the code.
  */
 function SessionCard({ session }: { session: Session }) {
     const max = session.max_players;
@@ -354,8 +310,8 @@ function SessionCard({ session }: { session: Session }) {
 
                 {/*
                  * No code and no one-tap join. Publishing the pair here would
-                 * make it a credential anyone could read off a public page, so
-                 * it has to come from the club.
+                 * make it a credential anyone could read off a public page; the
+                 * club hands them out, and both go into the form above.
                  */}
                 <span className="text-meta text-muted">ID and key from the club</span>
             </div>

@@ -389,6 +389,9 @@ class OpenPlayRotationService
             'branch_id' => $session->branch_id,
             'court_id' => $court->id,
             'match_type' => 'doubles',
+            /* The session decides what a win is, not the column default. */
+            'target_score' => $session->target_score,
+            'win_by_two' => $session->win_by_two,
             'team_one_name' => $label($pairing['one']),
             'team_two_name' => $label($pairing['two']),
             'status' => 'live',

@@ -1,0 +1,351 @@
+- generic [ref=f217e3]:
+  - link "Skip to main content" [ref=f217e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f217e8]:
+    - generic [ref=f217e9]:
+      - list [ref=f217e10]:
+        - listitem [ref=f217e11]:
+          - link "EAJ EAJ CourtPrime Modern club operations" [ref=f217e12] [cursor=pointer]:
+            - /url: /dashboard
+            - generic [ref=f217e13]: EAJ
+            - generic [ref=f217e14]:
+              - generic [ref=f217e15]: EAJ CourtPrime
+              - generic [ref=f217e16]: Modern club operations
+      - generic [ref=f217e23]:
+        - paragraph [ref=f217e24]: EAJ CourtPrime Club
+        - paragraph [ref=f217e25]: Organization Owner
+    - generic [ref=f217e26]:
+      - generic [ref=f217e28]:
+        - button "Today" [expanded] [ref=f217e29]
+        - list [ref=f217e33]:
+          - listitem [ref=f217e34]:
+            - link "Dashboard" [ref=f217e35] [cursor=pointer]:
+              - /url: /dashboard
+          - listitem [ref=f217e42]:
+            - link "Operations" [ref=f217e43] [cursor=pointer]:
+              - /url: /operations
+          - listitem [ref=f217e49]:
+            - link "Live courts" [ref=f217e50] [cursor=pointer]:
+              - /url: /live-courts
+          - listitem [ref=f217e59]:
+            - link "Check-in" [ref=f217e60] [cursor=pointer]:
+              - /url: /check-in
+      - generic [ref=f217e67]:
+        - button "Courts & bookings" [expanded] [ref=f217e68]
+        - list [ref=f217e72]:
+          - listitem [ref=f217e73]:
+            - link "Reservations 6" [ref=f217e74] [cursor=pointer]:
+              - /url: /reservations
+              - generic [ref=f217e79]: Reservations
+              - generic [ref=f217e80]: "6"
+          - listitem [ref=f217e81]:
+            - link "Scheduler" [ref=f217e82] [cursor=pointer]:
+              - /url: /scheduler
+          - listitem [ref=f217e87]:
+            - link "Courts" [ref=f217e88] [cursor=pointer]:
+              - /url: /courts
+          - listitem [ref=f217e93]:
+            - link "Branches" [ref=f217e94] [cursor=pointer]:
+              - /url: /branches
+          - listitem [ref=f217e99]:
+            - link "Maintenance" [ref=f217e100] [cursor=pointer]:
+              - /url: /maintenance
+      - generic [ref=f217e105]:
+        - button "People" [expanded] [ref=f217e106]
+        - list [ref=f217e110]:
+          - listitem [ref=f217e111]:
+            - link "Players" [ref=f217e112] [cursor=pointer]:
+              - /url: /players
+          - listitem [ref=f217e119]:
+            - link "Memberships" [ref=f217e120] [cursor=pointer]:
+              - /url: /memberships
+          - listitem [ref=f217e125]:
+            - link "Staff" [ref=f217e126] [cursor=pointer]:
+              - /url: /staff
+          - listitem [ref=f217e132]:
+            - link "Coaches" [ref=f217e133] [cursor=pointer]:
+              - /url: /coaches
+          - listitem [ref=f217e138]:
+            - link "Open play" [ref=f217e139] [cursor=pointer]:
+              - /url: /open-play
+      - button "Money" [ref=f217e148]
+      - button "Growth" [ref=f217e153]
+    - generic [ref=f217e156]:
+      - generic [ref=f217e157]:
+        - generic:
+          - list
+      - list [ref=f217e158]:
+        - listitem [ref=f217e159]:
+          - button "OD Owner Demo" [ref=f217e160]:
+            - generic [ref=f217e161]: OD
+            - generic [ref=f217e163]: Owner Demo
+  - main [ref=f217e168]:
+    - generic [ref=f217e169]:
+      - button "Toggle Sidebar" [ref=f217e170]
+      - generic [ref=f217e172]:
+        - navigation "breadcrumb" [ref=f217e173]:
+          - list [ref=f217e174]:
+            - listitem [ref=f217e175]:
+              - link "Branches" [disabled] [ref=f217e176]
+        - paragraph [ref=f217e177]: EAJ CourtPrime Club · Organization Owner
+      - button "Search CourtPrime" [ref=f217e179]:
+        - generic [ref=f217e180]: Search
+        - generic [ref=f217e185]: ⌘K
+    - generic [ref=f217e186]:
+      - generic [ref=f217e187]:
+        - heading "Multi-Branch Control" [level=1] [ref=f217e188]
+        - paragraph [ref=f217e189]: Manage locations, operating hours, tax setup, court counts, and branch status.
+      - generic [ref=f217e190]:
+        - generic [ref=f217e191]:
+          - generic [ref=f217e192]: New Branch
+          - generic [ref=f217e199]:
+            - generic [ref=f217e200]:
+              - generic [ref=f217e201]:
+                - text: Branch Name
+                - textbox [ref=f217e202]
+              - generic [ref=f217e203]:
+                - text: Code
+                - textbox [ref=f217e204]
+            - generic [ref=f217e205]:
+              - text: Address
+              - textbox [ref=f217e206]
+            - generic [ref=f217e207]:
+              - generic [ref=f217e208]:
+                - text: Phone
+                - textbox [ref=f217e209]
+              - generic [ref=f217e210]:
+                - text: Email
+                - textbox [ref=f217e211]
+              - generic [ref=f217e212]:
+                - text: Manager
+                - textbox [ref=f217e213]
+              - generic [ref=f217e214]:
+                - text: Timezone
+                - textbox [ref=f217e215]: Asia/Manila
+              - generic [ref=f217e216]:
+                - text: Currency
+                - textbox [ref=f217e217]: PHP
+              - generic [ref=f217e218]:
+                - text: Tax %
+                - spinbutton [ref=f217e219]: "0"
+              - generic [ref=f217e220]:
+                - text: Opens
+                - textbox [ref=f217e221]: 06:00
+              - generic [ref=f217e222]:
+                - text: Closes
+                - textbox [ref=f217e223]: 23:00
+            - button "Save Branch" [ref=f217e224]
+        - generic [ref=f217e225]:
+          - generic [ref=f217e227]:
+            - generic [ref=f217e228]:
+              - generic [ref=f217e229]:
+                - paragraph [ref=f217e230]: BAC
+                - heading "Bacolod Sports Center" [level=2] [ref=f217e231]
+              - generic [ref=f217e232]: active
+            - paragraph [ref=f217e234]: Lacson Street, Bacolod City
+            - generic [ref=f217e238]:
+              - generic [ref=f217e239]:
+                - paragraph [ref=f217e240]: Courts
+                - paragraph [ref=f217e241]: "4"
+              - generic [ref=f217e242]:
+                - paragraph [ref=f217e243]: Reservations
+                - paragraph [ref=f217e244]: "4"
+              - generic [ref=f217e245]:
+                - paragraph [ref=f217e246]: Tax
+                - paragraph [ref=f217e247]: 12.00%
+              - generic [ref=f217e248]:
+                - paragraph [ref=f217e249]: Currency
+                - paragraph [ref=f217e250]: PHP
+            - paragraph [ref=f217e252]: 06:00 to 23:00 local time
+            - generic [ref=f217e257]:
+              - generic [ref=f217e258]:
+                - paragraph [ref=f217e259]: Gallery
+                - paragraph [ref=f217e260]: 6 photos
+              - list [ref=f217e261]:
+                - listitem [ref=f217e262]:
+                  - generic [ref=f217e263]:
+                    - generic [ref=f217e264]:
+                      - img "Championship court" [ref=f217e265]
+                      - generic [ref=f217e266]:
+                        - button "Choose File" [ref=f217e267]
+                        - button "Replace image" [ref=f217e268]
+                        - button "Remove photo" [ref=f217e273]
+                    - button "Championship court" [ref=f217e278]
+                - listitem [ref=f217e283]:
+                  - generic [ref=f217e284]:
+                    - generic [ref=f217e285]:
+                      - img "Match play" [ref=f217e286]
+                      - generic [ref=f217e287]:
+                        - button "Choose File" [ref=f217e288]
+                        - button "Replace image" [ref=f217e289]
+                        - button "Remove photo" [ref=f217e294]
+                    - button "Match play" [ref=f217e299]
+                - listitem [ref=f217e304]:
+                  - generic [ref=f217e305]:
+                    - generic [ref=f217e306]:
+                      - img "Equipment and rentals" [ref=f217e307]
+                      - generic [ref=f217e308]:
+                        - button "Choose File" [ref=f217e309]
+                        - button "Replace image" [ref=f217e310]
+                        - button "Remove photo" [ref=f217e315]
+                    - button "Equipment and rentals" [ref=f217e320]
+                - listitem [ref=f217e325]:
+                  - generic [ref=f217e326]:
+                    - generic [ref=f217e327]:
+                      - img "Open play nights" [ref=f217e328]
+                      - generic [ref=f217e329]:
+                        - button "Choose File" [ref=f217e330]
+                        - button "Replace image" [ref=f217e331]
+                        - button "Remove photo" [ref=f217e336]
+                    - button "Open play nights" [ref=f217e341]
+                - listitem [ref=f217e346]:
+                  - generic [ref=f217e347]:
+                    - generic [ref=f217e348]:
+                      - img "Centre court" [ref=f217e349]
+                      - generic [ref=f217e350]:
+                        - button "Choose File" [ref=f217e351]
+                        - button "Replace image" [ref=f217e352]
+                        - button "Remove photo" [ref=f217e357]
+                    - button "Centre court" [ref=f217e362]
+                - listitem [ref=f217e367]:
+                  - generic [ref=f217e368]:
+                    - generic [ref=f217e369]:
+                      - img "Show court" [ref=f217e370]
+                      - generic [ref=f217e371]:
+                        - button "Choose File" [ref=f217e372]
+                        - button "Replace image" [ref=f217e373]
+                        - button "Remove photo" [ref=f217e378]
+                    - button "Show court" [ref=f217e383]
+                - listitem [ref=f217e388]:
+                  - button "Choose File" [ref=f217e389]
+                  - button "Add photo" [ref=f217e390]
+          - generic [ref=f217e397]:
+            - generic [ref=f217e398]:
+              - generic [ref=f217e399]:
+                - paragraph [ref=f217e400]: DGT
+                - heading "Dumaguete Pickleball Hub" [level=2] [ref=f217e401]
+              - generic [ref=f217e402]: active
+            - paragraph [ref=f217e404]: Rizal Boulevard, Dumaguete City
+            - generic [ref=f217e408]:
+              - generic [ref=f217e409]:
+                - paragraph [ref=f217e410]: Courts
+                - paragraph [ref=f217e411]: "3"
+              - generic [ref=f217e412]:
+                - paragraph [ref=f217e413]: Reservations
+                - paragraph [ref=f217e414]: "3"
+              - generic [ref=f217e415]:
+                - paragraph [ref=f217e416]: Tax
+                - paragraph [ref=f217e417]: 12.00%
+              - generic [ref=f217e418]:
+                - paragraph [ref=f217e419]: Currency
+                - paragraph [ref=f217e420]: PHP
+            - paragraph [ref=f217e422]: 06:00 to 23:00 local time
+            - generic [ref=f217e427]:
+              - generic [ref=f217e428]:
+                - paragraph [ref=f217e429]: Gallery
+                - paragraph [ref=f217e430]: 4 photos
+              - list [ref=f217e431]:
+                - listitem [ref=f217e432]:
+                  - generic [ref=f217e433]:
+                    - generic [ref=f217e434]:
+                      - img "Championship court" [ref=f217e435]
+                      - generic [ref=f217e436]:
+                        - button "Choose File" [ref=f217e437]
+                        - button "Replace image" [ref=f217e438]
+                        - button "Remove photo" [ref=f217e443]
+                    - button "Championship court" [ref=f217e448]
+                - listitem [ref=f217e453]:
+                  - generic [ref=f217e454]:
+                    - generic [ref=f217e455]:
+                      - img "Match play" [ref=f217e456]
+                      - generic [ref=f217e457]:
+                        - button "Choose File" [ref=f217e458]
+                        - button "Replace image" [ref=f217e459]
+                        - button "Remove photo" [ref=f217e464]
+                    - button "Match play" [ref=f217e469]
+                - listitem [ref=f217e474]:
+                  - generic [ref=f217e475]:
+                    - generic [ref=f217e476]:
+                      - img "Equipment and rentals" [ref=f217e477]
+                      - generic [ref=f217e478]:
+                        - button "Choose File" [ref=f217e479]
+                        - button "Replace image" [ref=f217e480]
+                        - button "Remove photo" [ref=f217e485]
+                    - button "Equipment and rentals" [ref=f217e490]
+                - listitem [ref=f217e495]:
+                  - generic [ref=f217e496]:
+                    - generic [ref=f217e497]:
+                      - img "Open play nights" [ref=f217e498]
+                      - generic [ref=f217e499]:
+                        - button "Choose File" [ref=f217e500]
+                        - button "Replace image" [ref=f217e501]
+                        - button "Remove photo" [ref=f217e506]
+                    - button "Open play nights" [ref=f217e511]
+                - listitem [ref=f217e516]:
+                  - button "Choose File" [ref=f217e517]
+                  - button "Add photo" [ref=f217e518]
+          - generic [ref=f217e525]:
+            - generic [ref=f217e526]:
+              - generic [ref=f217e527]:
+                - paragraph [ref=f217e528]: CEB
+                - heading "Cebu Pickle Arena" [level=2] [ref=f217e529]
+              - generic [ref=f217e530]: active
+            - paragraph [ref=f217e532]: IT Park, Cebu City
+            - generic [ref=f217e536]:
+              - generic [ref=f217e537]:
+                - paragraph [ref=f217e538]: Courts
+                - paragraph [ref=f217e539]: "3"
+              - generic [ref=f217e540]:
+                - paragraph [ref=f217e541]: Reservations
+                - paragraph [ref=f217e542]: "1"
+              - generic [ref=f217e543]:
+                - paragraph [ref=f217e544]: Tax
+                - paragraph [ref=f217e545]: 12.00%
+              - generic [ref=f217e546]:
+                - paragraph [ref=f217e547]: Currency
+                - paragraph [ref=f217e548]: PHP
+            - paragraph [ref=f217e550]: 06:00 to 23:00 local time
+            - generic [ref=f217e555]:
+              - generic [ref=f217e556]:
+                - paragraph [ref=f217e557]: Gallery
+                - paragraph [ref=f217e558]: 4 photos
+              - list [ref=f217e559]:
+                - listitem [ref=f217e560]:
+                  - generic [ref=f217e561]:
+                    - generic [ref=f217e562]:
+                      - img "Championship court" [ref=f217e563]
+                      - generic [ref=f217e564]:
+                        - button "Choose File" [ref=f217e565]
+                        - button "Replace image" [ref=f217e566]
+                        - button "Remove photo" [ref=f217e571]
+                    - button "Championship court" [ref=f217e576]
+                - listitem [ref=f217e581]:
+                  - generic [ref=f217e582]:
+                    - generic [ref=f217e583]:
+                      - img "Match play" [ref=f217e584]
+                      - generic [ref=f217e585]:
+                        - button "Choose File" [ref=f217e586]
+                        - button "Replace image" [ref=f217e587]
+                        - button "Remove photo" [ref=f217e592]
+                    - button "Match play" [ref=f217e597]
+                - listitem [ref=f217e602]:
+                  - generic [ref=f217e603]:
+                    - generic [ref=f217e604]:
+                      - img "Equipment and rentals" [ref=f217e605]
+                      - generic [ref=f217e606]:
+                        - button "Choose File" [ref=f217e607]
+                        - button "Replace image" [ref=f217e608]
+                        - button "Remove photo" [ref=f217e613]
+                    - button "Equipment and rentals" [ref=f217e618]
+                - listitem [ref=f217e623]:
+                  - generic [ref=f217e624]:
+                    - generic [ref=f217e625]:
+                      - img "Open play nights" [ref=f217e626]
+                      - generic [ref=f217e627]:
+                        - button "Choose File" [ref=f217e628]
+                        - button "Replace image" [ref=f217e629]
+                        - button "Remove photo" [ref=f217e634]
+                    - button "Open play nights" [ref=f217e639]
+                - listitem [ref=f217e644]:
+                  - button "Choose File" [ref=f217e645]
+                  - button "Add photo" [ref=f217e646]

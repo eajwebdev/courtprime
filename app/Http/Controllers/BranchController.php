@@ -19,9 +19,19 @@ class BranchController extends Controller
 
         return Inertia::render('branches', [
             'branches' => Branch::query()
+                ->with('photos')
                 ->withCount(['courts', 'reservations'])
                 ->latest()
-                ->get(),
+                ->get()
+                ->map(fn (Branch $branch) => [
+                    ...$branch->toArray(),
+                    /* Resolved URLs so the client never rebuilds storage paths. */
+                    'photos' => $branch->photos->map(fn ($photo) => [
+                        'id' => $photo->id,
+                        'url' => $photo->url,
+                        'caption' => $photo->caption,
+                    ])->values(),
+                ]),
         ]);
     }
 

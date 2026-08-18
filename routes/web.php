@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountReceivableController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ApiCredentialController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\BranchPhotoController;
 use App\Http\Controllers\CashierSessionController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\CoachController;
@@ -142,6 +143,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('operations', OperationsController::class)->name('operations');
     Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
     Route::post('branches', [BranchController::class, 'store'])->name('branches.store');
+    /* Gallery management, scoped to a branch the club can already manage. */
+    Route::post('branches/{branch}/photos', [BranchPhotoController::class, 'store'])->name('branches.photos.store');
+    Route::post('branches/{branch}/photos/{photo}', [BranchPhotoController::class, 'update'])->name('branches.photos.update');
+    Route::delete('branches/{branch}/photos/{photo}', [BranchPhotoController::class, 'destroy'])->name('branches.photos.destroy');
     Route::get('courts', [CourtController::class, 'index'])->name('courts.index');
     Route::post('courts', [CourtController::class, 'store'])->name('courts.store');
     Route::get('players', [PlayerController::class, 'index'])->name('players.index');

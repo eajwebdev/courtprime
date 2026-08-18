@@ -1,0 +1,54 @@
+- generic [ref=f216e3]:
+  - complementary [ref=f216e4]:
+    - link "EAJ CourtPrime home" [ref=f216e5] [cursor=pointer]:
+      - /url: /
+      - img "EAJ CourtPrime" [ref=f216e6]
+    - generic [ref=f216e7]:
+      - heading "One player identity. Every connected court." [level=2] [ref=f216e8]: One player identity.Every connected court.
+      - list [ref=f216e9]:
+        - listitem [ref=f216e10]:
+          - paragraph [ref=f216e11]: One identity
+          - paragraph [ref=f216e12]: Register once, play at every connected club
+        - listitem [ref=f216e13]:
+          - paragraph [ref=f216e14]: Verified record
+          - paragraph [ref=f216e15]: Ratings and match history follow you
+        - listitem [ref=f216e16]:
+          - paragraph [ref=f216e17]: Private operations
+          - paragraph [ref=f216e18]: Club business data stays inside the club
+    - paragraph [ref=f216e19]: Tenant-isolated by design. Your club data is never shared.
+  - main [ref=f216e23]:
+    - generic [ref=f216e24]:
+      - link "Back to CourtPrime" [ref=f216e25] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f216e28]:
+        - heading "Welcome back" [level=1] [ref=f216e29]
+        - paragraph [ref=f216e30]: Sign in to your CourtPrime account.
+      - generic [ref=f216e32]:
+        - generic [ref=f216e33]:
+          - generic [ref=f216e34]: Email address
+          - textbox "Email address" [ref=f216e35]:
+            - /placeholder: you@club.com
+            - text: owner@eaj.test
+        - generic [ref=f216e36]:
+          - generic [ref=f216e37]:
+            - generic [ref=f216e38]: Password
+            - link "Forgot password?" [ref=f216e39] [cursor=pointer]:
+              - /url: http://127.0.0.1:8152/forgot-password
+          - generic [ref=f216e40]:
+            - textbox "Password" [ref=f216e41]:
+              - /placeholder: Your password
+              - text: password
+            - button "Show password" [ref=f216e42]
+        - generic [ref=f216e46]:
+          - checkbox "Keep me signed in" [ref=f216e47]
+          - checkbox
+          - generic [ref=f216e48]: Keep me signed in
+        - button "Sign in" [disabled]
+        - paragraph [ref=f216e50]:
+          - text: New to CourtPrime?
+          - link "Create a player account" [ref=f216e51] [cursor=pointer]:
+            - /url: http://127.0.0.1:8152/register
+        - paragraph [ref=f216e52]:
+          - text: Running a club?
+          - link "Book a demo" [ref=f216e53] [cursor=pointer]:
+            - /url: /request-demo

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { VenueGalleryManager } from '@/components/venue/venue-gallery-manager';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -151,11 +152,17 @@ export default function Branches({ branches }: { branches: any[] }) {
                                         <Metric label="Tax" value={`${branch.tax_rate}%`} />
                                         <Metric label="Currency" value={branch.currency} />
                                     </div>
-                                    <div className="dark:bg-surface-muted mt-5 rounded-lg bg-slate-50 p-3 text-sm">
-                                        <p className="text-muted-foreground flex items-center gap-2">
+                                    <div className="bg-surface-muted mt-5 rounded-lg p-3">
+                                        <p className="text-meta text-muted flex items-center gap-2">
                                             <Clock className="size-4" />
-                                            {branch.operating_hours?.opens ?? '06:00'} - {branch.operating_hours?.closes ?? '23:00'} local time
+                                            {branch.operating_hours?.opens ?? '06:00'} to {branch.operating_hours?.closes ?? '23:00'} local time
                                         </p>
+                                    </div>
+
+                                    {/* What players see on /find-courts, editable here by
+                                        the club that owns the venue. */}
+                                    <div className="border-border mt-5 border-t pt-5">
+                                        <VenueGalleryManager branchId={branch.id} photos={branch.photos ?? []} />
                                     </div>
                                 </CardContent>
                             </Card>

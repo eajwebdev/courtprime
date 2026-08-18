@@ -2,6 +2,7 @@ import { FlashToast } from '@/components/flash-toast';
 import { CommandMenu } from '@/components/global-search';
 import { BrandWordmarkAuto } from '@/components/marketing-artwork';
 import { PlayerBottomNav } from '@/components/player-bottom-nav';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { UserMenuContent } from '@/components/user-menu-content';
@@ -51,6 +52,7 @@ export default function PlayerShell({ children, width = 'default' }: { children:
                     </nav>
 
                     <div className="flex items-center gap-2">
+                        <ThemeToggle />
                         <CommandMenu />
                         <DropdownMenu>
                             <DropdownMenuTrigger className="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:ring-offset-2">

@@ -1,5 +1,6 @@
 import { BrandWordmark } from '@/components/marketing-artwork';
 import { MobileNavDrawer, type MobileNavLink } from '@/components/mobile-nav-drawer';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
@@ -55,6 +56,7 @@ export function MarketingNav({ authenticated }: { authenticated: boolean }) {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <ThemeToggle tone="onDeep" />
                     <Link
                         href={authenticated ? '/dashboard' : '/login'}
                         className="text-label hidden rounded-sm px-2 font-medium text-white/80 transition-colors hover:text-white sm:inline-flex"

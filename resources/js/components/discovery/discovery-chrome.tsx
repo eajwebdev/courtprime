@@ -1,5 +1,6 @@
 import { AthleteArtwork, BrandWordmark, BrandWordmarkAuto } from '@/components/marketing-artwork';
 import { MobileNavDrawer, type MobileNavLink } from '@/components/mobile-nav-drawer';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
@@ -57,6 +58,8 @@ export function DiscoveryHeader({
                         );
                     })}
                 </nav>
+
+                <ThemeToggle />
 
                 {authenticated ? (
                     <Button asChild size="sm" variant="outline">

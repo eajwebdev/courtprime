@@ -3,11 +3,13 @@ import { DiscoveryHero, FilterChip, FilterRow } from '@/components/discovery/dis
 import { DiscoveryPage } from '@/components/discovery/discovery-page';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
+import { VenueGallery } from '@/components/venue/venue-gallery';
+import { VenueLinks } from '@/components/venue/venue-links';
 import { currency, friendlyDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Lock, MapPin, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Clock, Lock, MapPin, Search, SlidersHorizontal, X } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- branch payload is shaped
@@ -217,23 +219,72 @@ export default function CourtDiscovery({ date, search, branches }: Props) {
                                    three pieces of chrome saying what the rows
                                    already say. */
                                 <article key={branch.id} className="border-border bg-surface overflow-hidden rounded-xl border">
-                                    <div className="border-border flex items-start gap-3 border-b px-4 py-3">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-meta text-primary truncate font-semibold tracking-wide uppercase">
-                                                {branch.organization?.name}
-                                            </p>
-                                            <h3 className="text-h3 text-foreground mt-0.5 truncate">{branch.name}</h3>
-                                            <p className="text-meta text-muted mt-0.5 flex items-center gap-1.5">
-                                                <MapPin className="size-3.5 shrink-0" aria-hidden />
-                                                <span className="truncate">{branch.address ?? 'Address unavailable'}</span>
-                                            </p>
-                                        </div>
+                                    {/* Gallery beside the details on desktop, stacked on a
+                                        phone. A listing should show the place, not only
+                                        name it. */}
+                                    <div className="border-border grid gap-4 border-b p-4 sm:grid-cols-[minmax(0,18rem)_1fr]">
+                                        <VenueGallery photos={branch.photos ?? []} name={branch.name} />
 
-                                        {branch.organization?.slug && (
-                                            <Button asChild variant="outline" size="sm" className="shrink-0">
-                                                <Link href={`/clubs/${branch.organization.slug}`}>Club</Link>
-                                            </Button>
-                                        )}
+                                        <div className="flex min-w-0 flex-col">
+                                            <div className="flex items-start gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-meta text-primary truncate font-semibold tracking-wide uppercase">
+                                                        {branch.organization?.name}
+                                                    </p>
+                                                    <h3 className="text-h3 text-foreground mt-0.5 truncate">{branch.name}</h3>
+                                                    <p className="text-meta text-muted mt-0.5 flex items-center gap-1.5">
+                                                        <MapPin className="size-3.5 shrink-0" aria-hidden />
+                                                        <span className="truncate">{branch.address ?? 'Address unavailable'}</span>
+                                                    </p>
+                                                </div>
+
+                                                {branch.organization?.slug && (
+                                                    <Button asChild variant="outline" size="sm" className="shrink-0">
+                                                        <Link href={`/clubs/${branch.organization.slug}`}>Club</Link>
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            {/* A divided facts band rather than a loose meta
+                                                line, so the column has weight beside the
+                                                gallery instead of a pool of dead space. */}
+                                            <dl className="border-border bg-border mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-lg border">
+                                                <div className="bg-surface px-3 py-2">
+                                                    <dt className="text-muted text-[0.625rem] tracking-wide uppercase">Courts</dt>
+                                                    <dd data-numeric className="text-label text-foreground font-semibold">
+                                                        {branch.courts.length}
+                                                    </dd>
+                                                </div>
+                                                <div className="bg-surface px-3 py-2">
+                                                    <dt className="text-muted text-[0.625rem] tracking-wide uppercase">Open slots</dt>
+                                                    <dd data-numeric className="text-label text-success font-semibold">
+                                                        {branch.courts.reduce(
+                                                            (sum: number, court: any) => sum + Number(court.available_slots ?? 0),
+                                                            0,
+                                                        )}
+                                                    </dd>
+                                                </div>
+                                                <div className="bg-surface px-3 py-2">
+                                                    <dt className="text-muted text-[0.625rem] tracking-wide uppercase">From</dt>
+                                                    <dd data-numeric className="text-label text-foreground font-semibold">
+                                                        {currency(
+                                                            Math.min(...branch.courts.map((court: any) => Number(court.standard_hourly_rate ?? 0))),
+                                                        )}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+
+                                            {branch.operating_hours?.opens && (
+                                                <p data-numeric className="text-meta text-muted mt-2 flex items-center gap-1.5">
+                                                    <Clock className="size-3.5 shrink-0" aria-hidden />
+                                                    Open {branch.operating_hours.opens} to {branch.operating_hours.closes}
+                                                </p>
+                                            )}
+
+                                            <div className="mt-3">
+                                                <VenueLinks links={branch.organization?.links} phone={branch.contact_number} name={branch.name} />
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <ul className="bg-border grid gap-px sm:grid-cols-2">

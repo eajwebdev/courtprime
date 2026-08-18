@@ -41,6 +41,12 @@ class Branch extends Model
         return $this->belongsTo(Organization::class);
     }
 
+    /** Venue gallery, ordered for display. */
+    public function photos(): HasMany
+    {
+        return $this->hasMany(BranchPhoto::class)->orderBy('sort_order');
+    }
+
     public function courts(): HasMany
     {
         return $this->hasMany(Court::class);

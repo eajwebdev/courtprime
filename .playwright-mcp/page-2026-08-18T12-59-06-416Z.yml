@@ -1,0 +1,199 @@
+- generic [ref=f194e3]:
+  - banner [ref=f194e4]:
+    - generic [ref=f194e5]:
+      - link "EAJ CourtPrime home" [ref=f194e7] [cursor=pointer]:
+        - /url: /
+        - img "EAJ CourtPrime" [ref=f194e8]
+      - navigation "Discover" [ref=f194e9]:
+        - link "Courts" [ref=f194e10] [cursor=pointer]:
+          - /url: /find-courts
+        - link "Open play" [ref=f194e11] [cursor=pointer]:
+          - /url: /find-open-play
+        - link "Tournaments" [ref=f194e12] [cursor=pointer]:
+          - /url: /find-tournaments
+        - link "Rankings" [ref=f194e13] [cursor=pointer]:
+          - /url: /leaderboards
+      - link "Sign in" [ref=f194e14] [cursor=pointer]:
+        - /url: /login
+  - generic [ref=f194e15]:
+    - generic [ref=f194e17]:
+      - generic [ref=f194e18]:
+        - paragraph [ref=f194e19]: CourtPrime player network
+        - heading "Find a court. Book with one account." [level=1] [ref=f194e20]
+        - paragraph [ref=f194e21]: Search every connected club, compare open slots and rates, then check in with your CourtPrime identity.
+      - generic [ref=f194e22]:
+        - generic [ref=f194e23]:
+          - generic [ref=f194e24]: Club, branch or city
+          - searchbox "Club, branch or city" [ref=f194e25]: Dumaguete Pickleball Hub
+          - button "Clear search" [ref=f194e26]
+          - button "Search" [ref=f194e30]
+        - group "Date" [ref=f194e31]:
+          - button "Today 18" [pressed] [ref=f194e32]:
+            - generic [ref=f194e33]: Today
+            - generic [ref=f194e34]: "18"
+          - button "Wed 19" [ref=f194e35]:
+            - generic [ref=f194e36]: Wed
+            - generic [ref=f194e37]: "19"
+          - button "Thu 20" [ref=f194e38]:
+            - generic [ref=f194e39]: Thu
+            - generic [ref=f194e40]: "20"
+          - button "Fri 21" [ref=f194e41]:
+            - generic [ref=f194e42]: Fri
+            - generic [ref=f194e43]: "21"
+          - button "Sat 22" [ref=f194e44]:
+            - generic [ref=f194e45]: Sat
+            - generic [ref=f194e46]: "22"
+          - button "Sun 23" [ref=f194e47]:
+            - generic [ref=f194e48]: Sun
+            - generic [ref=f194e49]: "23"
+          - button "Mon 24" [ref=f194e50]:
+            - generic [ref=f194e51]: Mon
+            - generic [ref=f194e52]: "24"
+          - button "Choose another date" [ref=f194e53]:
+            - generic [ref=f194e56]: More
+        - generic [ref=f194e57]:
+          - button "Indoor only" [ref=f194e58]
+          - button "Has open slots" [ref=f194e59]
+    - generic [ref=f194e60]:
+      - generic [ref=f194e61]:
+        - paragraph [ref=f194e62]:
+          - text: 6 courts at 2 clubs
+          - generic [ref=f194e63]: · Today
+        - paragraph [ref=f194e64]: From ₱650 / hour
+      - paragraph [ref=f194e65]:
+        - text: Availability is open to everyone. Sign in to confirm a booking.
+        - link "Sign in" [ref=f194e69] [cursor=pointer]:
+          - /url: /login
+      - generic [ref=f194e70]:
+        - article [ref=f194e71]:
+          - generic [ref=f194e72]:
+            - generic [ref=f194e73]:
+              - figure "Championship court" [ref=f194e74]:
+                - img "Dumaguete Pickleball Hub — Championship court" [ref=f194e75]
+              - generic [ref=f194e77]:
+                - button "Championship court" [pressed] [ref=f194e78]
+                - button "Match play" [ref=f194e79]
+                - button "Equipment and rentals" [ref=f194e80]
+                - button "Open play nights" [ref=f194e81]
+            - generic [ref=f194e82]:
+              - generic [ref=f194e83]:
+                - generic [ref=f194e84]:
+                  - paragraph [ref=f194e85]: EAJ CourtPrime Club
+                  - heading "Dumaguete Pickleball Hub" [level=3] [ref=f194e86]
+                  - paragraph [ref=f194e87]:
+                    - generic [ref=f194e91]: Rizal Boulevard, Dumaguete City
+                - link "Club" [ref=f194e92] [cursor=pointer]:
+                  - /url: /clubs/eaj-courtprime-club
+              - generic [ref=f194e93]:
+                - generic [ref=f194e94]:
+                  - term [ref=f194e95]: Courts
+                  - definition [ref=f194e96]: "3"
+                - generic [ref=f194e97]:
+                  - term [ref=f194e98]: Open
+                  - definition [ref=f194e99]: 06:00 to 23:00
+              - generic [ref=f194e101]:
+                - link "Dumaguete Pickleball Hub on Website" [ref=f194e102] [cursor=pointer]:
+                  - /url: https://eaj-courtprime-club.test
+                - link "Dumaguete Pickleball Hub on Facebook" [ref=f194e106] [cursor=pointer]:
+                  - /url: https://facebook.com/eaj-courtprime-club
+                - link "Dumaguete Pickleball Hub on Instagram" [ref=f194e109] [cursor=pointer]:
+                  - /url: https://instagram.com/eaj-courtprime-club
+                - link "Call Dumaguete Pickleball Hub" [ref=f194e113] [cursor=pointer]:
+                  - /url: tel:+639175551382
+          - list [ref=f194e116]:
+            - listitem [ref=f194e117]:
+              - link [ref=f194e118] [cursor=pointer]:
+                - /url: /me/book?court=5&search=Dumaguete%20Pickleball%20Hub&date=2026-08-18
+                - generic [ref=f194e119]:
+                  - paragraph [ref=f194e120]: Court 1
+                  - paragraph [ref=f194e121]: ₱650/hr
+                - generic [ref=f194e122]:
+                  - paragraph [ref=f194e123]: standard · cushioned acrylic
+                  - paragraph [ref=f194e124]: 31 slots
+            - listitem [ref=f194e125]:
+              - link [ref=f194e126] [cursor=pointer]:
+                - /url: /me/book?court=6&search=Dumaguete%20Pickleball%20Hub&date=2026-08-18
+                - generic [ref=f194e127]:
+                  - paragraph [ref=f194e128]: Court 2
+                  - paragraph [ref=f194e129]: ₱650/hr
+                - generic [ref=f194e130]:
+                  - paragraph [ref=f194e131]: standard · cushioned acrylic
+                  - paragraph [ref=f194e132]: 31 slots
+            - listitem [ref=f194e133]:
+              - link [ref=f194e134] [cursor=pointer]:
+                - /url: /me/book?court=7&search=Dumaguete%20Pickleball%20Hub&date=2026-08-18
+                - generic [ref=f194e135]:
+                  - paragraph [ref=f194e136]: Court 3
+                  - paragraph [ref=f194e137]: ₱650/hr
+                - generic [ref=f194e138]:
+                  - paragraph [ref=f194e139]: standard · cushioned acrylic
+                  - paragraph [ref=f194e140]: 31 slots
+            - listitem [ref=f194e141]
+        - article [ref=f194e142]:
+          - generic [ref=f194e143]:
+            - generic [ref=f194e144]:
+              - figure "Championship court" [ref=f194e145]:
+                - img "Dumaguete Pickleball Hub — Championship court" [ref=f194e146]
+              - generic [ref=f194e148]:
+                - button "Championship court" [pressed] [ref=f194e149]
+                - button "Match play" [ref=f194e150]
+                - button "Equipment and rentals" [ref=f194e151]
+                - button "Open play nights" [ref=f194e152]
+            - generic [ref=f194e153]:
+              - generic [ref=f194e154]:
+                - generic [ref=f194e155]:
+                  - paragraph [ref=f194e156]: Negros Prime Pickle
+                  - heading "Dumaguete Pickleball Hub" [level=3] [ref=f194e157]
+                  - paragraph [ref=f194e158]:
+                    - generic [ref=f194e162]: Rizal Boulevard, Dumaguete City
+                - link "Club" [ref=f194e163] [cursor=pointer]:
+                  - /url: /clubs/negros-prime-pickle
+              - generic [ref=f194e164]:
+                - generic [ref=f194e165]:
+                  - term [ref=f194e166]: Courts
+                  - definition [ref=f194e167]: "3"
+                - generic [ref=f194e168]:
+                  - term [ref=f194e169]: Open
+                  - definition [ref=f194e170]: 06:00 to 22:00
+              - generic [ref=f194e172]:
+                - link "Dumaguete Pickleball Hub on Website" [ref=f194e173] [cursor=pointer]:
+                  - /url: https://negros-prime-pickle.test
+                - link "Dumaguete Pickleball Hub on Facebook" [ref=f194e177] [cursor=pointer]:
+                  - /url: https://facebook.com/negros-prime-pickle
+                - link "Dumaguete Pickleball Hub on Instagram" [ref=f194e180] [cursor=pointer]:
+                  - /url: https://instagram.com/negros-prime-pickle
+                - link "Call Dumaguete Pickleball Hub" [ref=f194e184] [cursor=pointer]:
+                  - /url: tel:+639175553153
+          - list [ref=f194e187]:
+            - listitem [ref=f194e188]:
+              - link [ref=f194e189] [cursor=pointer]:
+                - /url: /me/book?court=11&search=Dumaguete%20Pickleball%20Hub&date=2026-08-18
+                - generic [ref=f194e190]:
+                  - paragraph [ref=f194e191]: Court 1
+                  - paragraph [ref=f194e192]: ₱650/hr
+                - generic [ref=f194e193]:
+                  - paragraph [ref=f194e194]: standard · cushioned acrylic
+                  - paragraph [ref=f194e195]: 34 slots
+            - listitem [ref=f194e196]:
+              - link [ref=f194e197] [cursor=pointer]:
+                - /url: /me/book?court=12&search=Dumaguete%20Pickleball%20Hub&date=2026-08-18
+                - generic [ref=f194e198]:
+                  - paragraph [ref=f194e199]: Court 2
+                  - paragraph [ref=f194e200]: ₱700/hr
+                - generic [ref=f194e201]:
+                  - paragraph [ref=f194e202]: standard · cushioned acrylic
+                  - paragraph [ref=f194e203]: 34 slots
+            - listitem [ref=f194e204]:
+              - link [ref=f194e205] [cursor=pointer]:
+                - /url: /me/book?court=13&search=Dumaguete%20Pickleball%20Hub&date=2026-08-18
+                - generic [ref=f194e206]:
+                  - paragraph [ref=f194e207]: Court 3
+                  - paragraph [ref=f194e208]: ₱750/hr
+                - generic [ref=f194e209]:
+                  - paragraph [ref=f194e210]: standard · cushioned acrylic
+                  - paragraph [ref=f194e211]: 34 slots
+            - listitem [ref=f194e212]
+    - contentinfo [ref=f194e213]:
+      - generic [ref=f194e214]:
+        - img "EAJ CourtPrime" [ref=f194e215]
+        - paragraph [ref=f194e216]: One player identity. Every connected court.

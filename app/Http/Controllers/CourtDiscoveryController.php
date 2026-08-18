@@ -20,7 +20,7 @@ class CourtDiscoveryController extends Controller
 
         $branches = Branch::query()
             ->withoutGlobalScope('organization')
-            ->with(['organization', 'courts' => fn ($query) => $query
+            ->with(['organization', 'photos', 'courts' => fn ($query) => $query
                 ->withoutGlobalScope('organization')
                 ->whereIn('status', ['available', 'reserved', 'occupied', 'open_play'])
                 ->orderBy('court_number')])
@@ -42,10 +42,28 @@ class CourtDiscoveryController extends Controller
                 'address' => $branch->address,
                 'timezone' => $branch->timezone,
                 'operating_hours' => $branch->operating_hours,
+                'contact_number' => $branch->contact_number,
+                'email' => $branch->email,
+                /* Venue gallery, ordered. Empty until the club uploads. */
+                'photos' => $branch->photos->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'url' => $photo->url,
+                    'caption' => $photo->caption,
+                ])->values(),
                 'organization' => [
                     'id' => $branch->organization?->id,
                     'name' => $branch->organization?->name,
                     'slug' => $branch->organization?->slug,
+                    /*
+                     * Each club owns its own links. They live in the existing
+                     * settings JSON, so adding a channel needs no migration.
+                     */
+                    'links' => array_filter([
+                        'website' => $branch->organization?->settings['website'] ?? null,
+                        'facebook' => $branch->organization?->settings['facebook'] ?? null,
+                        'instagram' => $branch->organization?->settings['instagram'] ?? null,
+                        'tiktok' => $branch->organization?->settings['tiktok'] ?? null,
+                    ]),
                 ],
                 'courts' => $branch->courts->map(fn (Court $court) => [
                     'id' => $court->id,

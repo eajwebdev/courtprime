@@ -1,146 +1,167 @@
+import { BookingFormDialog, type BookingCourt, type BookingSeed } from '@/components/booking/booking-form-dialog';
+import { MonthCalendar, type DayLoad } from '@/components/booking/month-calendar';
+import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { currency } from '@/lib/format';
+import { currency, time12h } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { type FormEvent } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { CalendarDays, Clock, Plus, Users } from 'lucide-react';
+import { useState } from 'react';
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- payload from ReservationController. */
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Reservations', href: '/reservations' }];
 
-export default function Reservations({ reservations, courts }: { reservations: any; courts: any[] }) {
-    const form = useForm({
-        court_id: courts[0]?.id ?? '',
-        player_name: '',
-        player_email: '',
-        player_mobile_number: '',
-        reservation_date: new Date().toISOString().slice(0, 10),
-        start_time: '18:00',
-        end_time: '19:00',
-        players_count: 4,
-        reservation_type: 'court_booking',
-        source: 'front_desk',
-        payment_status: 'unpaid',
-        booking_status: 'confirmed',
-        notes: '',
-    });
+type Props = {
+    date: string;
+    month: string;
+    monthLoad: Record<string, DayLoad>;
+    reservations: any[];
+    courts: BookingCourt[];
+    branches: any[];
+};
 
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        form.post('/reservations', {
-            preserveScroll: true,
-            onSuccess: () => form.reset('player_name', 'player_email', 'player_mobile_number', 'notes'),
-        });
+/**
+ * The booking calendar.
+ *
+ * Month on the left for shape, the chosen day in full on the right, and the
+ * form in a dialog rather than parked down the side of the screen. Everything
+ * here answers "what is on, and when", which is the only thing this page was
+ * ever opened for.
+ */
+export default function Reservations({ date, month, monthLoad, reservations, courts }: Props) {
+    const [seed, setSeed] = useState<BookingSeed>({});
+    const [open, setOpen] = useState(false);
+
+    const go = (next: string) => router.get('/reservations', { date: next }, { preserveState: true, preserveScroll: true });
+
+    const book = (extra: BookingSeed = {}) => {
+        setSeed({ reservation_date: date, ...extra });
+        setOpen(true);
     };
+
+    const selected = new Date(`${date}T00:00:00`);
+    const totalDue = reservations.reduce((sum, entry) => sum + Number(entry.amount_due ?? 0), 0);
+    const unpaid = reservations.filter((entry) => entry.payment_status !== 'paid').length;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Reservations" />
-            <div className="grid gap-6 p-4 md:p-6 xl:grid-cols-[0.9fr_1.6fr]">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Quick Booking</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={submit} className="space-y-4">
-                            <Field
-                                label="Player Name"
-                                value={form.data.player_name}
-                                onChange={(value) => form.setData('player_name', value)}
-                                error={form.errors.player_name}
-                            />
-                            <Field
-                                label="Player Email"
-                                type="email"
-                                value={form.data.player_email}
-                                onChange={(value) => form.setData('player_email', value)}
-                            />
-                            <div className="space-y-2">
-                                <Label>Court</Label>
-                                <select
-                                    className="bg-background h-10 w-full rounded-md border px-3 text-sm"
-                                    value={form.data.court_id}
-                                    onChange={(event) => form.setData('court_id', Number(event.target.value))}
-                                >
-                                    {courts.map((court) => (
-                                        <option key={court.id} value={court.id}>
-                                            {court.branch?.code} - {court.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {form.errors.court_id && <p className="text-xs text-red-600">{form.errors.court_id}</p>}
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                <Field
-                                    label="Date"
-                                    type="date"
-                                    value={form.data.reservation_date}
-                                    onChange={(value) => form.setData('reservation_date', value)}
-                                />
-                                <Field
-                                    label="Start"
-                                    type="time"
-                                    value={form.data.start_time}
-                                    onChange={(value) => form.setData('start_time', value)}
-                                />
-                                <Field label="End" type="time" value={form.data.end_time} onChange={(value) => form.setData('end_time', value)} />
-                            </div>
-                            <Button disabled={form.processing} className="bg-primary w-full">
-                                Create Reservation
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Reservation Board</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {reservations.data.map((reservation: any) => (
-                            <div key={reservation.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_auto_auto] md:items-center">
-                                <div>
-                                    <p className="font-semibold">{reservation.reference}</p>
-                                    <p className="text-muted-foreground text-sm">
-                                        {reservation.player?.name ?? 'Walk-in'} - {reservation.court?.name} - {reservation.start_time.slice(0, 5)} to{' '}
-                                        {reservation.end_time.slice(0, 5)}
+            <div className="grid gap-6 p-4 md:p-6 xl:grid-cols-[20rem_minmax(0,1fr)]">
+                <div className="flex flex-col gap-5">
+                    <MonthCalendar month={month} selected={date} load={monthLoad} onSelect={go} onMonthChange={go} />
+
+                    <div className="border-border flex flex-col gap-2 border-t pt-4">
+                        <Button type="button" onClick={() => book()} className="w-full">
+                            <Plus className="size-4" />
+                            New booking
+                        </Button>
+                        <Button asChild variant="outline" className="w-full">
+                            <Link href={`/scheduler?date=${date}`}>
+                                <CalendarDays className="size-4" />
+                                Open day on the grid
+                            </Link>
+                        </Button>
+                    </div>
+                </div>
+
+                <section className="min-w-0">
+                    <header className="border-border mb-4 flex flex-wrap items-end justify-between gap-3 border-b pb-4">
+                        <div>
+                            <h1 className="text-h1 text-foreground">
+                                {selected.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </h1>
+                            <p className="text-meta text-muted mt-1">
+                                <span data-numeric className="text-foreground font-semibold">
+                                    {reservations.length}
+                                </span>{' '}
+                                {reservations.length === 1 ? 'booking' : 'bookings'}
+                                {reservations.length > 0 && (
+                                    <>
+                                        {' · '}
+                                        <span data-numeric>{currency(totalDue)}</span> booked
+                                        {unpaid > 0 && (
+                                            <>
+                                                {' · '}
+                                                <span data-numeric className="text-warning font-medium">
+                                                    {unpaid}
+                                                </span>{' '}
+                                                unpaid
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                    </header>
+
+                    {reservations.length === 0 ? (
+                        <EmptyState
+                            title="Nothing booked this day"
+                            description="Take a booking, or pick another date on the calendar."
+                            artwork="/cp-paddle4.png"
+                            action={
+                                <Button onClick={() => book()}>
+                                    <Plus className="size-4" />
+                                    New booking
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <ul className="divide-border border-border divide-y rounded-xl border">
+                            {reservations.map((entry) => (
+                                <li key={entry.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                                    {/* Fixed width so the times form a column
+                                        the eye can run down, and wide enough
+                                        that "10:00 AM to 11:30 AM" stays on one
+                                        line. */}
+                                    <p data-numeric className="text-label text-foreground w-40 shrink-0 font-semibold">
+                                        {time12h(entry.start_time)}
+                                        <span className="text-muted font-normal"> to {time12h(entry.end_time)}</span>
                                     </p>
-                                </div>
-                                <StatusBadge status={reservation.booking_status} />
-                                <div className="text-right">
-                                    <p className="font-semibold">{currency(reservation.amount_due)}</p>
-                                    <p className="text-muted-foreground text-xs">{reservation.payment_status}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            </div>
-        </AppLayout>
-    );
-}
 
-function Field({
-    label,
-    value,
-    onChange,
-    error,
-    type = 'text',
-}: {
-    label: string;
-    value: string | number;
-    onChange: (value: string) => void;
-    error?: string;
-    type?: string;
-}) {
-    return (
-        <div className="space-y-2">
-            <Label>{label}</Label>
-            <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
-            {error && <p className="text-xs text-red-600">{error}</p>}
-        </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-label text-foreground truncate font-medium">{entry.player ?? 'Walk-in'}</p>
+                                        <p className="text-meta text-muted truncate">
+                                            {entry.court}
+                                            {entry.branch ? ` · ${entry.branch}` : ''} · {entry.reference}
+                                        </p>
+                                    </div>
+
+                                    <p className="text-meta text-muted hidden items-center gap-1 sm:flex">
+                                        <Users className="size-3.5" aria-hidden />
+                                        <span data-numeric>{entry.players_count}</span>
+                                    </p>
+
+                                    <StatusBadge status={entry.booking_status} />
+
+                                    <div className="w-24 text-right">
+                                        <p data-numeric className="text-label text-foreground font-semibold">
+                                            {currency(entry.amount_due)}
+                                        </p>
+                                        <p className={cn('text-meta', entry.payment_status === 'paid' ? 'text-success' : 'text-warning')}>
+                                            {entry.payment_status}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    {reservations.length > 0 && (
+                        <p className="text-meta text-muted mt-3 flex items-center gap-1.5">
+                            <Clock className="size-3.5" aria-hidden />
+                            Times are club local.
+                        </p>
+                    )}
+                </section>
+            </div>
+
+            <BookingFormDialog open={open} onOpenChange={setOpen} courts={courts} seed={seed} />
+        </AppLayout>
     );
 }

@@ -1,0 +1,693 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to content" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - banner [ref=e4]:
+      - navigation "Primary" [ref=e5]:
+        - link "EAJ CourtPrime home" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "EAJ CourtPrime" [ref=e8]
+        - generic [ref=e9]:
+          - link "Player Network" [ref=e10] [cursor=pointer]:
+            - /url: "#identity"
+          - link "Discover Courts" [ref=e11] [cursor=pointer]:
+            - /url: "#discover"
+          - link "Live" [ref=e12] [cursor=pointer]:
+            - /url: "#live"
+          - link "Business OS" [ref=e13] [cursor=pointer]:
+            - /url: "#business"
+          - link "Pricing" [ref=e14] [cursor=pointer]:
+            - /url: "#pricing"
+        - generic [ref=e15]:
+          - link "Sign in" [ref=e16] [cursor=pointer]:
+            - /url: /login
+          - link "Book a demo" [ref=e17] [cursor=pointer]:
+            - /url: /request-demo
+    - main [ref=e18]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - paragraph [ref=e22]: One player identity · Every connected court
+          - heading "Register once. Play everywhere." [level=1] [ref=e23]: Register once.Play everywhere.
+          - paragraph [ref=e24]: CourtPrime gives players one verified record that follows them across every connected club, and gives club owners a private operating system to run reservations, courts, payments and tournaments.
+          - generic [ref=e25]:
+            - link "Find your next court" [ref=e26] [cursor=pointer]:
+              - /url: /find-courts
+            - link "Bring your club to CourtPrime" [ref=e27] [cursor=pointer]:
+              - /url: /request-demo
+          - paragraph [ref=e28]: Shared player identity. Private business operations. Tenant-isolated by design.
+        - generic [ref=e32]:
+          - img "Two CourtPrime players mid-rally" [ref=e34]
+          - generic [ref=e35]:
+            - paragraph [ref=e36]: CourtPrime ID
+            - paragraph [ref=e37]: CP-PLY-000001
+          - generic [ref=e38]:
+            - paragraph [ref=e39]: Global rating
+            - paragraph [ref=e40]: "4.21"
+          - generic [ref=e41]:
+            - paragraph [ref=e42]: Connected clubs
+            - paragraph [ref=e43]: "4"
+          - generic [ref=e44]:
+            - paragraph [ref=e45]: Next match
+            - paragraph [ref=e46]: 7:30 PM
+      - region "Network at a glance" [ref=e47]:
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - text: "0"
+            - paragraph [ref=e50]: Connected clubs
+          - generic [ref=e51]:
+            - text: "0"
+            - paragraph [ref=e52]: Locations live
+          - generic [ref=e53]:
+            - text: "0"
+            - paragraph [ref=e54]: Courts connected
+          - generic [ref=e55]:
+            - text: "0"
+            - paragraph [ref=e56]: Registered players
+          - generic [ref=e57]:
+            - text: "0"
+            - paragraph [ref=e58]: Matches recorded
+      - generic [ref=e60]:
+        - generic [ref=e62]:
+          - paragraph [ref=e63]: Section 01 · One player identity
+          - heading "One profile. Every connected court." [level=2] [ref=e64]
+          - paragraph [ref=e65]: Players register once with CourtPrime. That single verified identity connects to every participating club, so ratings, history and reservations never start over.
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - list [ref=e69]:
+              - listitem [ref=e70]:
+                - heading "Register once" [level=3] [ref=e71]
+                - paragraph [ref=e72]: A CourtPrime ID is issued the first time a player joins any connected club.
+              - listitem [ref=e73]:
+                - heading "Play everywhere" [level=3] [ref=e74]
+                - paragraph [ref=e75]: Walk into a different club in a different city and you are already known.
+              - listitem [ref=e76]:
+                - heading "Keep one verified record" [level=3] [ref=e77]
+                - paragraph [ref=e78]: Ratings, matches and rankings accumulate against one identity, never fragmented.
+            - link "See the player network" [ref=e79] [cursor=pointer]:
+              - /url: /leaderboards
+          - generic [ref=e80]:
+            - generic [ref=e87]:
+              - img "CourtPrime player" [ref=e88]
+              - paragraph [ref=e89]: CP-PLY-000001
+              - paragraph [ref=e90]: Verified identity
+            - generic [ref=e91]:
+              - paragraph [ref=e92]: Bacolod Sports Center
+              - paragraph [ref=e93]: Bacolod City
+            - generic [ref=e94]:
+              - paragraph [ref=e95]: Dumaguete Pickleball Hub
+              - paragraph [ref=e96]: Dumaguete City
+            - generic [ref=e97]:
+              - paragraph [ref=e98]: Cebu Pickle Arena
+              - paragraph [ref=e99]: Cebu City
+            - generic [ref=e100]:
+              - paragraph [ref=e101]: Dumaguete Pickleball Hub
+              - paragraph [ref=e102]: Dumaguete City
+      - generic [ref=e104]:
+        - generic [ref=e106]:
+          - paragraph [ref=e107]: Section 02 · Discover
+          - heading "Find a court the way players actually search." [level=2] [ref=e108]
+          - paragraph [ref=e109]: Location, surface, availability, open play, tournaments and rates, surfaced as venues, not as database rows.
+        - generic [ref=e110]:
+          - generic [ref=e112]:
+            - generic [ref=e117]:
+              - paragraph [ref=e118]: Where
+              - paragraph [ref=e119]: Bacolod City, Negros Occidental
+            - generic [ref=e124]:
+              - paragraph [ref=e125]: When
+              - paragraph [ref=e126]: Today · 6:00 PM - 9:00 PM
+            - link "Search courts" [ref=e127] [cursor=pointer]:
+              - /url: /find-courts
+          - generic [ref=e128]:
+            - generic [ref=e129]: Indoor
+            - generic [ref=e136]: Outdoor
+            - generic [ref=e141]: Open play
+            - generic [ref=e142]: Tournaments
+            - generic [ref=e143]: Available now
+      - generic [ref=e145]:
+        - generic [ref=e147]:
+          - paragraph [ref=e148]: Courts powered by CourtPrime
+          - heading "The network is filling up." [level=2] [ref=e149]
+          - paragraph [ref=e150]: Clubs already running on CourtPrime, and the next wave joining. Open any live club to see today's availability.
+        - generic [ref=e151]:
+          - list [ref=e152]:
+            - listitem [ref=e153]:
+              - link "BS Bacolod Sports Center Live" [ref=e154] [cursor=pointer]:
+                - /url: /find-courts?search=Bacolod%20Sports%20Center
+                - generic [ref=e155]: BS
+                - generic [ref=e156]: Bacolod Sports Center
+                - generic [ref=e157]: Live
+            - listitem [ref=e160]:
+              - link "DP Dumaguete Pickleball Hub Live" [ref=e161] [cursor=pointer]:
+                - /url: /find-courts?search=Dumaguete%20Pickleball%20Hub
+                - generic [ref=e162]: DP
+                - generic [ref=e163]: Dumaguete Pickleball Hub
+                - generic [ref=e164]: Live
+            - listitem [ref=e167]:
+              - link "CP Cebu Pickle Arena Live" [ref=e168] [cursor=pointer]:
+                - /url: /find-courts?search=Cebu%20Pickle%20Arena
+                - generic [ref=e169]: CP
+                - generic [ref=e170]: Cebu Pickle Arena
+                - generic [ref=e171]: Live
+            - listitem [ref=e174]:
+              - link "DP Dumaguete Pickleball Hub Live" [ref=e175] [cursor=pointer]:
+                - /url: /find-courts?search=Dumaguete%20Pickleball%20Hub
+                - generic [ref=e176]: DP
+                - generic [ref=e177]: Dumaguete Pickleball Hub
+                - generic [ref=e178]: Live
+            - listitem [ref=e181]:
+              - link "CC Cebu Central Live" [ref=e182] [cursor=pointer]:
+                - /url: /find-courts?search=Cebu%20Central
+                - generic [ref=e183]: CC
+                - generic [ref=e184]: Cebu Central
+                - generic [ref=e185]: Live
+            - listitem [ref=e188]:
+              - link "MC Mandaue Courts Live" [ref=e189] [cursor=pointer]:
+                - /url: /find-courts?search=Mandaue%20Courts
+                - generic [ref=e190]: MC
+                - generic [ref=e191]: Mandaue Courts
+                - generic [ref=e192]: Live
+            - listitem [ref=e195]:
+              - generic [ref=e196]: Joining soon
+            - listitem [ref=e201]:
+              - generic [ref=e202]: Joining soon
+            - listitem [ref=e207]:
+              - generic [ref=e208]: Joining soon
+            - listitem [ref=e213]:
+              - generic [ref=e214]: Joining soon
+            - listitem [ref=e219]:
+              - generic [ref=e220]: Joining soon
+            - listitem [ref=e225]:
+              - generic [ref=e226]: Joining soon
+            - listitem [ref=e231]:
+              - generic [ref=e232]: Joining soon
+            - listitem [ref=e237]:
+              - generic [ref=e238]: Joining soon
+            - listitem [ref=e243]:
+              - link "Your club here" [ref=e244] [cursor=pointer]:
+                - /url: /request-demo
+          - paragraph [ref=e249]: Browsing is open to everyone. Signing in is only needed to confirm a booking.
+      - generic [ref=e254]:
+        - generic [ref=e256]:
+          - paragraph [ref=e257]: Section 03 · Book from one account
+          - heading "Watch CourtPrime operate." [level=2] [ref=e258]
+          - paragraph [ref=e259]: The same account books any connected club. No second registration, no second wallet, no second identity.
+        - generic [ref=e261]:
+          - list [ref=e262]:
+            - listitem [ref=e263]:
+              - button "1 Find club" [ref=e264]:
+                - generic [ref=e265]: "1"
+                - generic [ref=e266]: Find club
+            - listitem [ref=e267]:
+              - button "2 Choose branch" [ref=e268]:
+                - generic [ref=e269]: "2"
+                - generic [ref=e270]: Choose branch
+            - listitem [ref=e271]:
+              - button "3 Choose court" [ref=e272]:
+                - generic [ref=e273]: "3"
+                - generic [ref=e274]: Choose court
+            - listitem [ref=e275]:
+              - button "4 Choose time" [ref=e276]:
+                - generic [ref=e277]: "4"
+                - generic [ref=e278]: Choose time
+            - listitem [ref=e279]:
+              - button "5 Add players" [ref=e280]:
+                - generic [ref=e281]: "5"
+                - generic [ref=e282]: Add players
+            - listitem [ref=e283]:
+              - button "6 Add rentals" [ref=e284]:
+                - generic [ref=e285]: "6"
+                - generic [ref=e286]: Add rentals
+            - listitem [ref=e287]:
+              - button "7 Pay" [ref=e288]:
+                - generic [ref=e289]: "7"
+                - generic [ref=e290]: Pay
+            - listitem [ref=e291]:
+              - button "8 Confirmed" [ref=e292]:
+                - generic [ref=e293]: "8"
+                - generic [ref=e294]: Confirmed
+          - generic [ref=e297]:
+            - paragraph [ref=e298]: Step 1 of 8
+            - generic [ref=e299]:
+              - heading "Find club" [level=3] [ref=e300]
+              - paragraph [ref=e301]: Any connected club
+              - paragraph [ref=e302]: Search by club, branch or city
+      - generic [ref=e306]:
+        - generic [ref=e308]:
+          - paragraph [ref=e309]: Section 04 · Your record follows you
+          - heading "Four clubs. Four cities. One timeline." [level=2] [ref=e310]
+          - paragraph [ref=e311]: Matches played at different organisations flow into a single chronological player history, the record belongs to the player, not to any one club.
+        - generic [ref=e313]:
+          - list [ref=e316]:
+            - listitem [ref=e317]:
+              - generic [ref=e319]:
+                - paragraph [ref=e320]: Bacolod Sports Center
+                - paragraph [ref=e321]: Aug 12
+              - generic [ref=e322]:
+                - generic [ref=e323]: Won
+                - generic [ref=e324]: 11 - 8
+                - generic [ref=e325]: +0.06 rating
+            - listitem [ref=e326]:
+              - generic [ref=e328]:
+                - paragraph [ref=e329]: Dumaguete Pickleball Hub
+                - paragraph [ref=e330]: Jul 28
+              - generic [ref=e331]:
+                - generic [ref=e332]: Won
+                - generic [ref=e333]: 11 - 6
+                - generic [ref=e334]: +0.04 rating
+            - listitem [ref=e335]:
+              - generic [ref=e337]:
+                - paragraph [ref=e338]: Cebu Pickle Arena
+                - paragraph [ref=e339]: Jul 14
+              - generic [ref=e340]:
+                - generic [ref=e341]: Lost
+                - generic [ref=e342]: 9 - 11
+                - generic [ref=e343]: "-0.02 rating"
+            - listitem [ref=e344]:
+              - generic [ref=e346]:
+                - paragraph [ref=e347]: Dumaguete Pickleball Hub
+                - paragraph [ref=e348]: Jun 30
+              - generic [ref=e349]:
+                - generic [ref=e350]: Won
+                - generic [ref=e351]: 11 - 4
+                - generic [ref=e352]: +0.07 rating
+          - generic:
+            - img "CourtPrime player"
+            - generic [ref=e353]:
+              - paragraph: Global rating
+              - paragraph: "4.21"
+              - paragraph: ▲ 0.15 over 4 clubs
+      - generic [ref=e355]:
+        - generic [ref=e357]:
+          - paragraph [ref=e358]: Section 05 · Live network
+          - heading "Right now, across the CourtPrime network." [level=2] [ref=e359]
+          - paragraph [ref=e360]: Every connected club scores into the same live layer. Players, lobby displays and organisers all read the same source of truth.
+        - generic [ref=e363]:
+          - article [ref=e364]:
+            - generic [ref=e365]:
+              - generic [ref=e366]:
+                - paragraph [ref=e367]: Bacolod Sports Center
+                - paragraph [ref=e368]: Court 03
+              - generic [ref=e369]: Live
+            - generic [ref=e373]:
+              - paragraph [ref=e374]: Team A
+              - generic [ref=e375]: vs
+              - paragraph [ref=e376]: Team B
+              - generic [ref=e377]: "11"
+              - generic [ref=e378]: "-"
+              - generic [ref=e379]: "8"
+          - article [ref=e380]:
+            - generic [ref=e381]:
+              - generic [ref=e382]:
+                - paragraph [ref=e383]: Dumaguete Pickleball Hub
+                - paragraph [ref=e384]: Championship Court
+              - generic [ref=e385]: Live
+            - generic [ref=e389]:
+              - paragraph [ref=e390]: Team C
+              - generic [ref=e391]: vs
+              - paragraph [ref=e392]: Team D
+              - generic [ref=e393]: "7"
+              - generic [ref=e394]: "-"
+              - generic [ref=e395]: "5"
+          - article [ref=e396]:
+            - generic [ref=e397]:
+              - generic [ref=e398]:
+                - paragraph [ref=e399]: Cebu Pickle Arena
+                - paragraph [ref=e400]: Court 02
+              - generic [ref=e401]: open play
+            - generic [ref=e403]:
+              - paragraph [ref=e404]: Open play
+              - paragraph [ref=e405]: 6 in queue
+          - article [ref=e406]:
+            - generic [ref=e407]:
+              - generic [ref=e408]:
+                - paragraph [ref=e409]: Dumaguete Pickleball Hub
+                - paragraph [ref=e410]: Court 01
+              - generic [ref=e411]: Live
+            - generic [ref=e415]:
+              - paragraph [ref=e416]: Team E
+              - generic [ref=e417]: vs
+              - paragraph [ref=e418]: Team F
+              - generic [ref=e419]: "9"
+              - generic [ref=e420]: "-"
+              - generic [ref=e421]: "9"
+      - generic [ref=e423]:
+        - generic [ref=e425]:
+          - paragraph [ref=e426]: Section 06 · Rankings
+          - heading "Standings that mean the same thing everywhere." [level=2] [ref=e427]
+          - paragraph [ref=e428]: One rating engine across the network. Filter down from global to a single branch without the numbers changing meaning.
+        - generic [ref=e429]:
+          - tablist "Ranking scope" [ref=e430]:
+            - tab "Global" [selected] [ref=e431]
+            - tab "City" [ref=e433]
+            - tab "Organization" [ref=e434]
+            - tab "Branch" [ref=e435]
+          - generic [ref=e436]:
+            - generic [ref=e437]:
+              - generic [ref=e438]: "1"
+              - generic [ref=e439]:
+                - paragraph [ref=e440]: M. Santos
+                - paragraph [ref=e441]: Connected club
+              - generic [ref=e442]:
+                - paragraph [ref=e443]: "218"
+                - paragraph [ref=e444]: matches
+              - generic [ref=e445]:
+                - paragraph [ref=e446]: "5.42"
+                - paragraph [ref=e447]: ▲ 2
+            - generic [ref=e448]:
+              - generic [ref=e449]: "2"
+              - generic [ref=e450]:
+                - paragraph [ref=e451]: J. Tan
+                - paragraph [ref=e452]: Connected club
+              - generic [ref=e453]:
+                - paragraph [ref=e454]: "194"
+                - paragraph [ref=e455]: matches
+              - generic [ref=e456]:
+                - paragraph [ref=e457]: "5.31"
+                - paragraph [ref=e458]: ▼ 1
+            - generic [ref=e459]:
+              - generic [ref=e460]: "3"
+              - generic [ref=e461]:
+                - paragraph [ref=e462]: A. Cruz
+                - paragraph [ref=e463]: Connected club
+              - generic [ref=e464]:
+                - paragraph [ref=e465]: "176"
+                - paragraph [ref=e466]: matches
+              - generic [ref=e467]:
+                - paragraph [ref=e468]: "5.18"
+                - paragraph [ref=e469]: ▲ 4
+            - generic [ref=e470]:
+              - generic [ref=e471]: "4"
+              - generic [ref=e472]:
+                - paragraph [ref=e473]: R. Villanueva
+                - paragraph [ref=e474]: Connected club
+              - generic [ref=e475]:
+                - paragraph [ref=e476]: "158"
+                - paragraph [ref=e477]: matches
+              - generic [ref=e478]:
+                - paragraph [ref=e479]: "5.02"
+                - paragraph [ref=e480]: "-"
+            - generic [ref=e481]:
+              - generic [ref=e482]: "5"
+              - generic [ref=e483]:
+                - paragraph [ref=e484]: K. Reyes
+                - paragraph [ref=e485]: Connected club
+              - generic [ref=e486]:
+                - paragraph [ref=e487]: "203"
+                - paragraph [ref=e488]: matches
+              - generic [ref=e489]:
+                - paragraph [ref=e490]: "4.94"
+                - paragraph [ref=e491]: ▼ 2
+      - generic [ref=e495]:
+        - paragraph [ref=e496]: Section 07 · For club owners
+        - heading "Connect your courts to the player network while keeping your business operations private." [level=2] [ref=e497]
+        - paragraph [ref=e498]: Players see one shared identity. You see your own books. Revenue, staffing, pricing, inventory and customer data stay inside your organisation, tenant-isolated at the database level, not by convention.
+        - generic [ref=e499]:
+          - generic [ref=e506]:
+            - paragraph [ref=e507]: Shared
+            - paragraph [ref=e508]: Player identity, ratings, rankings
+          - generic [ref=e513]:
+            - paragraph [ref=e514]: Private
+            - paragraph [ref=e515]: Revenue, staff, pricing, customers
+      - generic [ref=e517]:
+        - generic [ref=e519]:
+          - paragraph [ref=e520]: Section 08 · Business operating system
+          - heading "One system behind the counter." [level=2] [ref=e521]
+          - paragraph [ref=e522]: Nine modules that already share your players, your branches and your pricing, so nothing needs re-entering.
+        - generic [ref=e524]:
+          - navigation "Business modules" [ref=e525]:
+            - list [ref=e526]:
+              - listitem [ref=e527]:
+                - button "Reservations" [ref=e528]
+              - listitem [ref=e533]:
+                - button "Live Courts" [ref=e534]
+              - listitem [ref=e542]:
+                - button "POS" [ref=e543]
+              - listitem [ref=e546]:
+                - button "Memberships" [ref=e547]
+              - listitem [ref=e552]:
+                - button "Tournaments" [ref=e553]
+              - listitem [ref=e560]:
+                - button "Inventory" [ref=e561]
+              - listitem [ref=e572]:
+                - button "Staff" [ref=e573]
+              - listitem [ref=e579]:
+                - button "Finance" [ref=e580]
+          - generic [ref=e584]:
+            - generic [ref=e585]:
+              - heading "Every court, every slot, one grid." [level=3] [ref=e586]
+              - paragraph [ref=e587]: Drag-and-drop scheduling across branches with conflict detection and instant player lookup.
+            - generic [ref=e588]:
+              - generic [ref=e589]:
+                - paragraph [ref=e590]: Bookings today
+                - paragraph [ref=e591]: "38"
+              - list [ref=e592]:
+                - listitem [ref=e593]:
+                  - generic [ref=e594]:
+                    - paragraph [ref=e595]: Court 01 · 7:30 PM
+                    - paragraph [ref=e596]: Santos / Cruz
+                  - generic [ref=e597]: reserved
+                - listitem [ref=e599]:
+                  - generic [ref=e600]:
+                    - paragraph [ref=e601]: Court 03 · 8:00 PM
+                    - paragraph [ref=e602]: Open play · 6 queued
+                  - generic [ref=e603]: open play
+                - listitem [ref=e605]:
+                  - generic [ref=e606]:
+                    - paragraph [ref=e607]: Court 04 · 8:30 PM
+                    - paragraph [ref=e608]: Reyes / Lim
+                  - generic [ref=e609]: confirmed
+      - generic [ref=e612]:
+        - generic [ref=e614]:
+          - paragraph [ref=e615]: Section 09 · Analytics
+          - heading "The numbers a club owner actually runs on." [level=2] [ref=e616]
+          - paragraph [ref=e617]: Revenue, occupancy, peak demand and branch comparison, measured the same way across every location you operate.
+        - generic [ref=e618]:
+          - generic [ref=e619]:
+            - generic [ref=e620]:
+              - generic [ref=e621]:
+                - generic [ref=e622]:
+                  - heading "Revenue" [level=3] [ref=e623]
+                  - paragraph [ref=e624]: Last 6 months · all branches
+                - paragraph [ref=e625]: ₱1.24M▲ 12.6%
+              - application [ref=e629]:
+                - generic [ref=e641]:
+                  - generic [ref=e642]:
+                    - generic [ref=e643]: Mar
+                    - generic [ref=e645]: Apr
+                    - generic [ref=e647]: May
+                    - generic [ref=e649]: Jun
+                    - generic [ref=e651]: Jul
+                    - generic [ref=e653]: Aug
+                  - generic [ref=e655]:
+                    - generic [ref=e656]: 0k
+                    - generic [ref=e658]: 350k
+                    - generic [ref=e660]: 700k
+                    - generic [ref=e662]: 1050k
+                    - generic [ref=e664]: 1400k
+            - generic [ref=e666]:
+              - generic [ref=e667]:
+                - heading "Occupancy by branch" [level=3] [ref=e668]
+                - paragraph [ref=e669]: Court utilisation, August
+              - generic [ref=e670]:
+                - generic [ref=e672]:
+                  - generic [ref=e673]: Main
+                  - generic [ref=e674]: 88%
+                - generic [ref=e678]:
+                  - generic [ref=e679]: North
+                  - generic [ref=e680]: 74%
+                - generic [ref=e684]:
+                  - generic [ref=e685]: Seaside
+                  - generic [ref=e686]: 61%
+                - generic [ref=e690]:
+                  - generic [ref=e691]: Uptown
+                  - generic [ref=e692]: 47%
+            - generic [ref=e695]:
+              - generic [ref=e696]:
+                - heading "Peak hours" [level=3] [ref=e697]
+                - paragraph [ref=e698]: Average utilisation by time of day
+              - application [ref=e702]:
+                - generic [ref=e706]:
+                  - generic [ref=e707]:
+                    - generic [ref=e708]: 6a
+                    - generic [ref=e710]: 9a
+                    - generic [ref=e712]: 12p
+                    - generic [ref=e714]: 3p
+                    - generic [ref=e716]: 6p
+                    - generic [ref=e718]: 9p
+                  - generic [ref=e720]:
+                    - generic [ref=e721]: 0%
+                    - generic [ref=e723]: 25%
+                    - generic [ref=e725]: 50%
+                    - generic [ref=e727]: 75%
+                    - generic [ref=e729]: 100%
+            - generic [ref=e731]:
+              - generic [ref=e732]:
+                - generic [ref=e733]:
+                  - heading "Reservations" [level=3] [ref=e734]
+                  - paragraph [ref=e735]: Booked court sessions per month
+                - paragraph [ref=e736]: 1,794▲ 10.0%
+              - application [ref=e740]:
+                - generic [ref=e748]:
+                  - generic [ref=e749]:
+                    - generic [ref=e750]: Mar
+                    - generic [ref=e752]: Apr
+                    - generic [ref=e754]: May
+                    - generic [ref=e756]: Jun
+                    - generic [ref=e758]: Jul
+                    - generic [ref=e760]: Aug
+                  - generic [ref=e762]:
+                    - generic [ref=e763]: "0"
+                    - generic [ref=e765]: "450"
+                    - generic [ref=e767]: "900"
+                    - generic [ref=e769]: "1350"
+                    - generic [ref=e771]: "1800"
+          - paragraph [ref=e773]: Illustrative figures. Live dashboards read from your own organisation only.
+      - generic [ref=e777]:
+        - generic [ref=e779]:
+          - paragraph [ref=e780]: Pricing
+          - heading "Priced per club, not per headache." [level=2] [ref=e781]
+          - paragraph [ref=e782]: Start with a single court and grow into a multi-branch network without changing systems.
+        - generic [ref=e783]:
+          - paragraph [ref=e784]: Founding club offer. First 50 clubs keep this rate for 12 months.
+          - generic [ref=e787]:
+            - article [ref=e788]:
+              - heading "Starter" [level=3] [ref=e789]
+              - paragraph [ref=e790]: For a single club finding its feet.
+              - generic [ref=e791]:
+                - paragraph [ref=e792]:
+                  - generic [ref=e793]: ₱2,499
+                  - generic [ref=e794]: Save 60%
+                - paragraph [ref=e795]:
+                  - generic [ref=e796]: ₱999
+                  - generic [ref=e797]: / month
+                - paragraph [ref=e798]: First 50 clubs. Locked for 12 months.
+              - list [ref=e799]:
+                - listitem [ref=e800]:
+                  - generic [ref=e803]: 1 branch
+                - listitem [ref=e804]:
+                  - generic [ref=e807]: 4 courts
+                - listitem [ref=e808]:
+                  - generic [ref=e811]: Reservations
+                - listitem [ref=e812]:
+                  - generic [ref=e815]: Basic Pos
+                - listitem [ref=e816]:
+                  - generic [ref=e819]: Players
+              - link "Talk to us" [ref=e820] [cursor=pointer]:
+                - /url: /request-demo
+            - article [ref=e821]:
+              - generic [ref=e822]: Most chosen
+              - heading "Professional" [level=3] [ref=e823]
+              - paragraph [ref=e824]: For clubs running more than one location.
+              - generic [ref=e825]:
+                - paragraph [ref=e826]:
+                  - generic [ref=e827]: ₱4,999
+                  - generic [ref=e828]: Save 50%
+                - paragraph [ref=e829]:
+                  - generic [ref=e830]: ₱2,499
+                  - generic [ref=e831]: / month
+                - paragraph [ref=e832]: First 50 clubs. Locked for 12 months.
+              - list [ref=e833]:
+                - listitem [ref=e834]:
+                  - generic [ref=e837]: 6 branches
+                - listitem [ref=e838]:
+                  - generic [ref=e841]: 40 courts
+                - listitem [ref=e842]:
+                  - generic [ref=e845]: Reservations
+                - listitem [ref=e846]:
+                  - generic [ref=e849]: Pos
+                - listitem [ref=e850]:
+                  - generic [ref=e853]: Memberships
+              - link "Claim founding rate" [ref=e854] [cursor=pointer]:
+                - /url: /request-demo
+            - article [ref=e855]:
+              - heading "Enterprise" [level=3] [ref=e856]
+              - paragraph [ref=e857]: For networks that need it their way.
+              - generic [ref=e858]:
+                - paragraph [ref=e859]:
+                  - generic [ref=e860]: Standard rate
+                - paragraph [ref=e861]:
+                  - generic [ref=e862]: ₱9,999
+                  - generic [ref=e863]: / month
+                - paragraph [ref=e864]: Billed monthly. Cancel anytime.
+              - list [ref=e865]:
+                - listitem [ref=e866]:
+                  - generic [ref=e869]: Unlimited branches
+                - listitem [ref=e870]:
+                  - generic [ref=e873]: Unlimited courts
+                - listitem [ref=e874]:
+                  - generic [ref=e877]: Api Access
+                - listitem [ref=e878]:
+                  - generic [ref=e881]: Custom Domain
+                - listitem [ref=e882]:
+                  - generic [ref=e885]: White Label
+              - link "Talk to us" [ref=e886] [cursor=pointer]:
+                - /url: /request-demo
+          - paragraph [ref=e889]:
+            - text: Every plan includes the player network, live scoring and unlimited player accounts.
+            - link "Talk to us" [ref=e890] [cursor=pointer]:
+              - /url: /request-demo
+            - text: about annual billing.
+      - generic [ref=e893]:
+        - heading "One player identity. Every connected court. One premium pickleball ecosystem." [level=2] [ref=e894]: One player identity.Every connected court.One premium pickleball ecosystem.
+        - generic [ref=e895]:
+          - generic [ref=e896]:
+            - paragraph [ref=e897]: For players
+            - paragraph [ref=e898]: Find courts, join open play, and carry one verified record everywhere.
+            - link "Find your next court" [ref=e899] [cursor=pointer]:
+              - /url: /find-courts
+          - generic [ref=e900]:
+            - paragraph [ref=e901]: For clubs
+            - paragraph [ref=e902]: Run reservations, POS, memberships and tournaments in one place.
+            - link "Bring your club to CourtPrime" [ref=e903] [cursor=pointer]:
+              - /url: /request-demo
+    - contentinfo [ref=e906]:
+      - generic [ref=e907]:
+        - generic [ref=e908]:
+          - generic [ref=e909]:
+            - img "EAJ CourtPrime" [ref=e910]
+            - paragraph [ref=e911]: One player identity. Every connected court. A product of EAJ Web Development Services.
+          - generic [ref=e912]:
+            - generic [ref=e913]:
+              - paragraph [ref=e914]: Players
+              - list [ref=e915]:
+                - listitem [ref=e916]:
+                  - link "Find courts" [ref=e917] [cursor=pointer]:
+                    - /url: /find-courts
+                - listitem [ref=e918]:
+                  - link "Open play" [ref=e919] [cursor=pointer]:
+                    - /url: /find-open-play
+                - listitem [ref=e920]:
+                  - link "Tournaments" [ref=e921] [cursor=pointer]:
+                    - /url: /find-tournaments
+                - listitem [ref=e922]:
+                  - link "Leaderboards" [ref=e923] [cursor=pointer]:
+                    - /url: /leaderboards
+            - generic [ref=e924]:
+              - paragraph [ref=e925]: Clubs
+              - list [ref=e926]:
+                - listitem [ref=e927]:
+                  - link "Business OS" [ref=e928] [cursor=pointer]:
+                    - /url: "#business"
+                - listitem [ref=e929]:
+                  - link "Pricing" [ref=e930] [cursor=pointer]:
+                    - /url: "#pricing"
+                - listitem [ref=e931]:
+                  - link "Book a demo" [ref=e932] [cursor=pointer]:
+                    - /url: /request-demo
+                - listitem [ref=e933]:
+                  - link "Sign in" [ref=e934] [cursor=pointer]:
+                    - /url: /login
+            - generic [ref=e935]:
+              - paragraph [ref=e936]: Company
+              - list [ref=e937]:
+                - listitem [ref=e938]:
+                  - link "Privacy policy" [ref=e939] [cursor=pointer]:
+                    - /url: /privacy-policy
+                - listitem [ref=e940]:
+                  - link "Terms of service" [ref=e941] [cursor=pointer]:
+                    - /url: /terms-of-service
+                - listitem [ref=e942]:
+                  - link "Contact" [ref=e943] [cursor=pointer]:
+                    - /url: mailto:hello@eajwebdev.test
+        - paragraph [ref=e945]: © 2026 EAJ Web Development Services. All rights reserved.
+  - generic [ref=e946]: "450"

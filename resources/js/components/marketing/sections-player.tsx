@@ -1,18 +1,19 @@
 import { AthleteArtwork } from '@/components/marketing-artwork';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { Button } from '@/components/ui/button';
-import { currency } from '@/lib/format';
 import { EASE, revealProps, usePathDraw, useReveal, VIEWPORT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { motion, useReducedMotion, useScroll } from 'framer-motion';
-import { ArrowRight, Clock, Lock, MapPin, Search, Sun, Wind } from 'lucide-react';
+import { ArrowRight, Clock, Lock, MapPin, Plus, Search, Shield, Sun, Wind } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export type NetworkClub = {
     name: string;
     city: string | null;
     slug: string | null;
+    /** Venues this club runs. A club is the unit here, not the venue. */
+    branches?: number;
     courts: number;
     rate: number | string | null;
 };
@@ -229,59 +230,87 @@ export function SectionDiscover() {
 export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) {
     const reduce = useReducedMotion();
 
-    if (clubs.length === 0) return null;
+    /*
+     * A logo wall, not a directory. Discover already lists venues with rates and
+     * availability; repeating that here made two sections do one job. This one
+     * answers a different question — who is actually on the network — so it
+     * shows badges, and every real club links through to its listing.
+     *
+     * partner.png was offered for the placeholders but it is a 1-bit threshold
+     * copy of the monogram with heavy edge noise; eight of them would read as a
+     * rendering fault. A quiet outline mark is the honest placeholder.
+     */
+    const placeholders = Array.from({ length: 8 }, (_, index) => index);
 
     return (
         <MarketingSection
             id="powered-courts"
             eyebrow="Courts powered by CourtPrime"
-            title="Every connected court, open to browse."
-            description="Real venues running on CourtPrime right now. Open one to see today's availability and rates — no account needed until you book."
+            title="The network is filling up."
+            description="Clubs already running on CourtPrime, and the next wave joining. Open any live club to see today's availability."
+            align="center"
         >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
                 {clubs.map((venue, index) => (
-                    <motion.div key={`${venue.name}-${index}`} {...revealProps(reduce, { delay: Math.min(index, 5) * 0.05, y: 16 })}>
-                        {/* The whole card is the link; a card with one button in the
-                            corner makes people hunt for the 40px that works. */}
+                    <motion.li key={`${venue.name}-${index}`} {...revealProps(reduce, { delay: Math.min(index, 6) * 0.04, y: 12 })}>
                         <Link
                             href={`/find-courts?search=${encodeURIComponent(venue.name)}`}
-                            className="border-border bg-surface hover:border-border-strong hover:shadow-e1 group flex h-full flex-col rounded-xl border p-4 transition-all sm:p-5"
+                            title={venue.name}
+                            className="border-border bg-surface hover:border-border-strong group flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-colors sm:p-4"
                         >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <h3 className="text-h3 text-foreground truncate">{venue.name}</h3>
-                                    {venue.city && (
-                                        <p className="text-meta text-muted mt-1 flex items-center gap-1.5">
-                                            <MapPin className="size-3.5 shrink-0" aria-hidden />
-                                            <span className="truncate">{venue.city}</span>
-                                        </p>
-                                    )}
-                                </div>
-                                {Number(venue.rate ?? 0) > 0 && (
-                                    <div className="shrink-0 text-right">
-                                        <p data-numeric className="text-label text-foreground font-semibold">
-                                            {currency(venue.rate)}
-                                        </p>
-                                        <p className="text-meta text-muted">from / hr</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-3">
-                                <p className="text-meta text-muted">
-                                    <span data-numeric>{venue.courts}</span> {venue.courts === 1 ? 'court' : 'courts'}
-                                </p>
-                                <span className="text-meta text-primary flex items-center gap-1 font-medium">
-                                    See availability
-                                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                                </span>
-                            </div>
+                            {/* No club has uploaded a mark yet, so the monogram
+                                stands in — same pattern as the player avatar. */}
+                            <span className="bg-surface-deep text-primary flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold sm:size-12">
+                                {venue.name
+                                    .split(' ')
+                                    .filter(Boolean)
+                                    .slice(0, 2)
+                                    .map((part) => part[0]?.toUpperCase() ?? '')
+                                    .join('')}
+                            </span>
+                            <span className="text-meta text-foreground line-clamp-2 font-medium">{venue.name}</span>
+                            <span data-numeric className="text-muted text-[0.6875rem]">
+                                {venue.courts} {venue.courts === 1 ? 'court' : 'courts'}
+                            </span>
+                            <span className="text-primary flex items-center gap-0.5 text-[0.6875rem] font-medium">
+                                Live
+                                <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                            </span>
                         </Link>
-                    </motion.div>
+                    </motion.li>
                 ))}
-            </div>
 
-            <p className="text-meta text-muted mt-4 flex items-center gap-2">
+                {placeholders.map((index) => (
+                    <motion.li key={`joining-${index}`} {...revealProps(reduce, { delay: Math.min(clubs.length + index, 8) * 0.04, y: 12 })}>
+                        <div className="border-border bg-surface-muted/40 flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center sm:p-4">
+                            <span className="border-border-strong text-muted flex size-11 shrink-0 items-center justify-center rounded-full border border-dashed sm:size-12">
+                                <Shield className="size-5" aria-hidden />
+                            </span>
+                            <span className="text-muted text-[0.6875rem] font-medium tracking-wide uppercase">Joining soon</span>
+                        </div>
+                    </motion.li>
+                ))}
+
+                {/* The one action in this section. */}
+                {/* One tile wide so 3 live + 8 joining + this fills two clean rows of six
+                    instead of leaving a hole and wrapping onto a third. */}
+                <motion.li {...revealProps(reduce, { delay: 0.4, y: 12 })}>
+                    <Link
+                        href="/request-demo"
+                        className="border-primary/40 bg-primary-soft hover:border-primary group flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed p-3 text-center transition-colors sm:p-4"
+                    >
+                        <span className="border-primary/50 text-primary flex size-11 shrink-0 items-center justify-center rounded-full border border-dashed sm:size-12">
+                            <Plus className="size-5" aria-hidden />
+                        </span>
+                        <span className="text-primary flex items-center gap-0.5 text-[0.6875rem] font-semibold">
+                            Add your club
+                            <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                        </span>
+                    </Link>
+                </motion.li>
+            </ul>
+
+            <p className="text-meta text-muted mt-5 flex items-center justify-center gap-2">
                 <Lock className="size-3.5 shrink-0" aria-hidden />
                 Browsing is open to everyone. Signing in is only needed to confirm a booking.
             </p>

@@ -40,26 +40,43 @@ class LandingController extends Controller
     private function networkClubs(): array
     {
         return Cache::remember('landing.network_clubs', now()->addMinutes(10), function (): array {
-            return Branch::query()
+            /*
+             * Keyed on the organisation, not the branch.
+             *
+             * Two different clubs each run a venue called "Dumaguete Pickleball
+             * Hub", so a branch-level list rendered the same name twice and read
+             * as a duplicate-render bug. A club is also the right unit here: the
+             * section is about who is on the network, not how many sites they
+             * operate.
+             */
+            return Organization::query()
                 ->withoutGlobalScope('organization')
-                ->with('organization:id,name,slug,status')
-                ->withCount('courts')
-                ->whereHas('organization', fn ($query) => $query->whereIn('status', ['trial', 'active']))
-                ->orderByDesc('courts_count')
-                ->limit(6)
+                ->whereIn('status', ['trial', 'active'])
+                ->withCount('branches')
                 ->get()
-                ->map(function (Branch $branch): array {
-                    $address = (string) ($branch->address ?? '');
+                ->map(function (Organization $organization): array {
+                    $branches = Branch::query()
+                        ->withoutGlobalScope('organization')
+                        ->where('organization_id', $organization->id)
+                        ->get(['id', 'address']);
+
+                    $courtQuery = Court::query()
+                        ->withoutGlobalScope('organization')
+                        ->whereIn('branch_id', $branches->pluck('id'));
+
+                    $address = (string) ($branches->first()->address ?? '');
                     $parts = array_filter(array_map('trim', explode(',', $address)));
 
                     return [
-                        'name' => (string) $branch->name,
+                        'name' => (string) $organization->name,
                         'city' => $parts ? (string) end($parts) : null,
-                        'slug' => $branch->organization?->slug,
-                        'courts' => (int) $branch->courts_count,
-                        'rate' => $branch->courts()->min('standard_hourly_rate'),
+                        'slug' => $organization->slug,
+                        'branches' => (int) $organization->branches_count,
+                        'courts' => (int) $courtQuery->count(),
+                        'rate' => $courtQuery->min('standard_hourly_rate'),
                     ];
                 })
+                ->sortByDesc('courts')
                 ->values()
                 ->all();
         });

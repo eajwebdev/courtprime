@@ -1,46 +1,63 @@
 import { useEffect, useState } from 'react';
 
-export type Appearance = 'light' | 'dark' | 'system';
+/**
+ * Light or dark. There is no "system".
+ *
+ * A third state meant the toggle could not simply flip, and a visitor whose OS
+ * preferred dark landed on dark without choosing it. The first visit now seeds
+ * from the OS once, and after that the stored choice is the only authority.
+ */
+export type Appearance = 'light' | 'dark';
+
+const STORAGE_KEY = 'appearance';
 
 const prefersDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
 
 const applyTheme = (appearance: Appearance) => {
-    const isDark = appearance === 'dark' || (appearance === 'system' && prefersDark());
-
-    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.classList.toggle('dark', appearance === 'dark');
 };
 
-const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+/** Anything stored by the previous three-state version resolves to a real mode. */
+const readStored = (): Appearance => {
+    const stored = localStorage.getItem(STORAGE_KEY);
 
-const handleSystemThemeChange = () => {
-    const currentAppearance = localStorage.getItem('appearance') as Appearance;
-    applyTheme(currentAppearance || 'system');
+    if (stored === 'light' || stored === 'dark') {
+        return stored;
+    }
+
+    return prefersDark() ? 'dark' : 'light';
 };
 
 export function initializeTheme() {
-    const savedAppearance = (localStorage.getItem('appearance') as Appearance) || 'system';
-
-    applyTheme(savedAppearance);
-
-    // Add the event listener for system theme changes...
-    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    applyTheme(readStored());
 }
 
 export function useAppearance() {
-    const [appearance, setAppearance] = useState<Appearance>('system');
+    const [appearance, setAppearance] = useState<Appearance>('light');
 
     const updateAppearance = (mode: Appearance) => {
         setAppearance(mode);
-        localStorage.setItem('appearance', mode);
+        localStorage.setItem(STORAGE_KEY, mode);
         applyTheme(mode);
     };
 
-    useEffect(() => {
-        const savedAppearance = localStorage.getItem('appearance') as Appearance;
-        updateAppearance(savedAppearance || 'system');
+    /**
+     * One click flips it.
+     *
+     * The next mode is derived from the applied class, not from React state.
+     * Reading state would use the pre-render value, and putting the DOM write
+     * inside a state updater would make the updater impure and batch the class
+     * changes. The document is the source of truth and is always current.
+     */
+    const toggleAppearance = () => {
+        updateAppearance(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+    };
 
-        return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    useEffect(() => {
+        const current = readStored();
+        setAppearance(current);
+        applyTheme(current);
     }, []);
 
-    return { appearance, updateAppearance };
+    return { appearance, updateAppearance, toggleAppearance };
 }

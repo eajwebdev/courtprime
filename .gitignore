@@ -27,3 +27,5 @@ yarn-error.log
 # Player-uploaded photos are user data, never source.
 /storage/app/public/player-avatars
 /storage/app/public/player-action-photos
+
+/.playwright-mcp

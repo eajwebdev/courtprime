@@ -12,8 +12,6 @@ use App\Models\Expense;
 use App\Models\InventoryMovement;
 use App\Models\MaintenanceWorkOrder;
 use App\Models\MatchGame;
-use App\Models\OpenPlayPlayer;
-use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
 use App\Models\OpenPlaySessionCourt;
 use App\Models\Organization;
@@ -488,7 +486,9 @@ class DatabaseSeeder extends Seeder
              */
             'status' => 'open',
             'session_code' => 'OP-DEMO01',
-            'notes' => 'Seeded open play session. Players join with the code.',
+            /* Organiser key: first device to enter this pair runs the board. */
+            'session_key' => '1234',
+            'notes' => 'Seeded open play session. Starts empty; players are added at the board.',
         ]);
 
         /* Without allocated courts the rotation has nowhere to put anyone. */
@@ -500,23 +500,13 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        foreach ($players as $index => $player) {
-            OpenPlayPlayer::query()->create([
-                'organization_id' => $organization->id,
-                'open_play_session_id' => $openPlay->id,
-                'player_id' => $player->id,
-                'status' => $index < 4 ? 'checked_in' : 'registered',
-                'checked_in_at' => $index < 4 ? now()->subMinutes(20 - $index) : null,
-            ]);
-
-            OpenPlayQueueEntry::query()->create([
-                'organization_id' => $organization->id,
-                'open_play_session_id' => $openPlay->id,
-                'player_id' => $player->id,
-                'position' => $index + 1,
-                'status' => 'waiting',
-            ]);
-        }
+        /*
+         * The session seeds empty on purpose.
+         *
+         * Pre-loading players made every demo open with a queue nobody had
+         * checked in, and the board opened mid-session. A real session starts
+         * at zero and fills as people arrive through the board.
+         */
 
         PlayerRanking::query()->where('organization_id', $organization->id)->delete();
         $players->sortByDesc('rating')->values()->each(function (Player $player, int $index) use ($organization) {

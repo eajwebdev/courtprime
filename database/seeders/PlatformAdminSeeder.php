@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use Database\Seeders\Concerns\UsesSeedCredentials;
 use Illuminate\Database\Seeder;
 
 /**
@@ -12,6 +13,8 @@ use Illuminate\Database\Seeder;
  */
 class PlatformAdminSeeder extends Seeder
 {
+    use UsesSeedCredentials;
+
     public function run(): void
     {
         $this->superadmin();
@@ -20,12 +23,12 @@ class PlatformAdminSeeder extends Seeder
     public function superadmin(): User
     {
         return User::query()->updateOrCreate(
-            ['email' => 'superadmin@eaj.test'],
+            ['email' => $this->seedSuperadminEmail()],
             [
                 'organization_id' => null,
                 'branch_id' => null,
-                'name' => 'EAJ Superadmin',
-                'password' => 'password',
+                'name' => 'CP ADMIN',
+                'password' => $this->seedPassword(),
                 'role_key' => 'eaj_superadmin',
                 'is_superadmin' => true,
                 'position' => 'Platform Administrator',

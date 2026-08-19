@@ -10,6 +10,7 @@ use App\Models\StaffProfile;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use Database\Seeders\Concerns\UsesSeedCredentials;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -28,6 +29,8 @@ use Illuminate\Support\Collection;
  */
 class ClubPartnerSeeder extends Seeder
 {
+    use UsesSeedCredentials;
+
     public function run(): void
     {
         $this->callOnce(SubscriptionPlanSeeder::class);
@@ -235,7 +238,7 @@ class ClubPartnerSeeder extends Seeder
                     'organization_id' => $organization->id,
                     'branch_id' => $branch?->id,
                     'name' => $member['name'],
-                    'password' => 'password',
+                    'password' => $this->seedPassword(),
                     'role_key' => $member['role'],
                     'is_superadmin' => false,
                     'position' => str($member['role'])->replace('_', ' ')->headline()->toString(),

@@ -91,7 +91,17 @@ export function CourtCard({
 
     return (
         <article className="border-border bg-surface flex h-full flex-col overflow-hidden rounded-xl border">
-            <div className="border-border bg-surface-muted flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
+            {/*
+              * One header row whoever holds the court.
+              *
+              * Whose court it is used to be a second row that only appeared on
+              * somebody else's card, and the footer of buttons only appeared on
+              * your own — so two cards side by side had different amounts of
+              * chrome and their scores sat at different heights. The row is
+              * always here and always the same height; only what sits at the
+              * end of it changes.
+              */}
+            <div className="border-border bg-surface-muted flex min-h-11 shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
                 <p className="text-label text-foreground font-semibold">{match.court}</p>
                 <p className="text-meta text-muted">
                     {target ? (
@@ -107,37 +117,31 @@ export function CourtCard({
                     round <span data-numeric>{match.round}</span>
                 </p>
 
-                {/* Only before the first point: moving somebody across the net
-                    mid game would leave points against a team they were not
-                    on. And only for whoever is scoring this court. */}
-                {mine && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0"
-                        disabled={started}
-                        title={started ? 'Take the points back to rearrange' : 'Rearrange the teams'}
-                        onClick={() => setArranging(true)}
-                    >
-                        <Shuffle className="size-4" />
-                        <span className="hidden sm:inline">Teams</span>
-                    </Button>
-                )}
-            </div>
-
-            {/* Whose court this is, when it is not yours. A number that cannot
-                be tapped needs to say why before somebody taps it twice. */}
-            {!mine && (
-                <div className="border-border text-meta text-muted flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
-                    <span className="truncate">{heldBy ? `${heldBy} is scoring this court` : 'Nobody is scoring this court'}</span>
-                    {!heldBy && courtId && (
-                        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => post(`${base}/courts/${courtId}/claim`)}>
-                            Score this court
+                <span className="flex h-9 shrink-0 items-center">
+                    {mine ? (
+                        /* Only before the first point: moving somebody across
+                           the net mid game would leave points against a team
+                           they were not on. */
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={started}
+                            title={started ? 'Take the points back to rearrange' : 'Rearrange the teams'}
+                            onClick={() => setArranging(true)}
+                        >
+                            <Shuffle className="size-4" />
+                            <span className="hidden sm:inline">Teams</span>
                         </Button>
-                    )}
-                </div>
-            )}
+                    ) : heldBy ? (
+                        <span className="text-meta text-muted truncate">{heldBy}</span>
+                    ) : courtId ? (
+                        <Button type="button" variant="outline" size="sm" onClick={() => post(`${base}/courts/${courtId}/claim`)}>
+                            Score this
+                        </Button>
+                    ) : null}
+                </span>
+            </div>
 
             <div className={cn('bg-border grid min-h-0 flex-1 grid-cols-2 gap-px', !mine && 'pointer-events-none opacity-70')}>
                 <TeamScore
@@ -164,7 +168,16 @@ export function CourtCard({
                 />
             </div>
 
-            {!mine ? null : confirming ? (
+            {/* The footer is always here so the scores above it line up across
+                the row. On somebody else's court it carries the one thing worth
+                saying about it rather than an empty band. */}
+            {!mine ? (
+                <div className="border-border flex shrink-0 items-center justify-center border-t px-3 py-3">
+                    <p className="text-meta text-muted flex h-12 items-center text-center">
+                        {heldBy ? `${heldBy} is keeping this score` : 'Nobody is scoring this court yet'}
+                    </p>
+                </div>
+            ) : confirming ? (
                 <div className="border-border shrink-0 border-t px-3 py-3">
                     <p className="text-meta text-muted mb-2 text-center">Level at {scoreOne}. Who won?</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -357,11 +370,14 @@ function TeamScore({
             /* The whole half scores: a small "+1" is a miss on a tablet at
                arm's length across a court. `touch-action` keeps the browser
                from claiming a horizontal drag as a scroll before we see it. */
+            /* Nothing moves. The half sliding under the finger looked like the
+               card itself was being dragged somewhere, on a screen where every
+               other panel stays put; the colour and the label say what is
+               about to happen without the layout shifting to say it. */
             className={cn(
                 'group bg-surface hover:bg-surface-muted active:bg-primary-soft relative flex h-full min-h-32 touch-pan-y flex-col items-center justify-center gap-2 overflow-hidden px-3 py-4 transition-colors select-none sm:min-h-36',
                 undoing && 'bg-danger-soft',
             )}
-            style={{ transform: dragging < 0 ? `translateX(${Math.max(dragging / 3, -24)}px)` : undefined }}
         >
             {/* The one effect on this screen: a soft bloom behind whichever
                 number is ahead, so the lead reads from across a court without

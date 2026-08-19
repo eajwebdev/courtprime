@@ -20,6 +20,19 @@ type ActiveSession = {
     organization: string | null;
 };
 
+/** A session the signed-in user already administers, openable without the pair. */
+type StaffSession = {
+    id: number;
+    name: string;
+    code: string;
+    status: string;
+    session_date: string;
+    start_time: string;
+    end_time: string;
+    branch: string | null;
+    held: boolean;
+};
+
 function dayLabel(iso: string) {
     if (!iso) return '';
 
@@ -42,7 +55,7 @@ function dayLabel(iso: string) {
  * right: the list below shows what is running, which the discovery page already
  * makes public, but never a key and never whether a board is already held.
  */
-export default function OpenPlayGate({ active = [] }: { active?: ActiveSession[] }) {
+export default function OpenPlayGate({ active = [], mine = [] }: { active?: ActiveSession[]; mine?: StaffSession[] }) {
     const form = useForm({ code: '', key: '', who: '' });
     const keyField = useRef<HTMLInputElement>(null);
 
@@ -68,8 +81,51 @@ export default function OpenPlayGate({ active = [] }: { active?: ActiveSession[]
                         <div className="bg-surface-deep text-surface-deep-foreground rounded-2xl px-5 py-5">
                             <p className="text-eyebrow text-primary uppercase">Open play</p>
                             <h1 className="mt-1 text-[1.5rem] leading-tight font-semibold tracking-tight text-white">Open your session board</h1>
-                            <p className="text-meta mt-1.5 text-white/55">Enter the session ID and key the club gave you.</p>
+                            <p className="text-meta mt-1.5 text-white/55">
+                                {mine.length > 0
+                                    ? 'Your club’s sessions open straight from here. The ID and key are for everyone else.'
+                                    : 'Enter the session ID and key the club gave you.'}
+                            </p>
                         </div>
+
+                        {/* Signed in and running this club: no reason to type a
+                            secret you are the one handing out. */}
+                        {mine.length > 0 && (
+                            <div className="border-border bg-surface mt-4 overflow-hidden rounded-xl border">
+                                <p className="border-border bg-surface-muted text-label text-foreground border-b px-4 py-2.5 font-semibold">
+                                    Your sessions
+                                </p>
+                                <ul className="divide-border divide-y">
+                                    {mine.map((session) => (
+                                        <li key={session.id} className="flex items-center gap-3 px-4 py-3">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-label text-foreground truncate font-medium">{session.name}</p>
+                                                <p className="text-meta text-muted truncate">
+                                                    {session.branch}
+                                                    {session.branch && ' · '}
+                                                    {dayLabel(session.session_date)}
+                                                    {session.start_time && (
+                                                        <>
+                                                            {' · '}
+                                                            <span data-numeric>{time12h(session.start_time)}</span>
+                                                        </>
+                                                    )}
+                                                </p>
+                                                {session.held && (
+                                                    <p className="text-meta text-warning mt-0.5">
+                                                        Another device is running it — you will open it read-only.
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <StatusBadge status={session.status} />
+                                            <Button asChild size="sm" className="shrink-0">
+                                                <Link href={`/open-play/${session.code}/board`}>Open</Link>
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
 
                         <form onSubmit={submit} className="border-border bg-surface mt-4 rounded-xl border p-4 sm:p-5">
                             <div className="grid gap-4">

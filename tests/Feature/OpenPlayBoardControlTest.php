@@ -74,6 +74,110 @@ class OpenPlayBoardControlTest extends TestCase
         return $session;
     }
 
+    /**
+     * Staff do not need the pair for their own club.
+     *
+     * The ID and key exist so a board can be run by somebody with no account.
+     * A club owner already holds stronger credentials, and was being sent to a
+     * form to type a secret they are the one handing out — from a button on
+     * their own admin page that promised to open the board.
+     */
+    public function test_a_signed_in_club_user_opens_their_own_board_without_the_key(): void
+    {
+        $session = $this->makeSession();
+
+        $owner = User::factory()->create([
+            'organization_id' => $session->organization_id,
+            'branch_id' => $session->branch_id,
+            'role_key' => 'organization_owner',
+        ]);
+
+        $this->actingAs($owner)
+            ->get('/open-play/OP-TEST01/board')
+            ->assertOk();
+
+        /* And with the board in hand, not merely watching it. */
+        $this->actingAs($owner)
+            ->post('/open-play/OP-TEST01/settings', [
+                'name' => 'Renamed by staff',
+                'format' => 'doubles',
+                'target_score' => 11,
+                'win_by_two' => true,
+                'court_ids' => [],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('Renamed by staff', $session->fresh()->name);
+    }
+
+    /** Being signed in somewhere else is not being signed in here. */
+    public function test_a_signed_in_user_from_another_club_still_needs_the_key(): void
+    {
+        $this->makeSession();
+
+        $stranger = Organization::query()->create([
+            'name' => 'Other Club',
+            'slug' => 'other-club',
+            'status' => 'active',
+            'timezone' => 'Asia/Manila',
+            'currency' => 'PHP',
+        ]);
+
+        $outsider = User::factory()->create([
+            'organization_id' => $stranger->id,
+            'role_key' => 'organization_owner',
+        ]);
+
+        /* Bounced to the gate exactly as a stranger with no account is. */
+        $this->actingAs($outsider)
+            ->get('/open-play/OP-TEST01/board')
+            ->assertRedirect('/open-play/board');
+
+        $this->actingAs($outsider)
+            ->post('/open-play/OP-TEST01/settings', [
+                'name' => 'Taken over',
+                'format' => 'doubles',
+                'target_score' => 11,
+                'win_by_two' => true,
+                'court_ids' => [],
+            ])
+            ->assertForbidden();
+    }
+
+    /**
+     * The setup screen offers an empty player cap and calls it no limit, and
+     * saving it failed on a NOT NULL column — which at the tablet looked like
+     * the session refusing to save at all.
+     */
+    public function test_a_session_can_be_saved_with_no_player_cap(): void
+    {
+        $session = $this->makeSession();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        $this->post('/open-play/OP-TEST01/settings', [
+            'name' => 'Uncapped',
+            'format' => 'doubles',
+            'target_score' => 11,
+            'win_by_two' => true,
+            'max_players' => null,
+            'court_ids' => [],
+        ])->assertRedirect();
+
+        $this->assertNull($session->fresh()->max_players);
+    }
+
+    /** The pair is still the only way in without an account. */
+    public function test_an_anonymous_visitor_still_needs_the_key(): void
+    {
+        $this->makeSession();
+
+        $this->get('/open-play/OP-TEST01/board')->assertRedirect('/open-play/board');
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => 'wrong'])
+            ->assertSessionHasErrors('code');
+    }
+
     public function test_a_second_device_cannot_open_a_board_someone_else_holds(): void
     {
         $this->makeSession();

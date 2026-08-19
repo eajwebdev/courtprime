@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -61,11 +62,20 @@ class PublicOpenPlayBoardController extends Controller
      * whether a board is already held, so the list gives away nothing the
      * discovery page does not.
      */
-    public function gate(): Response
+    public function gate(Request $request): Response
     {
         $today = NetworkClock::today();
 
         return Inertia::render('open-play-gate', [
+            /*
+             * A signed-in club's own sessions, openable without the pair.
+             *
+             * Staff kept landing here from their own admin page and being asked
+             * for a secret they hand out to other people. The code and key are
+             * for running a board without an account, not a second lock on the
+             * people who own the club.
+             */
+            'mine' => $this->staffSessions($request, $today),
             'active' => OpenPlaySession::query()
                 ->withoutGlobalScope('organization')
                 ->with(['branch.organization:id,name'])
@@ -91,6 +101,49 @@ class PublicOpenPlayBoardController extends Controller
                 ])
                 ->all(),
         ]);
+    }
+
+    /**
+     * The sessions a signed-in user may run without the pair.
+     *
+     * Authorized one at a time through the same policy the admin pages use, so
+     * this lists what they could already manage and never widens it.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function staffSessions(Request $request, mixed $today): array
+    {
+        if (! $request->user()) {
+            return [];
+        }
+
+        return OpenPlaySession::query()
+            ->withoutGlobalScope('organization')
+            ->with(['branch.organization:id,name'])
+            ->whereIn('status', ['scheduled', 'open', 'live'])
+            /* Clubs play past midnight. A session still marked live is still
+               the one being run, whatever date it was opened on, and dropping
+               it at 00:00 takes the board away from whoever is running it. */
+            ->where(fn ($query) => $query->whereDate('session_date', '>=', $today)->orWhere('status', 'live'))
+            ->orderByRaw("FIELD(status, 'live', 'open', 'scheduled')")
+            ->orderBy('session_date')
+            ->orderBy('start_time')
+            ->limit(24)
+            ->get()
+            ->filter(fn (OpenPlaySession $session) => Gate::allows('update', $session))
+            ->map(fn (OpenPlaySession $session) => [
+                'id' => $session->id,
+                'name' => $session->name,
+                'code' => $session->session_code,
+                'status' => $session->status,
+                'session_date' => $session->session_date?->toDateString(),
+                'start_time' => substr((string) $session->start_time, 0, 5),
+                'end_time' => substr((string) $session->end_time, 0, 5),
+                'branch' => $session->branch?->name,
+                'held' => (bool) $session->organizer_token && ! OpenPlayBoardAccess::hasGoneQuiet($session),
+            ])
+            ->values()
+            ->all();
     }
 
     /** Exchanges the pair for the board, if nobody else is holding it. */
@@ -723,7 +776,10 @@ class PublicOpenPlayBoardController extends Controller
             'target_score' => $data['target_score'],
             'win_by_two' => $data['win_by_two'],
             'max_consecutive_games' => $data['max_consecutive_games'] ?? null,
-            'max_players' => $data['max_players'],
+            /* Absent from the validated data when the client omits it, which
+               is not the same as being sent empty: omitting leaves the cap
+               alone, sending it empty is the "no limit" the screen offers. */
+            'max_players' => array_key_exists('max_players', $data) ? $data['max_players'] : $session->max_players,
         ]);
 
         /* The pivot carries organization_id and the column has no default, so
@@ -950,11 +1006,49 @@ class PublicOpenPlayBoardController extends Controller
             ->whereIn('status', ['scheduled', 'open', 'live'])
             ->first();
 
-        if (! $session || ! $request->session()->get($this->grantKey($session->id))) {
+        if (! $session) {
             return null;
         }
 
-        return $session;
+        if ($request->session()->get($this->grantKey($session->id))) {
+            return $session;
+        }
+
+        /*
+         * Staff do not need the code for their own club's session.
+         *
+         * The ID and key exist so a board can be run by people who are not
+         * signed in — a player with a phone, a tablet nobody logs into. A club
+         * owner already holds stronger credentials than the pair does, and was
+         * being sent to a form to type a secret they own, from a button on
+         * their own admin page that promised to open the board.
+         */
+        return $this->staffGrant($request, $session) ? $session : null;
+    }
+
+    /**
+     * Let a signed-in member of this club straight in, and give them the board
+     * if nobody is running it.
+     *
+     * Control still belongs to one device: if another tablet is actively
+     * holding it, this only opens the board to look at, and taking it over
+     * stays the deliberate act it already is — "Sign out that device" on the
+     * staff page. Two people scoring the same game is the thing the hold is
+     * there to prevent, and being staff does not make that safe.
+     */
+    private function staffGrant(Request $request, OpenPlaySession $session): bool
+    {
+        if (! $request->user() || ! Gate::allows('update', $session)) {
+            return false;
+        }
+
+        /* Claims when the board is free or has gone quiet, and is a no-op when
+           somebody else has it — either way this browser may now see it. */
+        OpenPlayBoardAccess::claim($request, $session, $request->user()->name);
+
+        $request->session()->put($this->grantKey($session->id), true);
+
+        return true;
     }
 
     private function requireGrant(Request $request, string $code, OpenPlayService $openPlay): OpenPlaySession

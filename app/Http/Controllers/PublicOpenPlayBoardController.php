@@ -6,6 +6,7 @@ use App\Http\Requests\OpenPlayAddPlayerRequest;
 use App\Models\ActivityTimelineEvent;
 use App\Models\ClubMatch;
 use App\Models\Court;
+use App\Models\OpenPlayCourtHold;
 use App\Models\OpenPlayMatch;
 use App\Models\OpenPlayPlayer;
 use App\Models\OpenPlayQueueEntry;
@@ -849,6 +850,57 @@ class PublicOpenPlayBoardController extends Controller
         $this->log($request, $session, 'open_play.started', 'Started the session', $players.' players, '.$courts.' courts');
 
         return back()->with('success', 'Session started. First round is on.');
+    }
+
+    /**
+     * Close the night from the board.
+     *
+     * The host's job, like starting it was. A session that has ended stops
+     * being a way in — the ID and key are only accepted for a scheduled, open
+     * or live session — so this is what turns the pair off for everybody
+     * holding it, including whoever is scoring a court right now.
+     */
+    public function endSession(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
+    {
+        $session = $this->requireHost($request, $code, $openPlay);
+
+        if (in_array($session->status, ['completed', 'cancelled'], true)) {
+            return to_route('open-play.gate')->with('success', 'That session had already ended.');
+        }
+
+        /* Games still on did not finish, so they are cancelled rather than
+           credited to somebody because the club closed. */
+        $live = OpenPlayMatch::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->where('status', 'live')
+            ->get();
+
+        $this->log($request, $session, 'open_play.ended', 'Ended the session', $live->count() > 0 ? $live->count().' unfinished cancelled' : null);
+
+        /*
+         * Closed first, then the courts cleared. Cancelling frees a court, and
+         * a session still rotating fills a free court straight away — so doing
+         * it the other way round drew a replacement for every game cancelled
+         * and the night never ended.
+         */
+        DB::transaction(function () use ($session) {
+            $session->update(['status' => 'completed', 'auto_rotate' => false]);
+
+            OpenPlayCourtHold::query()
+                ->withoutGlobalScope('organization')
+                ->where('open_play_session_id', $session->id)
+                ->delete();
+        });
+
+        foreach ($live as $match) {
+            $rotation->cancelMatch($match);
+        }
+
+        OpenPlayCourtAccess::releaseAll($request, $session);
+        OpenPlayBoardAccess::release($request, $session);
+
+        return to_route('open-play.gate')->with('success', 'Session ended. Its ID and key no longer open a board.');
     }
 
     /** Name, scoring and which courts are in play. */

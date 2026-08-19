@@ -1,6 +1,6 @@
 import { BrandIcon } from '@/components/marketing-artwork';
 import { Button } from '@/components/ui/button';
-import { Check, Copy, History, LogOut } from 'lucide-react';
+import { Check, CircleStop, Copy, History, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -21,6 +21,7 @@ export function BoardHeader({
     inControl,
     onShowActivity,
     onRelease,
+    onEnd,
     activityCount,
 }: {
     session: any;
@@ -28,6 +29,8 @@ export function BoardHeader({
     inControl: boolean;
     onShowActivity: () => void;
     onRelease: () => void;
+    /** Only the host closing a session that has started. */
+    onEnd?: () => void;
     activityCount: number;
 }) {
     const [copied, setCopied] = useState(false);
@@ -99,6 +102,15 @@ export function BoardHeader({
                         <Button type="button" variant="onDeep" size="sm" onClick={onRelease} className="shrink-0">
                             <LogOut className="size-4" />
                             <span className="hidden sm:inline">Release</span>
+                        </Button>
+                    )}
+
+                    {/* Closing the night, which is the host's call and not the
+                        same as handing the board to the next person. */}
+                    {inControl && onEnd && (
+                        <Button type="button" variant="onDeep" size="sm" onClick={onEnd} className="shrink-0">
+                            <CircleStop className="size-4" />
+                            <span className="hidden sm:inline">End session</span>
                         </Button>
                     )}
                 </div>

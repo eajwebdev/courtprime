@@ -62,6 +62,7 @@ export default function OpenPlayBoard({
 }: Props) {
     const [showActivity, setShowActivity] = useState(false);
     const [confirmRelease, setConfirmRelease] = useState(false);
+    const [confirmEnd, setConfirmEnd] = useState(false);
     const { errors } = usePage().props as any;
     const base = `/open-play/${session.session_code}`;
     const started = Boolean(session.started);
@@ -113,6 +114,7 @@ export default function OpenPlayBoard({
                 activityCount={activity.length}
                 onShowActivity={() => setShowActivity(true)}
                 onRelease={() => setConfirmRelease(true)}
+                onEnd={started ? () => setConfirmEnd(true) : undefined}
             />
 
             <main
@@ -177,6 +179,22 @@ export default function OpenPlayBoard({
                 confirmLabel="Release board"
                 variant="destructive"
                 onConfirm={() => router.post(`${base}/release`)}
+            />
+
+            {/* Ending is not releasing: the board goes back to whoever wants
+                it, a session that has ended cannot be opened by anybody. */}
+            <ConfirmDialog
+                open={confirmEnd}
+                onOpenChange={setConfirmEnd}
+                title="End this session?"
+                description={
+                    liveMatches.length > 0
+                        ? `${liveMatches.length} ${liveMatches.length === 1 ? 'game is' : 'games are'} still on and will be cancelled, counting for nobody. The session ID and key stop working for everyone.`
+                        : 'The session ID and key stop working, for everyone holding them. Nothing already played is lost.'
+                }
+                confirmLabel="End session"
+                variant="destructive"
+                onConfirm={() => router.post(`${base}/end`)}
             />
 
             <FlashToast />

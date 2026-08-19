@@ -309,6 +309,96 @@ class OpenPlayBoardControlTest extends TestCase
         $this->assertDatabaseCount('open_play_court_holds', 0);
     }
 
+    /**
+     * An ended session is not a way in any more.
+     *
+     * The ID and key are only accepted for a scheduled, open or live session,
+     * so ending one turns the pair off for everybody — including whoever was
+     * already holding a board or scoring a court on it.
+     */
+    public function test_ending_a_session_turns_its_id_and_key_off(): void
+    {
+        $session = $this->makeSession();
+        $court = $session->courts()->first();
+
+        $owner = User::factory()->create([
+            'organization_id' => $session->organization_id,
+            'branch_id' => $session->branch_id,
+            'role_key' => 'organization_owner',
+        ]);
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasNoErrors();
+        $this->get('/open-play/OP-TEST01/board')->assertOk();
+
+        /* Staff close the night from the office. */
+        $this->actingAs($owner)->post("/open-play/{$session->id}/end-session")->assertRedirect();
+
+        $this->assertSame('completed', $session->fresh()->status);
+        /* Nobody is left holding a court on a session nobody can open. */
+        $this->assertDatabaseCount('open_play_court_holds', 0);
+
+        /* The browser that was running it is turned away now. */
+        $this->get('/open-play/OP-TEST01/board')->assertRedirect('/open-play/board');
+
+        /* And the pair no longer opens anything, for anybody. */
+        $this->flushSession();
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
+            ->assertSessionHasErrors('code');
+    }
+
+    /** Games still on when the night is called did not finish, so they count for nobody. */
+    public function test_ending_a_session_cancels_the_games_still_on(): void
+    {
+        $session = $this->makeSession();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        foreach (['A Player', 'B Player', 'C Player', 'D Player'] as $name) {
+            $this->post('/open-play/OP-TEST01/players', ['name' => $name])->assertRedirect();
+        }
+
+        $this->post('/open-play/OP-TEST01/start')->assertRedirect();
+
+        $match = $session->matches()->where('status', 'live')->firstOrFail();
+
+        /* The host ends it from the board. */
+        $this->post('/open-play/OP-TEST01/end')->assertRedirect('/open-play/board');
+
+        $this->assertSame('cancelled', $match->fresh()->status);
+        $this->assertSame('completed', $session->fresh()->status);
+
+        /*
+         * And no replacement was drawn. Cancelling frees a court, and a session
+         * still rotating refills a free court at once — so closing the night
+         * after clearing the courts left a fresh game on every one of them.
+         */
+        $this->assertSame(
+            0,
+            $session->matches()->where('status', 'live')->count(),
+            'Ending the session left a game running.',
+        );
+    }
+
+    /** Only the host may close the night. */
+    public function test_a_court_scorer_cannot_end_the_session(): void
+    {
+        $session = $this->makeSession();
+        $court = $session->courts()->first();
+
+        /* Host takes the board first. */
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        /* Second person: in with the pair, scoring a court, not the host. */
+        $this->flushSession();
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasNoErrors();
+
+        $this->post('/open-play/OP-TEST01/end')->assertForbidden();
+
+        $this->assertNotSame('completed', $session->fresh()->status);
+    }
+
     /** A court put down is a court somebody else can pick up. */
     public function test_releasing_a_court_frees_it_for_the_next_person(): void
     {

@@ -6,6 +6,7 @@ use App\Http\Requests\OpenPlayGroupStoreRequest;
 use App\Http\Requests\OpenPlaySessionStoreRequest;
 use App\Models\Branch;
 use App\Models\Court;
+use App\Models\OpenPlayCourtHold;
 use App\Models\OpenPlayMatch;
 use App\Models\OpenPlaySession;
 use App\Models\OpenPlaySessionCourt;
@@ -15,7 +16,9 @@ use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\SubscriptionFeatureGate;
 use App\Services\TenantContext;
+use App\Support\NetworkClock;
 use App\Support\OpenPlayBoardAccess;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,12 +47,31 @@ class OpenPlayController extends Controller
          */
         $requested = trim((string) $request->query('session', ''));
 
+        /*
+         * One day at a time, today unless asked otherwise.
+         *
+         * A club runs open play most nights, so the list grows by one every
+         * day and last month's sessions were sitting on top of tonight's. The
+         * page opens on today and the date picker is how you reach a previous
+         * one — asking for a session by code still wins, and moves the page to
+         * that session's own date so the list around it makes sense.
+         */
         $session = OpenPlaySession::query()
             ->with(['branch.courts', 'courts', 'players.player', 'queue.player', 'queue.court'])
             ->when($requested !== '', fn ($query) => $query->where('session_code', strtoupper($requested)))
-            ->when($requested === '', fn ($query) => $query->orderByRaw("FIELD(status, 'live', 'open', 'scheduled', 'completed', 'cancelled')"))
+            ->when($requested === '', function ($query) use ($request) {
+                $query
+                    ->whereDate('session_date', $this->viewedDate($request))
+                    ->orderByRaw("FIELD(status, 'live', 'open', 'scheduled', 'completed', 'cancelled')");
+            })
             ->orderByDesc('id')
             ->first();
+
+        /* Asked for by code: the date follows the session, not the other way
+           round, so the list is not empty underneath it. */
+        $date = $requested !== '' && $session?->session_date
+            ? $session->session_date->toDateString()
+            : $this->viewedDate($request);
 
         /* Courts free up while nobody is looking at the screen, so a visit is
            also a chance to fill them. Generation is idempotent. */
@@ -62,9 +84,23 @@ class OpenPlayController extends Controller
             'sessions' => OpenPlaySession::query()
                 ->withCount(['players', 'queue'])
                 ->with('branch:id,name')
+                ->whereDate('session_date', $date)
                 ->orderByRaw("FIELD(status, 'live', 'open', 'scheduled', 'completed', 'cancelled')")
                 ->orderByDesc('id')
-                ->paginate(10),
+                ->paginate(10)
+                ->withQueryString(),
+            /* Which day is on screen, and the days that have anything on them,
+               so the picker can say where there is something to look at. */
+            'viewedDate' => $date,
+            'today' => NetworkClock::today(),
+            'sessionDates' => OpenPlaySession::query()
+                ->selectRaw('DATE(session_date) as day, COUNT(*) as sessions')
+                ->groupBy('day')
+                ->orderByDesc('day')
+                ->limit(60)
+                ->get()
+                ->map(fn ($row) => ['date' => (string) $row->day, 'sessions' => (int) $row->sessions])
+                ->all(),
             'activeSession' => $session,
             'sessionCourts' => $session ? $session->courts()->orderBy('court_number')->get(['courts.id', 'name', 'court_number']) : [],
             'liveMatches' => $session ? $this->liveMatches($session) : [],
@@ -144,6 +180,83 @@ class OpenPlayController extends Controller
         $rotation->generate($session);
 
         return back()->with('success', "Session created. Share ID {$session->session_code} and key {$session->session_key}.");
+    }
+
+    /**
+     * The day being looked at: today unless a valid one is asked for.
+     *
+     * Anything unparseable falls back to today rather than erroring — this is
+     * a query string on a page somebody may have bookmarked.
+     */
+    private function viewedDate(Request $request): string
+    {
+        $asked = trim((string) $request->query('date', ''));
+
+        if ($asked === '') {
+            return NetworkClock::today();
+        }
+
+        try {
+            return CarbonImmutable::parse($asked)->toDateString();
+        } catch (\Throwable) {
+            return NetworkClock::today();
+        }
+    }
+
+    /**
+     * Close the night.
+     *
+     * A session that has ended stops being a way in: the ID and key are only
+     * accepted for a scheduled, open or live session, so ending one turns the
+     * pair off for everybody holding it. The board is signed out and every
+     * court put down with it, because a session nobody can open is not a
+     * session anybody should still be scoring.
+     *
+     * Games still on the courts are cancelled rather than finished. They did
+     * not finish; crediting somebody with a win because the club closed would
+     * be inventing a result.
+     */
+    public function endSession(OpenPlaySession $session, OpenPlayRotationService $rotation): RedirectResponse
+    {
+        $this->authorize('update', $session);
+
+        if (in_array($session->status, ['completed', 'cancelled'], true)) {
+            return back()->with('success', 'That session had already ended.');
+        }
+
+        $live = OpenPlayMatch::query()
+            ->where('open_play_session_id', $session->id)
+            ->where('status', 'live')
+            ->get();
+
+        /*
+         * Closed first, then the courts cleared.
+         *
+         * Cancelling a match frees a court, and a session still rotating fills
+         * a free court straight away — so cancelling before closing drew a
+         * replacement for every game cancelled and the night would not end.
+         */
+        DB::transaction(function () use ($session) {
+            $session->update([
+                'status' => 'completed',
+                'auto_rotate' => false,
+                /* The hold, so the board is not left flagged as running. */
+                'organizer_token' => null,
+                'organizer_claimed_at' => null,
+                'organizer_last_seen_at' => null,
+            ]);
+
+            OpenPlayCourtHold::query()->where('open_play_session_id', $session->id)->delete();
+        });
+
+        foreach ($live as $match) {
+            $rotation->cancelMatch($match);
+        }
+
+        $unfinished = $live->count();
+
+        return back()->with('success', 'Session ended. The ID and key no longer open it.'
+            .($unfinished > 0 ? " {$unfinished} unfinished ".($unfinished === 1 ? 'game was' : 'games were').' cancelled.' : ''));
     }
 
     /**

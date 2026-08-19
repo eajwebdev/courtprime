@@ -8,7 +8,7 @@ import { currency, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Check, Copy, LogOut, MonitorPlay, Plus, RotateCw } from 'lucide-react';
+import { CalendarDays, Check, CircleStop, Copy, LogOut, MonitorPlay, Plus, RotateCw } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payloads come from OpenPlayController. */
@@ -18,6 +18,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Open Play', href: '/open-play' 
 type Props = {
     sessions: any;
     activeSession: any;
+    /** The day on screen, and today, so "today" can be offered as a way back. */
+    viewedDate: string;
+    today: string;
+    sessionDates: { date: string; sessions: number }[];
     board: { held: boolean; since: string | null; last_seen: string | null; quiet: boolean } | null;
     collections: CollectionSheet | null;
     sessionCourts: any[];
@@ -38,6 +42,9 @@ type Props = {
 export default function OpenPlay({
     sessions,
     activeSession,
+    viewedDate,
+    today,
+    sessionDates = [],
     board,
     collections,
     sessionCourts = [],
@@ -47,6 +54,14 @@ export default function OpenPlay({
 }: Props) {
     const [copied, setCopied] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [ending, setEnding] = useState(false);
+
+    const onToday = viewedDate === today;
+    const ended = ['completed', 'cancelled'].includes(String(activeSession?.status));
+
+    /* The date is the whole filter, so changing it is a fresh page rather than
+       a client-side filter over a list that only holds one day anyway. */
+    const showDate = (date: string) => router.get('/open-play', { date }, { preserveScroll: true, preserveState: false });
 
     /* Allocated courts with nothing on them. Leaving them off the board made
        an idle court look like a court that was never selected. */
@@ -111,16 +126,23 @@ export default function OpenPlay({
                                     </div>
 
                                     <div className="flex shrink-0 flex-wrap gap-2">
-                                        <Button type="button" variant="onDeep" onClick={copyCode}>
-                                            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                                            {copied ? 'Copied' : 'Copy ID + key'}
-                                        </Button>
-                                        <Button asChild>
-                                            <Link href={`/open-play/${activeSession.session_code}/board`}>
-                                                <MonitorPlay className="size-4" />
-                                                Open board
-                                            </Link>
-                                        </Button>
+                                        {/* An ended session's pair opens nothing, so neither
+                                            control is offered for one. */}
+                                        {!ended && (
+                                            <>
+                                                <Button type="button" variant="onDeep" onClick={copyCode}>
+                                                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                                                    {copied ? 'Copied' : 'Copy ID + key'}
+                                                </Button>
+                                                <Button asChild>
+                                                    <Link href={`/open-play/${activeSession.session_code}/board`}>
+                                                        <MonitorPlay className="size-4" />
+                                                        Open board
+                                                    </Link>
+                                                </Button>
+                                            </>
+                                        )}
+                                        {ended && <span className="text-meta rounded-full bg-white/10 px-3 py-1.5 text-white/70">Session ended</span>}
                                     </div>
                                 </div>
 
@@ -142,6 +164,30 @@ export default function OpenPlay({
                                                 : 'A device is running the board now.'
                                             : 'Nobody is holding the board.'}
                                     </p>
+                                    {/* Closing the night: the pair stops opening a board
+                                        for anybody still holding it. */}
+                                    {!ended && (
+                                        <ConfirmDialog
+                                            open={ending}
+                                            onOpenChange={setEnding}
+                                            trigger={
+                                                <Button type="button" variant="onDeep" size="sm">
+                                                    <CircleStop className="size-4" />
+                                                    End session
+                                                </Button>
+                                            }
+                                            title={`End ${activeSession.name}?`}
+                                            description={
+                                                liveMatches.length > 0
+                                                    ? `${liveMatches.length} ${liveMatches.length === 1 ? 'game is' : 'games are'} still on and will be cancelled, counting for nobody. The ID and key stop working for everyone holding them.`
+                                                    : 'The ID and key stop working, for everyone holding them. Nothing already played is lost.'
+                                            }
+                                            confirmLabel="End session"
+                                            variant="destructive"
+                                            onConfirm={() => router.post(`/open-play/${activeSession.id}/end-session`, {}, { preserveScroll: true })}
+                                        />
+                                    )}
+
                                     {board?.held && (
                                         <ConfirmDialog
                                             trigger={
@@ -275,6 +321,53 @@ export default function OpenPlay({
                         </Button>
                     </div>
 
+                    {/* A club runs one of these most nights, so the list is a
+                        day at a time and opens on today. The picker is how you
+                        reach a previous one. */}
+                    <div className="border-border bg-surface mb-3 rounded-xl border p-3">
+                        <div className="flex items-center gap-2">
+                            <CalendarDays className="text-muted size-4 shrink-0" aria-hidden />
+                            <input
+                                type="date"
+                                aria-label="Show sessions from"
+                                value={viewedDate}
+                                max={today}
+                                onChange={(event) => event.target.value && showDate(event.target.value)}
+                                className="border-border bg-surface text-foreground text-label h-9 min-w-0 flex-1 rounded-md border px-2 tabular-nums"
+                            />
+                            {!onToday && (
+                                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => showDate(today)}>
+                                    Today
+                                </Button>
+                            )}
+                        </div>
+
+                        {/* The days that have anything on them, so the picker is
+                            not a guessing game about which nights ran. */}
+                        {sessionDates.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {sessionDates.slice(0, 6).map((day) => (
+                                    <button
+                                        key={day.date}
+                                        type="button"
+                                        onClick={() => showDate(day.date)}
+                                        className={cn(
+                                            'text-meta rounded-full border px-2 py-0.5 font-medium transition-colors',
+                                            day.date === viewedDate
+                                                ? 'border-primary bg-primary-soft text-primary'
+                                                : 'border-border text-muted hover:text-foreground',
+                                        )}
+                                    >
+                                        <span data-numeric>{day.date === today ? 'Today' : shortDay(day.date)}</span>
+                                        <span className="text-muted ml-1" data-numeric>
+                                            {day.sessions}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     {activeSession && collections && (
                         <div className="mb-5">
                             {/* Taking money is staff work, so it lives here and
@@ -333,6 +426,13 @@ export default function OpenPlay({
             <SessionCreateDialog open={creating} onOpenChange={setCreating} branches={branches} />
         </AppLayout>
     );
+}
+
+/** "Sat 16 Aug" — enough to recognise a night without the year. */
+function shortDay(iso: string) {
+    const value = new Date(`${iso}T00:00:00`);
+
+    return Number.isNaN(value.getTime()) ? iso : value.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 function Team({ players, score, align = 'left' }: { players: any[]; score: number; align?: 'left' | 'right' }) {

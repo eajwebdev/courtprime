@@ -123,6 +123,7 @@ Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function 
     Route::post('courts/{court}/release', [PublicOpenPlayBoardController::class, 'releaseCourt'])->name('open-play.board.courts.release');
     Route::post('queue/reorder', [PublicOpenPlayBoardController::class, 'reorderQueue'])->name('open-play.board.queue.reorder');
     Route::post('queue/move', [PublicOpenPlayBoardController::class, 'moveInQueue'])->name('open-play.board.queue.move');
+    Route::post('end', [PublicOpenPlayBoardController::class, 'endSession'])->name('open-play.board.end');
 });
 Route::get('find-tournaments', [PublicTournamentController::class, 'index'])->name('tournaments.discovery');
 Route::post('find-tournaments/{tournamentId}/register', [PublicTournamentController::class, 'register'])->name('tournaments.discovery.register');
@@ -216,6 +217,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('open-play', [OpenPlayController::class, 'store'])->name('open-play.store');
     Route::post('open-play/{session}/groups', [OpenPlayController::class, 'group'])->name('open-play.groups.store');
     Route::post('open-play/{session}/release-board', [OpenPlayController::class, 'releaseBoard'])->name('open-play.release-board');
+    /* Ending a session turns its ID and key off: the pair is only accepted for
+       a scheduled, open or live one. */
+    /* Not `/end`: the public board group above owns `open-play/{code}/end`,
+       and a numeric id matches {code} perfectly well, so the board controller
+       answered this and turned staff away for having no session key. */
+    Route::post('open-play/{session}/end-session', [OpenPlayController::class, 'endSession'])->name('open-play.end');
     Route::post('open-play/{session}/collect/{player}', [OpenPlayController::class, 'settlePlayer'])->name('open-play.players.settle');
     Route::post('open-play/{session}/players/{player}', [OpenPlayController::class, 'join'])->name('open-play.join');
     Route::post('open-play/{session}/players/{player}/check-in', [OpenPlayController::class, 'checkIn'])->name('open-play.check-in');

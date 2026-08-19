@@ -9,16 +9,26 @@ import { useEffect, useRef, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
 
-/** How long to wait for a second tap before deciding what the first one meant. */
-const DOUBLE_TAP_MS = 300;
+/**
+ * How far a finger has to travel left before it is a swipe rather than a tap.
+ *
+ * Generous, because this is used at arm's length on a tablet propped at a net
+ * post: a deliberate swipe clears it easily and a tap that slides a little
+ * still scores.
+ */
+const SWIPE_BACK_PX = 44;
 
 /**
  * One court.
  *
- * One tap on a team scores. Two quick taps take the point back. There is no
- * separate undo control: the score is the only thing on the card worth
- * touching, and a small button next to a very large target is the one you hit
- * by mistake reaching across a net post.
+ * A tap on a team scores; dragging that half to the left takes the point back.
+ * There is no separate undo control: the score is the only thing on the card
+ * worth touching, and a small button next to a very large target is the one you
+ * hit by mistake reaching across a net post.
+ *
+ * A court is scored by one device. When it belongs to somebody else the card
+ * still shows the game — everyone standing around wants to see it — but it
+ * cannot be tapped, and it says who has it.
  *
  * A game played out to the target finishes itself, and nobody is asked who won
  * a game the score already settled. Finishing early asks only when the score
@@ -34,6 +44,9 @@ export function CourtCard({
     target,
     winByTwo,
     waiting = [],
+    mine = true,
+    heldBy = null,
+    courtId,
 }: {
     match: any;
     base: string;
@@ -42,6 +55,12 @@ export function CourtCard({
     winByTwo?: boolean;
     /** The queue, so a player can be swapped in from it before the first point. */
     waiting?: any[];
+    /** Whether this device is the one scoring this court. */
+    mine?: boolean;
+    /** Who has it, when somebody else does. */
+    heldBy?: string | null;
+    /** For taking the court, when it is free. */
+    courtId?: number;
 }) {
     const [confirming, setConfirming] = useState(false);
     const [arranging, setArranging] = useState(false);
@@ -90,22 +109,37 @@ export function CourtCard({
 
                 {/* Only before the first point: moving somebody across the net
                     mid game would leave points against a team they were not
-                    on. */}
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={started}
-                    title={started ? 'Take the points back to rearrange' : 'Rearrange the teams'}
-                    onClick={() => setArranging(true)}
-                >
-                    <Shuffle className="size-4" />
-                    <span className="hidden sm:inline">Teams</span>
-                </Button>
+                    on. And only for whoever is scoring this court. */}
+                {mine && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={started}
+                        title={started ? 'Take the points back to rearrange' : 'Rearrange the teams'}
+                        onClick={() => setArranging(true)}
+                    >
+                        <Shuffle className="size-4" />
+                        <span className="hidden sm:inline">Teams</span>
+                    </Button>
+                )}
             </div>
 
-            <div className="bg-border grid min-h-0 flex-1 grid-cols-2 gap-px">
+            {/* Whose court this is, when it is not yours. A number that cannot
+                be tapped needs to say why before somebody taps it twice. */}
+            {!mine && (
+                <div className="border-border text-meta text-muted flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
+                    <span className="truncate">{heldBy ? `${heldBy} is scoring this court` : 'Nobody is scoring this court'}</span>
+                    {!heldBy && courtId && (
+                        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => post(`${base}/courts/${courtId}/claim`)}>
+                            Score this court
+                        </Button>
+                    )}
+                </div>
+            )}
+
+            <div className={cn('bg-border grid min-h-0 flex-1 grid-cols-2 gap-px', !mine && 'pointer-events-none opacity-70')}>
                 <TeamScore
                     side="Team A"
                     players={one}
@@ -113,6 +147,7 @@ export function CourtCard({
                     against={match.team_two_score}
                     target={target}
                     winByTwo={winByTwo}
+                    readOnly={!mine}
                     onScore={(done) => post(`${base}/matches/${match.id}/score`, { team: 'team_one' }, done)}
                     onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_one' }, done)}
                 />
@@ -123,12 +158,13 @@ export function CourtCard({
                     against={match.team_one_score}
                     target={target}
                     winByTwo={winByTwo}
+                    readOnly={!mine}
                     onScore={(done) => post(`${base}/matches/${match.id}/score`, { team: 'team_two' }, done)}
                     onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_two' }, done)}
                 />
             </div>
 
-            {confirming ? (
+            {!mine ? null : confirming ? (
                 <div className="border-border shrink-0 border-t px-3 py-3">
                     <p className="text-meta text-muted mb-2 text-center">Level at {scoreOne}. Who won?</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -203,6 +239,7 @@ function TeamScore({
     against,
     target,
     winByTwo,
+    readOnly = false,
     onScore,
     onUndo,
 }: {
@@ -213,40 +250,68 @@ function TeamScore({
     against: number;
     target?: number;
     winByTwo?: boolean;
+    /** Somebody else is scoring this court; the number is here to read only. */
+    readOnly?: boolean;
     onScore: (done: () => void) => void;
     onUndo: (done: () => void) => void;
 }) {
-    const taps = useRef(0);
-    const timer = useRef<number | undefined>(undefined);
+    const startX = useRef<number | null>(null);
     const [pending, setPending] = useState(0);
+    const [dragging, setDragging] = useState(0);
     const reduce = useReducedMotion();
 
-    useEffect(() => () => window.clearTimeout(timer.current), []);
-
     /*
-     * The request waits for the double tap window to close, but the number does
-     * not: `pending` moves the moment a finger lands and is only cleared once
-     * the server has answered. Clearing it when the request went out instead
-     * made the score drop back to the old value for the length of the round
-     * trip and then jump forward again.
+     * A tap scores; dragging left takes the point back.
+     *
+     * It used to be tap to score and double tap to undo, which meant every
+     * single point waited 300ms to find out whether a second finger was
+     * coming — on the one control that gets used a hundred times a night. A
+     * point now lands the instant it is tapped, and taking one back is a
+     * gesture that cannot happen by accident.
+     *
+     * `pending` moves the moment the finger lifts and is only cleared once the
+     * server has answered, so the number never drops back to the old value for
+     * the length of the round trip and then jumps forward again.
      */
-    const tap = () => {
-        taps.current += 1;
-        setPending(taps.current === 1 ? 1 : -1);
+    const down = (event: React.PointerEvent) => {
+        if (readOnly) return;
 
-        window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => {
-            const count = taps.current;
-            taps.current = 0;
+        startX.current = event.clientX;
+        setDragging(0);
+    };
 
-            const done = () => setPending(0);
+    const move = (event: React.PointerEvent) => {
+        if (startX.current === null) return;
 
-            if (count === 1) {
-                onScore(done);
-            } else {
-                onUndo(done);
-            }
-        }, DOUBLE_TAP_MS);
+        /* Only leftward travel counts, and only far enough to be deliberate. */
+        setDragging(Math.min(0, event.clientX - startX.current));
+    };
+
+    const up = (event: React.PointerEvent) => {
+        if (startX.current === null) return;
+
+        const travelled = event.clientX - startX.current;
+        startX.current = null;
+        setDragging(0);
+
+        const done = () => setPending(0);
+
+        if (travelled <= -SWIPE_BACK_PX) {
+            if (score <= 0) return;
+
+            setPending(-1);
+            onUndo(done);
+
+            return;
+        }
+
+        setPending(1);
+        onScore(done);
+    };
+
+    const cancel = () => {
+        startX.current = null;
+        setDragging(0);
     };
 
     const shown = Math.max(0, score + pending);
@@ -261,14 +326,42 @@ function TeamScore({
        of the net rather than by comparing two numbers. */
     const progress = target ? Math.min(100, Math.round((shown / target) * 100)) : 0;
 
+    /* Far enough left to be reading as a take-back rather than a slip. */
+    const undoing = dragging <= -SWIPE_BACK_PX && score > 0;
+
     return (
         <button
             type="button"
-            onClick={tap}
-            aria-label={`Score for ${players.map((player: any) => player.name).join(' and ')}. Tap to add a point, double tap to take one back.`}
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={cancel}
+            onPointerLeave={cancel}
+            /* Pointer events cover mouse, pen and touch, but not the keyboard:
+               Enter and Space fire click and nothing else, so scoring stays
+               reachable without a pointer at all. */
+            onClick={(event) => {
+                /* detail 0 is a keyboard activation; a real click has already
+                   been handled by the pointer sequence above. */
+                if (readOnly || event.detail !== 0) return;
+
+                setPending(1);
+                onScore(() => setPending(0));
+            }}
+            disabled={readOnly}
+            aria-label={
+                readOnly
+                    ? `${players.map((player: any) => player.name).join(' and ')}, scored by somebody else`
+                    : `Score for ${players.map((player: any) => player.name).join(' and ')}. Tap to add a point, drag left to take one back.`
+            }
             /* The whole half scores: a small "+1" is a miss on a tablet at
-               arm's length across a court. */
-            className="group bg-surface hover:bg-surface-muted active:bg-primary-soft relative flex h-full min-h-32 flex-col items-center justify-center gap-2 overflow-hidden px-3 py-4 transition-colors sm:min-h-36"
+               arm's length across a court. `touch-action` keeps the browser
+               from claiming a horizontal drag as a scroll before we see it. */
+            className={cn(
+                'group bg-surface hover:bg-surface-muted active:bg-primary-soft relative flex h-full min-h-32 touch-pan-y flex-col items-center justify-center gap-2 overflow-hidden px-3 py-4 transition-colors select-none sm:min-h-36',
+                undoing && 'bg-danger-soft',
+            )}
+            style={{ transform: dragging < 0 ? `translateX(${Math.max(dragging / 3, -24)}px)` : undefined }}
         >
             {/* The one effect on this screen: a soft bloom behind whichever
                 number is ahead, so the lead reads from across a court without
@@ -327,7 +420,14 @@ function TeamScore({
             ) : null}
 
             <span className="relative flex h-4 items-center">
-                {matchPoint ? (
+                {/* While a finger is travelling left, the label says what
+                    letting go will do — the gesture is not discoverable on its
+                    own, and this is where the eyes already are. */}
+                {dragging < 0 ? (
+                    <span className={cn('text-[0.6875rem] font-semibold tracking-[0.14em] uppercase', undoing ? 'text-danger' : 'text-muted')}>
+                        {undoing ? 'release to take back' : 'keep dragging'}
+                    </span>
+                ) : matchPoint ? (
                     <span className="text-primary text-[0.6875rem] font-semibold tracking-[0.14em] uppercase">match point</span>
                 ) : level ? (
                     <span className="text-meta text-muted">all square</span>
@@ -335,7 +435,7 @@ function TeamScore({
                     /* Only while it is still nil all: once there are points on
                        the board the instruction is noise. */
                     <span className={cn('text-meta text-muted transition-opacity', (score > 0 || against > 0) && 'opacity-0')}>
-                        tap to score · double tap to undo
+                        tap to score · drag left to undo
                     </span>
                 )}
             </span>

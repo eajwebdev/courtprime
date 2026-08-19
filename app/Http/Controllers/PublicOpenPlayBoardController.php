@@ -19,6 +19,7 @@ use App\Services\PaddleStackService;
 use App\Services\PlayerIdentityService;
 use App\Support\NetworkClock;
 use App\Support\OpenPlayBoardAccess;
+use App\Support\OpenPlayCourtAccess;
 use App\Support\OpenPlaySessionLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -146,6 +147,29 @@ class PublicOpenPlayBoardController extends Controller
             ->all();
     }
 
+    /**
+     * Who is scoring each court, for the board to show.
+     *
+     * A name and whether it is yours, nothing that could be used to take a
+     * court off somebody: the hold itself is proved by a token this never
+     * carries.
+     *
+     * @param  array<int, int>  $mine
+     * @return array<int, array<string, mixed>>
+     */
+    private function courtHolders(OpenPlaySession $session, array $mine): array
+    {
+        return OpenPlayCourtAccess::rows($session)
+            ->reject(fn ($hold) => OpenPlayCourtAccess::isStale($hold))
+            ->map(fn ($hold) => [
+                'court_id' => (int) $hold->court_id,
+                'name' => $hold->holder_name ?: 'Someone',
+                'mine' => in_array((int) $hold->court_id, $mine, true),
+            ])
+            ->values()
+            ->all();
+    }
+
     /** Exchanges the pair for the board, if nobody else is holding it. */
     public function enter(Request $request, OpenPlayService $openPlay): RedirectResponse
     {
@@ -159,15 +183,71 @@ class PublicOpenPlayBoardController extends Controller
 
         $session = $openPlay->sessionForCode($request->string('code')->toString(), $request->string('key')->toString());
 
-        if (! OpenPlayBoardAccess::claim($request, $session, $request->input('who'))) {
-            return back()->withErrors([
-                'code' => 'This board is open on another device. It has to be released there before it can be opened here.',
-            ]);
+        /*
+         * The pair lets everybody in now, not just the first person.
+         *
+         * A club with two courts going needs two people scoring them, and the
+         * board used to be one device: whoever entered the pair first ran
+         * everything and everyone else was turned away with the right
+         * credentials in their hand. What is limited is courts — one scorer
+         * each — and that is enforced when a court is taken, not at the door.
+         *
+         * Whoever arrives first also becomes the host and owns the session's
+         * setup; `claim` is a no-op for everyone after them.
+         */
+        OpenPlayBoardAccess::claim($request, $session, $request->input('who'));
+
+        $request->session()->put($this->grantKey($session->id), true);
+
+        if ($name = trim((string) $request->input('who'))) {
+            $request->session()->put(OpenPlayBoardAccess::actorKey($session->id), $name);
         }
 
-        OpenPlaySessionLog::record($request, $session, 'open_play.board_opened', 'Took the board');
+        OpenPlaySessionLog::record($request, $session, 'open_play.board_opened', 'Opened the board');
 
         return to_route('open-play.board.public', ['code' => $session->session_code]);
+    }
+
+    /**
+     * Take a court to score.
+     *
+     * One device per court: this is where "only as many people as there are
+     * courts" is actually enforced. Somebody already scoring it keeps it until
+     * they put it down or their device goes quiet.
+     */
+    public function claimCourt(Request $request, string $code, int $court, OpenPlayService $openPlay): RedirectResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        /* Re-resolved against the session's own courts rather than trusted
+           from the URL: the board is reachable with a shared code. */
+        $courtModel = $session->courts()->where('courts.id', $court)->first();
+
+        abort_unless($courtModel !== null, 404);
+
+        if (! OpenPlayCourtAccess::claim($request, $session, $courtModel, $this->actorName($request, $session))) {
+            return back()->withErrors(['court' => 'Somebody else is scoring '.$courtModel->name.' right now.']);
+        }
+
+        $this->log($request, $session, 'open_play.court_taken', 'Took '.$courtModel->name);
+
+        return back()->with('success', 'You are scoring '.$courtModel->name.'.');
+    }
+
+    /** Put a court down so somebody else can score it. */
+    public function releaseCourt(Request $request, string $code, int $court, OpenPlayService $openPlay): RedirectResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        $courtModel = $session->courts()->where('courts.id', $court)->first();
+
+        abort_unless($courtModel !== null, 404);
+
+        OpenPlayCourtAccess::release($request, $session, $courtModel->id);
+
+        $this->log($request, $session, 'open_play.court_released', 'Put down '.$courtModel->name);
+
+        return back()->with('success', $courtModel->name.' is free for somebody else to score.');
     }
 
     /** Hand the board back, so the next person can take it with the same pair. */
@@ -198,9 +278,15 @@ class PublicOpenPlayBoardController extends Controller
             $rotation->generate($session);
         }
 
-        /* Every load, including the eight second poll, is the heartbeat that
-           keeps this device's hold on the board alive. */
+        /* Every load, including the poll, is the heartbeat that keeps this
+           device's holds alive — the session's, and every court it scores. */
         OpenPlayBoardAccess::touch($request, $session);
+
+        $myCourts = OpenPlayCourtAccess::held($request, $session);
+
+        foreach ($myCourts as $courtId) {
+            OpenPlayCourtAccess::touch($request, $session, $courtId);
+        }
 
         $session->refresh()->load('branch');
 
@@ -226,8 +312,12 @@ class PublicOpenPlayBoardController extends Controller
                 'starts_at' => substr((string) $session->start_time, 0, 5),
                 'ends_at' => substr((string) $session->end_time, 0, 5),
             ],
-            /* Whether this device is the one holding the board. */
+            /* Whether this device is the host: the one that opened the session
+               and owns how it is run. Scoring is a separate question now. */
             'inControl' => OpenPlayBoardAccess::isHolder($request, $session),
+            /* The courts this device is scoring, and who has the rest. */
+            'myCourts' => $myCourts,
+            'courtHolders' => $this->courtHolders($session, $myCourts),
             'you' => $this->actorName($request, $session),
             'courts' => $session->courts()->orderBy('court_number')->get(['courts.id', 'name']),
             'branchCourts' => Court::query()
@@ -251,7 +341,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayRotationService $rotation,
         PlayerIdentityService $identity,
     ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireBoard($request, $code, $openPlay);
 
         /*
          * An id means they were picked from the club's own members, so they are
@@ -306,7 +396,7 @@ class PublicOpenPlayBoardController extends Controller
         MatchScoringService $scoring,
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireScorer($request, $code, $match, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['team' => ['required', 'in:team_one,team_two']]);
@@ -339,7 +429,7 @@ class PublicOpenPlayBoardController extends Controller
 
     public function undo(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireScorer($request, $code, $match, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['team' => ['nullable', 'in:team_one,team_two']]);
@@ -372,7 +462,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayService $openPlay,
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireScorer($request, $code, $match, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $data = $request->validate([
@@ -524,7 +614,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayService $openPlay,
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireScorer($request, $code, $match, $openPlay);
         $this->clubMatchFor($session, $match);
 
         $rotation->cancelMatch($match);
@@ -543,7 +633,7 @@ class PublicOpenPlayBoardController extends Controller
      */
     public function rotation(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
     {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireHost($request, $code, $openPlay);
 
         $data = $request->validate(['auto_rotate' => ['required', 'boolean']]);
         $on = (bool) $data['auto_rotate'];
@@ -575,7 +665,7 @@ class PublicOpenPlayBoardController extends Controller
      */
     public function reorderQueue(Request $request, string $code, OpenPlayService $openPlay): RedirectResponse
     {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireHost($request, $code, $openPlay);
 
         $data = $request->validate([
             'player_ids' => ['required', 'array', 'min:1'],
@@ -592,7 +682,7 @@ class PublicOpenPlayBoardController extends Controller
     /** Move one player to a given place in the line, shifting everyone else along. */
     public function moveInQueue(Request $request, string $code, OpenPlayService $openPlay): RedirectResponse
     {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireHost($request, $code, $openPlay);
 
         $data = $request->validate([
             'player_id' => ['required', 'integer'],
@@ -629,7 +719,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayService $openPlay,
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireScorer($request, $code, $match, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate([
@@ -685,7 +775,7 @@ class PublicOpenPlayBoardController extends Controller
      */
     public function start(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
     {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireHost($request, $code, $openPlay);
 
         if ($session->status === 'live') {
             return back();
@@ -717,7 +807,7 @@ class PublicOpenPlayBoardController extends Controller
     /** Name, scoring and which courts are in play. */
     public function settings(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
     {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireHost($request, $code, $openPlay);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -854,7 +944,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayService $openPlay,
         OpenPlayCollectionService $collections,
     ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
+        $session = $this->requireBoard($request, $code, $openPlay);
 
         $onCourt = OpenPlayMatch::query()
             ->withoutGlobalScope('organization')
@@ -1060,20 +1150,75 @@ class PublicOpenPlayBoardController extends Controller
     }
 
     /**
-     * Only the device holding the board may change it.
+     * Only the host may change how the session is run.
      *
-     * The grant says this browser got through the gate at some point. The hold
-     * says it is still the one in charge, which is a different question once
-     * somebody else has taken the board over.
+     * Settings, starting, pausing the rotation and the order of the queue are
+     * one person's job: two people changing the format or the queue at the same
+     * time is the clash the single hold was there to prevent, and that much is
+     * still true now that scoring has been spread across the courts.
      */
-    private function requireControl(Request $request, string $code, OpenPlayService $openPlay): OpenPlaySession
+    private function requireHost(Request $request, string $code, OpenPlayService $openPlay): OpenPlaySession
     {
         $session = $this->requireGrant($request, $code, $openPlay);
 
         abort_unless(
             OpenPlayBoardAccess::isHolder($request, $session),
             403,
-            'Another device is running this board now.',
+            'Only the device that opened this session can change how it is run.',
+        );
+
+        return $session;
+    }
+
+    /**
+     * Anyone running any part of the board may change the roster.
+     *
+     * A walk-in turns up at whichever court is nearest, and making them wait
+     * for the host to be found is how the person at court two ends up not
+     * bothering. Every change is signed in the history either way.
+     */
+    private function requireBoard(Request $request, string $code, OpenPlayService $openPlay): OpenPlaySession
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        abort_unless(
+            OpenPlayBoardAccess::isHolder($request, $session) || OpenPlayCourtAccess::held($request, $session) !== [],
+            403,
+            'Take a court before changing the session.',
+        );
+
+        return $session;
+    }
+
+    /**
+     * Only the device scoring a court may score it.
+     *
+     * This is what keeps two people off one game. The host may score a court
+     * nobody has taken — they set the session up and should not be locked out
+     * of finishing a match on an unattended court — but never one somebody
+     * else is standing at.
+     */
+    private function requireScorer(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay): OpenPlaySession
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        abort_unless($match->open_play_session_id === $session->id, 404);
+
+        $courtId = (int) $match->court_id;
+
+        if (OpenPlayCourtAccess::holds($request, $session, $courtId)) {
+            return $session;
+        }
+
+        $taken = OpenPlayCourtAccess::rows($session)
+            ->first(fn ($hold) => (int) $hold->court_id === $courtId && ! OpenPlayCourtAccess::isStale($hold));
+
+        abort_unless(
+            OpenPlayBoardAccess::isHolder($request, $session) && ! $taken,
+            403,
+            $taken
+                ? 'Somebody else is scoring this court.'
+                : 'Take this court before scoring it.',
         );
 
         return $session;

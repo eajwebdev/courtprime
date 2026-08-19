@@ -9,14 +9,18 @@ use App\Models\OpenPlaySessionCourt;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * One device holds a board at a time.
+ * One device scores a court at a time.
  *
- * The session ID and key are the controls, so two tablets both adding players
- * and both recording results is the thing to prevent: that is how a rotation
- * ends up with two versions of who is next.
+ * The session ID and key are shared, so they let everybody in: a club with two
+ * courts going needs the two people standing at them both keeping score. What
+ * is limited is courts — one scorer each — and how the session itself is run,
+ * which stays with whoever opened it. Two devices on one game is still the
+ * thing being prevented: that is how a game ends up with two versions of its
+ * score.
  */
 class OpenPlayBoardControlTest extends TestCase
 {
@@ -178,18 +182,108 @@ class OpenPlayBoardControlTest extends TestCase
             ->assertSessionHasErrors('code');
     }
 
-    public function test_a_second_device_cannot_open_a_board_someone_else_holds(): void
+    /**
+     * The pair is shared, so it lets everybody in.
+     *
+     * A club with two courts going needs two people scoring them. What is
+     * limited is courts, not doors: the second person through gets the board
+     * but not the host's job, and takes a court to score.
+     */
+    public function test_a_second_device_can_open_the_same_board(): void
     {
         $this->makeSession();
 
-        $first = $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234']);
-        $first->assertRedirect('/open-play/OP-TEST01/board');
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
+            ->assertRedirect('/open-play/OP-TEST01/board');
 
         /* A second browser: same pair, no shared session. */
         $this->flushSession();
 
-        $second = $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234']);
-        $second->assertSessionHasErrors('code');
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
+            ->assertRedirect('/open-play/OP-TEST01/board');
+
+        $this->get('/open-play/OP-TEST01/board')->assertOk();
+
+        /* But running the session is still the first person's job. */
+        $this->post('/open-play/OP-TEST01/settings', [
+            'name' => 'Taken over',
+            'format' => 'doubles',
+            'target_score' => 11,
+            'win_by_two' => true,
+            'court_ids' => [],
+        ])->assertForbidden();
+    }
+
+    /**
+     * Two courts, two scorers, and neither can touch the other's game.
+     *
+     * This is the whole point of holding courts rather than the board: the
+     * people standing at the two courts each keep their own score, and the one
+     * thing still being prevented is two devices on one game.
+     */
+    public function test_a_court_is_scored_by_one_device_and_the_rest_are_free(): void
+    {
+        $session = $this->makeSession();
+        $courtOne = $session->courts()->first();
+
+        $courtTwo = Court::query()->create([
+            'organization_id' => $session->organization_id,
+            'branch_id' => $session->branch_id,
+            'name' => 'Court 2',
+            'court_number' => 2,
+            'status' => 'available',
+            'standard_hourly_rate' => 500,
+        ]);
+
+        OpenPlaySessionCourt::query()->create([
+            'organization_id' => $session->organization_id,
+            'open_play_session_id' => $session->id,
+            'court_id' => $courtTwo->id,
+        ]);
+
+        /* First person in takes court one. */
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$courtOne->id}/claim")->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$courtOne->id}/claim")->assertRedirect();
+
+        /* Second person, second browser, same pair. */
+        $this->flushSession();
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        /* Court one is taken, so they are turned away from it… */
+        $this->post("/open-play/OP-TEST01/courts/{$courtOne->id}/claim")
+            ->assertSessionHasErrors('court');
+
+        /* …and court two is theirs. */
+        $this->post("/open-play/OP-TEST01/courts/{$courtTwo->id}/claim")
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('open_play_court_holds', 2);
+    }
+
+    /** A court put down is a court somebody else can pick up. */
+    public function test_releasing_a_court_frees_it_for_the_next_person(): void
+    {
+        $session = $this->makeSession();
+        $court = $session->courts()->first();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasNoErrors();
+
+        $this->flushSession();
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasErrors('court');
+
+        /* The first person puts it down from their own browser. */
+        $this->flushSession();
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasErrors('court');
+
+        /* Nobody has checked in on it for long enough that it is not a hold
+           any more, which is how a flat phone stops locking a court. */
+        DB::table('open_play_court_holds')->update(['last_seen_at' => now()->subHour(), 'claimed_at' => now()->subHour()]);
+
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasNoErrors();
     }
 
     public function test_the_board_can_be_taken_once_it_is_released(): void
@@ -304,8 +398,18 @@ class OpenPlayBoardControlTest extends TestCase
 
         $this->flushSession();
 
+        /* The second person is let in, as anybody with the pair now is — but
+           the host's job stays with the device that is still checking in. */
         $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
-            ->assertSessionHasErrors('code');
+            ->assertRedirect('/open-play/OP-TEST01/board');
+
+        $this->post('/open-play/OP-TEST01/settings', [
+            'name' => 'Taken over',
+            'format' => 'doubles',
+            'target_score' => 11,
+            'win_by_two' => true,
+            'court_ids' => [],
+        ])->assertForbidden();
     }
 
     public function test_a_board_that_has_gone_quiet_can_be_taken_over(): void

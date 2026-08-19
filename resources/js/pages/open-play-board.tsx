@@ -17,6 +17,9 @@ import { useEffect, useState } from 'react';
 type Props = {
     session: any;
     inControl: boolean;
+    /** Courts this device is scoring. One device per court. */
+    myCourts: number[];
+    courtHolders: { court_id: number; name: string; mine: boolean }[];
     courts: BoardCourt[];
     branchCourts: BoardCourt[];
     roster: RosterEntry[];
@@ -42,7 +45,19 @@ type Props = {
  * 48px, and the layout gets wider rather than taller as the screen grows, so a
  * tablet in landscape shows the whole session without scrolling.
  */
-export default function OpenPlayBoard({ session, inControl, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
+export default function OpenPlayBoard({
+    session,
+    inControl,
+    myCourts = [],
+    courtHolders = [],
+    courts,
+    branchCourts,
+    roster,
+    liveMatches,
+    waiting,
+    results,
+    activity,
+}: Props) {
     const [showActivity, setShowActivity] = useState(false);
     const [confirmRelease, setConfirmRelease] = useState(false);
     const { errors } = usePage().props as any;
@@ -106,6 +121,9 @@ export default function OpenPlayBoard({ session, inControl, courts, branchCourts
                     <LiveBoard
                         base={base}
                         session={session}
+                        inControl={inControl}
+                        myCourts={myCourts}
+                        courtHolders={courtHolders}
                         courts={courts}
                         roster={roster}
                         liveMatches={liveMatches}
@@ -165,6 +183,9 @@ export default function OpenPlayBoard({ session, inControl, courts, branchCourts
 function LiveBoard({
     base,
     session,
+    inControl,
+    myCourts,
+    courtHolders,
     courts,
     roster,
     liveMatches,
@@ -175,6 +196,9 @@ function LiveBoard({
 }: {
     base: string;
     session: any;
+    inControl: boolean;
+    myCourts: number[];
+    courtHolders: { court_id: number; name: string; mine: boolean }[];
     courts: BoardCourt[];
     roster: RosterEntry[];
     liveMatches: any[];
@@ -185,6 +209,21 @@ function LiveBoard({
 }) {
     const busy = liveMatches.map((match) => match.court);
     const idle = courts.filter((court) => !busy.includes(court.name));
+
+    /* A match names its court, the holds key on its id, so the two are matched
+       by name once here rather than in every card. */
+    const courtIdOf = (name: string) => courts.find((court) => court.name === name)?.id;
+    const isMine = (name: string) => {
+        const id = courtIdOf(name);
+
+        return id !== undefined && myCourts.includes(id);
+    };
+    const holderOf = (name: string) => {
+        const id = courtIdOf(name);
+        const hold = courtHolders.find((entry) => entry.court_id === id);
+
+        return hold && !hold.mine ? hold.name : null;
+    };
     /* The server works out what a court takes, so the board never has to
        infer it from the format string. */
     const perMatch = session.capacity ?? (session.format === 'singles' ? 2 : 4);
@@ -226,21 +265,31 @@ function LiveBoard({
                         checked in
                     </span>
 
-                    {/* Pausing is a state the board has to show, not just a
-                        button it has: a court that finishes and stays empty
-                        otherwise reads as broken. */}
-                    <button
-                        type="button"
-                        onClick={() => post(`${base}/rotation`, { auto_rotate: paused ? '1' : '0' })}
-                        className={cn(
-                            'text-meta ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors',
-                            paused ? 'bg-warning-soft text-warning' : 'text-muted hover:text-foreground',
-                        )}
-                    >
-                        {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
-                        {paused ? 'Rotation paused · resume' : 'Pause rotation'}
-                    </button>
+                    {/* Pausing is how the session is run, so it belongs to the
+                        host. A state the board has to show, not just a button
+                        it has: a court that finishes and stays empty otherwise
+                        reads as broken. */}
+                    {inControl ? (
+                        <button
+                            type="button"
+                            onClick={() => post(`${base}/rotation`, { auto_rotate: paused ? '1' : '0' })}
+                            className={cn(
+                                'text-meta ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors',
+                                paused ? 'bg-warning-soft text-warning' : 'text-muted hover:text-foreground',
+                            )}
+                        >
+                            {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
+                            {paused ? 'Rotation paused · resume' : 'Pause rotation'}
+                        </button>
+                    ) : (
+                        paused && <span className="text-meta bg-warning-soft text-warning ml-auto rounded-full px-2.5 py-1 font-medium">Rotation paused</span>
+                    )}
                 </div>
+
+                {/* Which court you are keeping, and what is left to take. The
+                    first thing somebody who just came in with the code needs to
+                    answer, so it sits above the courts rather than in a tab. */}
+                <CourtBar base={base} courts={courts} myCourts={myCourts} courtHolders={courtHolders} post={post} />
 
                 <div className={cn('grid content-start gap-4 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:overflow-y-auto', courtGrid)}>
                     {liveMatches.map((match) => (
@@ -252,6 +301,9 @@ function LiveBoard({
                             target={session.target_score}
                             winByTwo={session.win_by_two}
                             waiting={waiting}
+                            courtId={courtIdOf(match.court)}
+                            mine={isMine(match.court)}
+                            heldBy={holderOf(match.court)}
                         />
                     ))}
 
@@ -276,6 +328,90 @@ function LiveBoard({
             </div>
 
             <BoardRail base={base} roster={roster} waiting={waiting} results={results} activity={activity} needed={needed} />
+        </div>
+    );
+}
+
+/**
+ * Which court you are keeping.
+ *
+ * A session runs on one ID and key however many people are at it, and what
+ * limits them is courts: one scorer each. This is where somebody who just came
+ * in takes one, and where they put it down when they leave — a court nobody
+ * releases frees itself after ten quiet minutes, but walking away without
+ * saying so should not be the normal way it happens.
+ */
+function CourtBar({
+    base,
+    courts,
+    myCourts,
+    courtHolders,
+    post,
+}: {
+    base: string;
+    courts: BoardCourt[];
+    myCourts: number[];
+    courtHolders: { court_id: number; name: string; mine: boolean }[];
+    post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
+}) {
+    if (courts.length === 0) return null;
+
+    const free = courts.filter((court) => !courtHolders.some((hold) => hold.court_id === court.id));
+
+    return (
+        <div className="border-border bg-surface flex shrink-0 flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
+            <span className="text-meta text-muted shrink-0">Scoring</span>
+
+            {courts.map((court) => {
+                const hold = courtHolders.find((entry) => entry.court_id === court.id);
+                const mine = myCourts.includes(court.id);
+
+                return (
+                    <span
+                        key={court.id}
+                        className={cn(
+                            'text-meta inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium',
+                            mine
+                                ? 'border-primary bg-primary-soft text-primary'
+                                : hold
+                                  ? 'border-border bg-surface-muted text-muted'
+                                  : 'border-border text-muted',
+                        )}
+                    >
+                        {court.name}
+                        <span className={cn(mine ? 'text-primary' : 'text-muted')}>
+                            {mine ? '· you' : hold ? `· ${hold.name}` : '· free'}
+                        </span>
+
+                        {mine && (
+                            <button
+                                type="button"
+                                aria-label={`Stop scoring ${court.name}`}
+                                title="Put this court down"
+                                onClick={() => post(`${base}/courts/${court.id}/release`)}
+                                className="text-primary/70 hover:text-primary"
+                            >
+                                <X className="size-3.5" />
+                            </button>
+                        )}
+                    </span>
+                );
+            })}
+
+            {myCourts.length === 0 && free.length > 0 && (
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                    <span className="text-meta text-muted">Take one:</span>
+                    {free.map((court) => (
+                        <Button key={court.id} type="button" size="sm" variant="outline" onClick={() => post(`${base}/courts/${court.id}/claim`)}>
+                            {court.name}
+                        </Button>
+                    ))}
+                </span>
+            )}
+
+            {myCourts.length === 0 && free.length === 0 && (
+                <span className="text-meta text-muted ml-auto">Every court is being scored. You can watch, and take one when it frees up.</span>
+            )}
         </div>
     );
 }

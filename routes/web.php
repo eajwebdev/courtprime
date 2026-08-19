@@ -117,6 +117,10 @@ Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function 
     Route::post('matches/{match}/finish', [PublicOpenPlayBoardController::class, 'complete'])->name('open-play.board.finish');
     Route::post('matches/{match}/cancel', [PublicOpenPlayBoardController::class, 'cancelMatch'])->name('open-play.board.cancel');
     Route::post('rotation', [PublicOpenPlayBoardController::class, 'rotation'])->name('open-play.board.rotation');
+    /* One scorer per court, which is what limits how many people can run a
+       session at once to how many courts it has. */
+    Route::post('courts/{court}/claim', [PublicOpenPlayBoardController::class, 'claimCourt'])->name('open-play.board.courts.claim');
+    Route::post('courts/{court}/release', [PublicOpenPlayBoardController::class, 'releaseCourt'])->name('open-play.board.courts.release');
     Route::post('queue/reorder', [PublicOpenPlayBoardController::class, 'reorderQueue'])->name('open-play.board.queue.reorder');
     Route::post('queue/move', [PublicOpenPlayBoardController::class, 'moveInQueue'])->name('open-play.board.queue.move');
 });

@@ -206,4 +206,3 @@ class UnifiedIdentityAndWorkspaceTest extends TestCase
             ->assertForbidden();
     }
 }
-

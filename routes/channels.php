@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\ClubMatch;
 use App\Models\Branch;
+use App\Models\ClubMatch;
 use App\Models\Court;
 use App\Models\Tournament;
 use App\Models\User;

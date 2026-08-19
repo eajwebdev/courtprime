@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\SubscriptionInvoice;
-use App\Models\SubscriptionPlan;
 use App\Services\Payments\PayMongoQrPh;
 use App\Services\SubscriptionBillingService;
 use App\Services\TenantContext;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,8 +16,11 @@ use Throwable;
 /**
  * What a club owes, and how it pays.
  *
- * The club's own view of its subscription: where the trial is up to, what the
- * next bill is, how long it has to pay it, and the terms it could switch to.
+ * View and pay only. Choosing a plan, a term, or starting a trial is EAJ's
+ * call, made from /tenant-subscriptions, the same as it already decides who
+ * is on the network at all; a club cannot grant itself a trial or downgrade
+ * its own bill. This page answers what the club owes and lets it clear that
+ * with QRPh, nothing more.
  */
 class BillingController extends Controller
 {
@@ -39,7 +40,6 @@ class BillingController extends Controller
         $this->authorize('manage', $organization);
 
         $subscription = $organization->subscription()->with('plan')->first();
-        $plans = SubscriptionPlan::query()->where('is_active', true)->orderBy('monthly_price')->get();
 
         $outstanding = $subscription
             ? $subscription->invoices()->whereIn('status', ['issued', 'overdue', 'partial'])->orderByDesc('id')->first()
@@ -65,13 +65,6 @@ class BillingController extends Controller
                 'grace_ends_on' => $outstanding->grace_ends_on?->toDateString(),
                 'reference' => $outstanding->payment_reference,
             ] : null,
-            'plans' => $plans->map(fn (SubscriptionPlan $plan) => [
-                'id' => $plan->id,
-                'code' => $plan->code,
-                'name' => $plan->name,
-                'description' => $plan->description,
-                'terms' => $this->billing->termOptions($plan),
-            ])->all(),
             'invoices' => $subscription
                 ? $subscription->invoices()->orderByDesc('id')->limit(12)->get()->map(fn (SubscriptionInvoice $invoice) => [
                     'number' => $invoice->invoice_number,
@@ -81,49 +74,10 @@ class BillingController extends Controller
                     'paid_at' => $invoice->paid_at?->toDateString(),
                 ])->all()
                 : [],
-            'trialDays' => SubscriptionBillingService::TRIAL_DAYS,
-            /* From BILLING_CYCLE_MONTHS, so the term picker opens on the term
-               the club is set up to default to rather than always monthly. */
-            'defaultTermMonths' => $this->billing->defaultTermMonths(),
             /* The page says plainly when payment cannot be taken yet, rather
                than offering a button that throws. */
             'canTakePayment' => $this->gateway->configured(),
         ]);
-    }
-
-    /** Start the fourteen day trial, which is how partner clubs come on. */
-    public function trial(Request $request, TenantContext $tenantContext): RedirectResponse
-    {
-        $organization = $tenantContext->currentOrganization();
-        $this->authorize('manage', $organization);
-
-        $plan = SubscriptionPlan::query()->findOrFail($request->integer('plan_id'));
-
-        if ($organization->subscription?->trial_ends_at) {
-            return back()->withErrors(['plan_id' => 'This club has already had its trial.']);
-        }
-
-        $this->billing->startTrial($organization, $plan);
-
-        return back()->with('success', 'Trial started. Everything is unlocked for '.SubscriptionBillingService::TRIAL_DAYS.' days.');
-    }
-
-    /** Choose a plan and a term, and raise the bill for it. */
-    public function subscribe(Request $request, TenantContext $tenantContext): RedirectResponse
-    {
-        $organization = $tenantContext->currentOrganization();
-        $this->authorize('manage', $organization);
-
-        $data = $request->validate([
-            'plan_id' => ['required', 'integer', 'exists:subscription_plans,id'],
-            'term_months' => ['required', 'integer', 'in:1,3,12'],
-        ]);
-
-        $plan = SubscriptionPlan::query()->findOrFail($data['plan_id']);
-
-        $this->billing->subscribe($organization, $plan, (int) $data['term_months']);
-
-        return back()->with('success', 'Subscription started. The invoice is ready to pay.');
     }
 
     /** Raise a QRPh code for the outstanding invoice. */

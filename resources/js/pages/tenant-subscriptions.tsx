@@ -7,12 +7,21 @@ import AppLayout from '@/layouts/app-layout';
 import { currency } from '@/lib/format';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Building2, CreditCard } from 'lucide-react';
-import { type FormEvent } from 'react';
+import { Building2, Check, CreditCard, Sparkles } from 'lucide-react';
+import { type FormEvent, useState } from 'react';
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- payload from TenantSubscriptionController. */
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Tenant Subscriptions', href: '/tenant-subscriptions' }];
 
-export default function TenantSubscriptions({ organizations, plans }: { organizations: any[]; plans: any[] }) {
+type Props = {
+    organizations: any[];
+    plans: any[];
+    trialDays: number;
+    canTakePayment: boolean;
+};
+
+export default function TenantSubscriptions({ organizations, plans, trialDays, canTakePayment }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Tenant Subscriptions" />
@@ -21,13 +30,20 @@ export default function TenantSubscriptions({ organizations, plans }: { organiza
                     <p className="text-sm font-semibold text-pink-600">EAJ Superadmin</p>
                     <h1 className="mt-2 text-2xl font-semibold">Tenant Subscriptions</h1>
                     <p className="text-muted-foreground mt-2 text-sm">
-                        Manage plan assignment, billing cycle, trials, renewals, suspensions, and cancellations.
+                        Start a club's trial, put it on a plan and term, and settle payments taken outside QRPh. A club sees what it owes and pays
+                        by QRPh from its own billing page, it does not choose its own plan.
                     </p>
                 </div>
 
                 <div className="grid gap-4">
                     {organizations.map((organization) => (
-                        <TenantSubscriptionCard key={organization.id} organization={organization} plans={plans} />
+                        <TenantSubscriptionCard
+                            key={organization.id}
+                            organization={organization}
+                            plans={plans}
+                            trialDays={trialDays}
+                            canTakePayment={canTakePayment}
+                        />
                     ))}
                     {organizations.length === 0 && (
                         <Card>
@@ -40,8 +56,61 @@ export default function TenantSubscriptions({ organizations, plans }: { organiza
     );
 }
 
-function TenantSubscriptionCard({ organization, plans }: { organization: any; plans: any[] }) {
+function TenantSubscriptionCard({
+    organization,
+    plans,
+    trialDays,
+    canTakePayment,
+}: {
+    organization: any;
+    plans: any[];
+    trialDays: number;
+    canTakePayment: boolean;
+}) {
     const subscription = organization.subscription;
+
+    /* The new path: start a trial, or put the club on a plan and term. Kept
+       separate from the manual override form below rather than merged into
+       it, because the two write through different logic, this one rolls the
+       period and raises the invoice the same way a real renewal does. */
+    const [newPlanId, setNewPlanId] = useState<number | null>(plans[0]?.id ?? null);
+    const [newMonths, setNewMonths] = useState(1);
+    const newPlan = plans.find((entry) => Number(entry.id) === newPlanId) ?? plans[0] ?? null;
+    const newTerm = newPlan?.terms?.find((entry: any) => entry.months === newMonths) ?? newPlan?.terms?.[0] ?? null;
+
+    const trialForm = useForm({ plan_id: newPlanId ?? '' });
+    const subscribeForm = useForm({ plan_id: newPlanId ?? '', term_months: newMonths });
+    const settleForm = useForm({ method: 'cash', reference: '' });
+
+    /*
+     * .transform() rather than setData-then-post: setData schedules a React
+     * state update, so a post() called right after in the same tick would
+     * still read the value from before the click. transform() reads newPlanId
+     * and newMonths from this render directly, which is what is actually
+     * current when the button was pressed.
+     */
+    const startTrial = () => {
+        trialForm.transform(() => ({ plan_id: newPlanId })).post(`/tenant-subscriptions/${organization.id}/trial`, { preserveScroll: true });
+    };
+
+    const subscribeTenant = () => {
+        subscribeForm
+            .transform(() => ({ plan_id: newPlanId, term_months: newMonths }))
+            .post(`/tenant-subscriptions/${organization.id}/subscribe`, { preserveScroll: true });
+    };
+
+    const outstanding = (subscription?.invoices ?? []).find((invoice: any) => ['issued', 'overdue', 'partial'].includes(invoice.status));
+
+    const settleOutstanding = (event: FormEvent) => {
+        event.preventDefault();
+        if (!outstanding) return;
+
+        settleForm.post(`/tenant-subscriptions/${organization.id}/invoices/${outstanding.id}/settle`, {
+            preserveScroll: true,
+            onSuccess: () => settleForm.reset('reference'),
+        });
+    };
+
     const form = useForm({
         subscription_plan_id: subscription?.subscription_plan_id ?? plans[0]?.id ?? '',
         status: subscription?.status ?? organization.status ?? 'trial',
@@ -137,6 +206,99 @@ function TenantSubscriptionCard({ organization, plans }: { organization: any; pl
                     <Info label="Users" value={organization.users_count} />
                     <Info label="Monthly" value={selectedPlan ? currency(selectedPlan.monthly_price) : '-'} />
                 </div>
+
+                {/* ---- Start a trial or subscribe: the path that keeps
+                    term_months, grace_days and QRPh in sync -------------- */}
+                <div className="bg-primary-soft/30 border-primary/20 space-y-3 rounded-lg border p-3">
+                    <p className="text-sm font-semibold">Start or change subscription</p>
+                    <p className="text-muted-foreground text-xs">
+                        The trial is {trialDays} days, free. Subscribing raises an invoice the club pays by QRPh from its own billing page.
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                        {plans.map((plan) => (
+                            <button
+                                key={plan.id}
+                                type="button"
+                                onClick={() => setNewPlanId(Number(plan.id))}
+                                className={`rounded-md border px-3 py-1.5 text-sm ${
+                                    Number(plan.id) === newPlanId ? 'border-primary bg-primary/10 font-semibold' : 'bg-background'
+                                }`}
+                            >
+                                {plan.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {newPlan?.terms && (
+                        <div className="flex flex-wrap gap-2">
+                            {newPlan.terms.map((term: any) => (
+                                <button
+                                    key={term.months}
+                                    type="button"
+                                    onClick={() => setNewMonths(term.months)}
+                                    className={`rounded-md border px-3 py-1.5 text-sm ${
+                                        term.months === newMonths ? 'border-primary bg-primary/10 font-semibold' : 'bg-background'
+                                    }`}
+                                >
+                                    {term.label} · {currency(term.per_month)}/mo
+                                    {term.saving_percent > 0 && <span className="ml-1 text-emerald-600">save {term.saving_percent}%</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={trialForm.processing || !newPlanId || Boolean(subscription?.trial_ends_at)}
+                            onClick={startTrial}
+                        >
+                            <Sparkles className="mr-1.5 size-4" />
+                            {subscription?.trial_ends_at ? 'Trial already used' : `Start ${trialDays}-day trial`}
+                        </Button>
+                        <Button type="button" size="sm" disabled={subscribeForm.processing || !newPlanId} onClick={subscribeTenant}>
+                            <CreditCard className="mr-1.5 size-4" />
+                            Subscribe{newTerm ? ` · ${currency(newTerm.total)}` : ''}
+                        </Button>
+                        {(trialForm.errors as any).plan_id && <p className="text-xs text-red-600">{(trialForm.errors as any).plan_id}</p>}
+                    </div>
+
+                    {outstanding && (
+                        <form onSubmit={settleOutstanding} className="border-t pt-3">
+                            <p className="text-xs font-semibold">
+                                Outstanding: {outstanding.invoice_number} · {currency(outstanding.total_amount)}
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-end gap-2">
+                                <Select
+                                    label="Paid by"
+                                    value={settleForm.data.method}
+                                    options={['cash', 'bank_transfer', 'other']}
+                                    onChange={(value) => settleForm.setData('method', value)}
+                                />
+                                <Field
+                                    label="Reference"
+                                    value={settleForm.data.reference}
+                                    onChange={(value) => settleForm.setData('reference', value)}
+                                    error={(settleForm.errors as any).method}
+                                />
+                                <Button size="sm" disabled={settleForm.processing}>
+                                    <Check className="mr-1.5 size-4" />
+                                    Mark this invoice paid
+                                </Button>
+                            </div>
+                            {!canTakePayment && (
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    QRPh is not connected, so the club cannot pay this online yet; this records an offline payment instead.
+                                </p>
+                            )}
+                        </form>
+                    )}
+                </div>
+
+                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Manual override</p>
 
                 <form onSubmit={submit} className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end">
                     <div className="space-y-2">

@@ -4,41 +4,30 @@ import { currency, friendlyDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Check, Clock, QrCode, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Check, Clock, Mail, QrCode } from 'lucide-react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from BillingController. */
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Billing', href: '/billing' }];
 
-type Term = { months: number; label: string; total: number; per_month: number; saving: number; saving_percent: number };
-type Plan = { id: number; code: string; name: string; description?: string | null; terms: Term[] };
-
 type Props = {
     subscription: any | null;
     outstanding: any | null;
-    plans: Plan[];
     invoices: any[];
-    trialDays: number;
-    defaultTermMonths: number;
     canTakePayment: boolean;
 };
 
 /**
  * A club's own billing.
  *
- * Answers the four questions a club actually has: what am I on, when is it due,
- * what happens if I am late, and how do I pay. The terms sit next to each other
- * with what each saves, because the discount for committing is the reason to
- * read this page at all.
+ * View and pay, nothing else. Choosing a plan, a term, or starting a trial is
+ * EAJ's call from /tenant-subscriptions, the same as deciding who is on the
+ * network at all. This page answers what the club owes and lets it clear that
+ * by QRPh; it does not offer a way to grant itself a trial or change its own
+ * plan.
  */
-export default function Billing({ subscription, outstanding, plans, invoices, trialDays, defaultTermMonths, canTakePayment }: Props) {
+export default function Billing({ subscription, outstanding, invoices, canTakePayment }: Props) {
     const { flash, errors } = usePage().props as any;
-    const [planId, setPlanId] = useState<number | null>(plans[0]?.id ?? null);
-    const [months, setMonths] = useState<number>(subscription?.term_months ?? defaultTermMonths);
-
-    const plan = plans.find((entry) => entry.id === planId) ?? plans[0] ?? null;
-    const term = plan?.terms.find((entry) => entry.months === months) ?? plan?.terms[0] ?? null;
 
     const trialing = subscription?.status === 'trialing';
     const pastDue = subscription?.status === 'past_due';
@@ -100,94 +89,22 @@ export default function Billing({ subscription, outstanding, plans, invoices, tr
                             </>
                         ) : (
                             <>
-                                <p className="text-eyebrow text-primary uppercase">Not subscribed</p>
+                                <p className="text-eyebrow text-primary uppercase">Not subscribed yet</p>
                                 <h1 className="mt-1 text-[1.75rem] leading-tight font-semibold tracking-tight text-white">
-                                    Start with {trialDays} days free
+                                    Your CourtPrime team sets this up
                                 </h1>
-                                <p className="text-meta mt-2 text-white/60">
-                                    Every feature, no card, nothing to pay. Partner clubs come on this way.
+                                <p className="text-meta mt-2 max-w-md text-white/60">
+                                    Trials, plans and billing terms are arranged with EAJ CourtPrime directly. Once your subscription is started,
+                                    this page is where you see what is owed and pay it.
                                 </p>
-                                <Button
-                                    className="mt-4"
-                                    onClick={() => router.post('/billing/trial', { plan_id: plan?.id }, { preserveScroll: true })}
-                                    disabled={!plan}
-                                >
-                                    <Sparkles className="size-4" />
-                                    Start the free trial
+                                <Button asChild variant="onDeep" className="mt-4">
+                                    <a href="mailto:hello@courtprime.app">
+                                        <Mail className="size-4" />
+                                        Contact CourtPrime
+                                    </a>
                                 </Button>
                             </>
                         )}
-                    </section>
-
-                    {/* ---- Choose a plan and a term --------------------------- */}
-                    <section>
-                        <h2 className="text-h2 text-foreground mb-1">{subscription ? 'Change plan or term' : 'Pick a plan'}</h2>
-                        <p className="text-meta text-muted mb-4">Longer terms cost less per month. The saving is the club's own annual rate.</p>
-
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            {plans.map((entry) => (
-                                <button
-                                    key={entry.id}
-                                    type="button"
-                                    aria-pressed={entry.id === planId}
-                                    onClick={() => setPlanId(entry.id)}
-                                    className={cn(
-                                        'rounded-xl border p-4 text-left transition-colors',
-                                        entry.id === planId
-                                            ? 'border-primary bg-primary-soft'
-                                            : 'border-border bg-surface hover:border-border-strong',
-                                    )}
-                                >
-                                    <p className="text-label text-foreground font-semibold">{entry.name}</p>
-                                    <p data-numeric className="text-meta text-muted mt-0.5">
-                                        from {currency(entry.terms[0]?.per_month ?? 0)}/mo
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
-
-                        {plan && (
-                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                {plan.terms.map((option) => (
-                                    <button
-                                        key={option.months}
-                                        type="button"
-                                        aria-pressed={option.months === months}
-                                        onClick={() => setMonths(option.months)}
-                                        className={cn(
-                                            'relative rounded-xl border p-4 text-left transition-colors',
-                                            option.months === months
-                                                ? 'border-primary bg-primary-soft'
-                                                : 'border-border bg-surface hover:border-border-strong',
-                                        )}
-                                    >
-                                        {option.saving_percent > 0 && (
-                                            <span className="bg-success absolute -top-2 right-3 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold text-white uppercase">
-                                                save {option.saving_percent}%
-                                            </span>
-                                        )}
-                                        <p className="text-label text-foreground font-semibold">{option.label}</p>
-                                        <p data-numeric className="text-h3 text-foreground mt-1">
-                                            {currency(option.per_month)}
-                                            <span className="text-meta text-muted font-normal"> /mo</span>
-                                        </p>
-                                        <p data-numeric className="text-meta text-muted mt-0.5">
-                                            {currency(option.total)} billed {option.months === 1 ? 'monthly' : `every ${option.months} months`}
-                                        </p>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        <Button
-                            size="touch"
-                            className="mt-4 w-full sm:w-auto"
-                            disabled={!plan || !term}
-                            onClick={() => router.post('/billing/subscribe', { plan_id: plan?.id, term_months: months }, { preserveScroll: true })}
-                        >
-                            {subscription && !trialing ? 'Change to this' : 'Start this subscription'}
-                            {term && <span data-numeric> · {currency(term.total)}</span>}
-                        </Button>
                     </section>
 
                     {invoices.length > 0 && (

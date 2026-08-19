@@ -15,6 +15,7 @@ use App\Services\MatchScoringService;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
+use App\Support\NetworkClock;
 use App\Support\OpenPlayBoardAccess;
 use App\Support\OpenPlaySessionLog;
 use Illuminate\Http\JsonResponse;
@@ -48,9 +49,46 @@ use Inertia\Response;
 class PublicOpenPlayBoardController extends Controller
 {
     /** The gate: ID and key, before anything about a session is revealed. */
+    /**
+     * The way in, with what is currently running.
+     *
+     * The page used to be a form on an empty screen: no way to tell whether the
+     * session you were handed a code for is even on tonight. It now lists the
+     * sessions that are open or live, so a player can see what is running and
+     * tap the one they are at. The key is still never listed, and neither is
+     * whether a board is already held, so the list gives away nothing the
+     * discovery page does not.
+     */
     public function gate(): Response
     {
-        return Inertia::render('open-play-gate');
+        $today = NetworkClock::today();
+
+        return Inertia::render('open-play-gate', [
+            'active' => OpenPlaySession::query()
+                ->withoutGlobalScope('organization')
+                ->with(['branch.organization:id,name'])
+                ->withCount('players')
+                ->whereDate('session_date', '>=', $today)
+                ->whereIn('status', ['open', 'live'])
+                ->whereHas('branch.organization', fn ($query) => $query->whereIn('status', ['trial', 'active']))
+                ->orderBy('session_date')
+                ->orderBy('start_time')
+                ->limit(12)
+                ->get()
+                ->map(fn (OpenPlaySession $session) => [
+                    'id' => $session->id,
+                    'name' => $session->name,
+                    'code' => $session->session_code,
+                    'status' => $session->status,
+                    'players_count' => $session->players_count,
+                    'session_date' => $session->session_date?->toDateString(),
+                    'start_time' => substr((string) $session->start_time, 0, 5),
+                    'end_time' => substr((string) $session->end_time, 0, 5),
+                    'branch' => $session->branch?->name,
+                    'organization' => $session->branch?->organization?->name,
+                ])
+                ->all(),
+        ]);
     }
 
     /** Exchanges the pair for the board, if nobody else is holding it. */

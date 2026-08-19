@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -62,12 +63,18 @@ export function CourtCard({
                 <TeamScore
                     players={one}
                     score={match.team_one_score}
+                    against={match.team_two_score}
+                    target={target}
+                    winByTwo={winByTwo}
                     onScore={(done) => post(`${base}/matches/${match.id}/score`, { team: 'team_one' }, done)}
                     onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_one' }, done)}
                 />
                 <TeamScore
                     players={two}
                     score={match.team_two_score}
+                    against={match.team_one_score}
+                    target={target}
+                    winByTwo={winByTwo}
                     onScore={(done) => post(`${base}/matches/${match.id}/score`, { team: 'team_two' }, done)}
                     onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_two' }, done)}
                 />
@@ -115,17 +122,24 @@ export function CourtCard({
 function TeamScore({
     players,
     score,
+    against,
+    target,
+    winByTwo,
     onScore,
     onUndo,
 }: {
     players: any[];
     score: number;
+    against: number;
+    target?: number;
+    winByTwo?: boolean;
     onScore: (done: () => void) => void;
     onUndo: (done: () => void) => void;
 }) {
     const taps = useRef(0);
     const timer = useRef<number | undefined>(undefined);
     const [pending, setPending] = useState(0);
+    const reduce = useReducedMotion();
 
     useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -156,6 +170,16 @@ function TeamScore({
     };
 
     const shown = Math.max(0, score + pending);
+    const leading = shown > against;
+    const level = shown > 0 && shown === against;
+
+    /* One more point wins it. Worth saying out loud on a court where nobody is
+       watching the number closely. */
+    const matchPoint = Boolean(target) && shown >= (target ?? 0) - 1 && shown + 1 - against >= (winByTwo ? 2 : 1);
+
+    /* Progress to the target, so the game reads at a glance from the far side
+       of the net rather than by comparing two numbers. */
+    const progress = target ? Math.min(100, Math.round((shown / target) * 100)) : 0;
 
     return (
         <button
@@ -164,17 +188,74 @@ function TeamScore({
             aria-label={`Score for ${players.map((player: any) => player.name).join(' and ')}. Tap to add a point, double tap to take one back.`}
             /* The whole half scores: a small "+1" is a miss on a tablet at
                arm's length across a court. */
-            className="bg-surface hover:bg-primary-soft active:bg-primary-soft flex h-full min-h-32 flex-col items-center justify-center gap-1 px-3 py-4 transition-colors sm:min-h-36"
+            className="group bg-surface hover:bg-surface-muted active:bg-primary-soft relative flex h-full min-h-32 flex-col items-center justify-center gap-2 overflow-hidden px-3 py-4 transition-colors sm:min-h-36"
         >
-            <span className="text-label text-secondary line-clamp-2 px-1 text-center leading-snug font-medium">
+            {/* The one effect on this screen: a soft bloom behind whichever
+                number is ahead, so the lead reads from across a court without
+                painting half the card. */}
+            {leading && (
+                <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                        background:
+                            'radial-gradient(18rem 12rem at 50% 50%, color-mix(in srgb, var(--primary) 22%, transparent) 0%, transparent 70%)',
+                    }}
+                />
+            )}
+
+            <span className="text-label text-secondary relative line-clamp-2 px-1 text-center leading-snug font-medium">
                 {players.map((player: any) => player.name).join(' / ')}
             </span>
-            <span data-numeric className="text-foreground text-[3rem] leading-none font-semibold sm:text-[4rem] lg:text-[5rem]">
-                {shown}
+
+            {/*
+             * The number replaces itself rather than ticking over. A point in
+             * pickleball is a discrete thing that just happened, and a rolling
+             * counter reads as a value settling rather than a point being won.
+             */}
+            <span className="relative flex items-center justify-center" style={{ minHeight: '1em' }}>
+                <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                        key={shown}
+                        data-numeric
+                        initial={reduce ? false : { opacity: 0, y: 14, scale: 0.82 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={reduce ? { opacity: 0 } : { opacity: 0, y: -14, scale: 0.82, position: 'absolute' }}
+                        transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 26 }}
+                        className={cn(
+                            'text-[3.25rem] leading-[0.85] font-semibold tracking-[-0.03em] tabular-nums sm:text-[4.5rem] lg:text-[5.5rem] 2xl:text-[6.5rem]',
+                            leading ? 'text-primary' : 'text-foreground',
+                        )}
+                    >
+                        {shown}
+                    </motion.span>
+                </AnimatePresence>
             </span>
-            {/* Only while it is still nil all: once there are points on the
-                board the instruction is noise. */}
-            <span className={cn('text-meta text-muted transition-opacity', score > 0 && 'opacity-0')}>tap to score · double tap to undo</span>
+
+            {/* A rail rather than a label: it fills as the game runs out. */}
+            {target ? (
+                <span aria-hidden className="bg-surface-muted relative h-1 w-16 overflow-hidden rounded-full sm:w-24 lg:w-28">
+                    <motion.span
+                        className={cn('absolute inset-y-0 left-0 rounded-full', leading ? 'bg-primary' : 'bg-border-strong')}
+                        animate={{ width: `${progress}%` }}
+                        transition={reduce ? { duration: 0 } : { duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                    />
+                </span>
+            ) : null}
+
+            <span className="relative flex h-4 items-center">
+                {matchPoint ? (
+                    <span className="text-primary text-[0.6875rem] font-semibold tracking-[0.14em] uppercase">match point</span>
+                ) : level ? (
+                    <span className="text-meta text-muted">all square</span>
+                ) : (
+                    /* Only while it is still nil all: once there are points on
+                       the board the instruction is noise. */
+                    <span className={cn('text-meta text-muted transition-opacity', (score > 0 || against > 0) && 'opacity-0')}>
+                        tap to score · double tap to undo
+                    </span>
+                )}
+            </span>
         </button>
     );
 }

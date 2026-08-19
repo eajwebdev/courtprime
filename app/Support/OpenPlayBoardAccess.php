@@ -8,19 +8,32 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Who is allowed onto an open play board, and under what name.
+ * Who is holding an open play board.
  *
- * Three routes let someone in: the board gate, a signed-in player joining with
- * the code, and a walk-in joining with the code. All three have to agree on
- * where the grant is kept, so the keys are defined once, here, rather than
- * three times in three controllers.
+ * One device at a time. The session ID and key are not a way to join a game,
+ * they are the controls: whoever enters them runs the board, and while they
+ * hold it nobody else can open it, even with the right pair. They hand it over
+ * by releasing it, and then the next person uses the same pair.
  *
- * The grant lives in the server session, so the board is never a URL that can
- * be forwarded or guessed into. The name is only ever used to sign entries in
- * the session's activity log.
+ * That is stricter than a shared board, and deliberately so. Two tablets both
+ * adding players and both recording results is how a rotation gets two versions
+ * of who is next.
+ *
+ * The hold is kept in the server session, so it cannot be forwarded in a URL,
+ * and mirrored on the session row as a hash so the server can tell whether a
+ * given browser is the holder.
  */
 final class OpenPlayBoardAccess
 {
+    /**
+     * How long a hold survives without the board checking in.
+     *
+     * The board polls every eight seconds, so an open one never comes close.
+     * This exists for the tablet that runs out of battery mid-session: without
+     * it, that session would be locked until someone edited the database.
+     */
+    private const STALE_AFTER_MINUTES = 10;
+
     public static function grantKey(int $sessionId): string
     {
         return "open_play_grant.{$sessionId}";
@@ -31,43 +44,33 @@ final class OpenPlayBoardAccess
         return "open-play.actor.{$sessionId}";
     }
 
-    public static function hostKey(int $sessionId): string
+    public static function holderKey(int $sessionId): string
     {
-        return "open-play.organizer.{$sessionId}";
-    }
-
-    /** Let this browser onto the board, and remember who is holding it. */
-    public static function grant(Request $request, OpenPlaySession $session, ?string $who = null): void
-    {
-        $request->session()->put(self::grantKey($session->id), true);
-
-        $name = trim((string) $who);
-
-        if ($name !== '') {
-            $request->session()->put(self::actorKey($session->id), $name);
-        }
+        return "open-play.holder.{$sessionId}";
     }
 
     /**
-     * Mark the first device in as the host.
+     * Take the board, if it is free.
      *
-     * Wrapped in a transaction with the row locked: two people can enter the
-     * key in the same instant, and a plain read-then-write would let both see
-     * an unclaimed session and both become host. The lock serialises the claim
-     * so exactly one wins.
+     * Locked and re-read inside the transaction: two people entering the pair
+     * in the same instant would otherwise both read it as free and both become
+     * the holder, which is the exact situation this is here to prevent.
      *
-     * The host badge is a label, not a permission. Everyone who gets through
-     * with the ID and key can run the board; the log records who did what.
+     * Returns false when somebody else is holding it.
      */
-    public static function claimHost(Request $request, OpenPlaySession $session): void
+    public static function claim(Request $request, OpenPlaySession $session, ?string $who = null): bool
     {
-        $token = DB::transaction(function () use ($session): ?string {
+        $token = DB::transaction(function () use ($request, $session): ?string {
             $locked = OpenPlaySession::query()
                 ->withoutGlobalScope('organization')
                 ->lockForUpdate()
                 ->find($session->id);
 
-            if (! $locked || $locked->organizer_token) {
+            if (! $locked) {
+                return null;
+            }
+
+            if ($locked->organizer_token && ! self::isHolder($request, $locked) && ! self::hasGoneQuiet($locked)) {
                 return null;
             }
 
@@ -76,23 +79,83 @@ final class OpenPlayBoardAccess
             $locked->update([
                 'organizer_token' => hash('sha256', $fresh),
                 'organizer_claimed_at' => now(),
+                'organizer_last_seen_at' => now(),
             ]);
 
             return $fresh;
         });
 
-        if ($token) {
-            $request->session()->put(self::hostKey($session->id), $token);
+        if (! $token) {
+            return false;
         }
+
+        $request->session()->put(self::holderKey($session->id), $token);
+        $request->session()->put(self::grantKey($session->id), true);
+
+        $name = trim((string) $who);
+
+        if ($name !== '') {
+            $request->session()->put(self::actorKey($session->id), $name);
+        }
+
+        return true;
+    }
+
+    /** Hand the board back so the next person can take it with the same pair. */
+    public static function release(Request $request, OpenPlaySession $session): void
+    {
+        if (self::isHolder($request, $session)) {
+            OpenPlaySession::query()
+                ->withoutGlobalScope('organization')
+                ->whereKey($session->id)
+                ->update([
+                    'organizer_token' => null,
+                    'organizer_claimed_at' => null,
+                    'organizer_last_seen_at' => null,
+                ]);
+        }
+
+        $request->session()->forget(self::holderKey($session->id));
+        $request->session()->forget(self::grantKey($session->id));
     }
 
     /** The stored token is hashed, so the raw value never sits in the database. */
-    public static function isHost(Request $request, OpenPlaySession $session): bool
+    public static function isHolder(Request $request, OpenPlaySession $session): bool
     {
-        $token = $request->session()->get(self::hostKey($session->id));
+        $token = $request->session()->get(self::holderKey($session->id));
 
         return is_string($token)
             && is_string($session->organizer_token)
             && hash_equals($session->organizer_token, hash('sha256', $token));
+    }
+
+    /** Called on every board poll, which is what keeps the hold alive. */
+    public static function touch(Request $request, OpenPlaySession $session): void
+    {
+        if (! self::isHolder($request, $session)) {
+            return;
+        }
+
+        OpenPlaySession::query()
+            ->withoutGlobalScope('organization')
+            ->whereKey($session->id)
+            ->update(['organizer_last_seen_at' => now()]);
+    }
+
+    /** A hold nobody has refreshed for long enough that it can be taken over. */
+    public static function hasGoneQuiet(OpenPlaySession $session): bool
+    {
+        if (! $session->organizer_token) {
+            return true;
+        }
+
+        $seen = $session->organizer_last_seen_at ?? $session->organizer_claimed_at;
+
+        return $seen === null || $seen->lt(now()->subMinutes(self::STALE_AFTER_MINUTES));
+    }
+
+    public static function staleAfterMinutes(): int
+    {
+        return self::STALE_AFTER_MINUTES;
     }
 }

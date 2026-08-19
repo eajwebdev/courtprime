@@ -32,7 +32,6 @@ use App\Http\Controllers\PlatformAuditController;
 use App\Http\Controllers\PlayerBookingController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlayerIdentityController;
-use App\Http\Controllers\PlayerOpenPlayController;
 use App\Http\Controllers\PlayerPortalController;
 use App\Http\Controllers\PlayerProfileController;
 use App\Http\Controllers\PlayerWalletController;
@@ -74,9 +73,9 @@ Route::get('find-courts', CourtDiscoveryController::class)->name('courts.discove
 Route::get('find-open-play', PublicOpenPlayController::class)->name('open-play.discovery');
 /* Walk-ins join with the club's code and a name, no account. Throttled because
    it creates player records from unauthenticated input. */
-Route::post('open-play/join', [PublicOpenPlayJoinController::class, 'store'])
+Route::post('open-play/open', [PublicOpenPlayJoinController::class, 'store'])
     ->middleware('throttle:10,1')
-    ->name('open-play.guest-join');
+    ->name('open-play.board.open');
 
 /*
  * The players' board. Owners create the session; the people on the court run
@@ -96,6 +95,7 @@ Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function 
     Route::delete('players/{player}', [PublicOpenPlayBoardController::class, 'removePlayer'])->name('open-play.board.players.remove');
     Route::post('settings', [PublicOpenPlayBoardController::class, 'settings'])->name('open-play.board.settings');
     Route::post('start', [PublicOpenPlayBoardController::class, 'start'])->name('open-play.board.start');
+    Route::post('release', [PublicOpenPlayBoardController::class, 'release'])->name('open-play.board.release');
     Route::post('matches/{match}/score', [PublicOpenPlayBoardController::class, 'score'])->name('open-play.board.score');
     Route::post('matches/{match}/undo', [PublicOpenPlayBoardController::class, 'undo'])->name('open-play.board.undo');
     Route::post('matches/{match}/finish', [PublicOpenPlayBoardController::class, 'complete'])->name('open-play.board.finish');
@@ -114,7 +114,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('me/book', [PlayerBookingController::class, 'store'])->name('me.book.store');
     Route::get('me/wallet', PlayerWalletController::class)->name('me.wallet');
     /* Players join an open play session with the code the club shared. */
-    Route::post('me/open-play/join', [PlayerOpenPlayController::class, 'store'])->name('me.open-play.join');
     Route::get('demo-pipeline', [DemoPipelineController::class, 'index'])->name('demo-pipeline.index');
     Route::post('demo-pipeline/{demoRequest}', [DemoPipelineController::class, 'update'])->name('demo-pipeline.update');
     Route::post('demo-pipeline/{demoRequest}/convert', [DemoPipelineController::class, 'convert'])->name('demo-pipeline.convert');

@@ -27,6 +27,12 @@ use Inertia\Response;
 /**
  * The board the players run.
  *
+ * The session ID and key are the controls, not an invitation: entering them
+ * takes the board, and whoever holds it is the only device that can change
+ * anything. Nobody else can open it with the same pair until it is released.
+ * Entering the pair does not put you in the rotation either, the holder adds
+ * players at the board.
+ *
  * The club owner's job ends at creating the session and handing out the code.
  * From there the people on the court add each other, keep score and settle who
  * won, so none of this requires a staff login.
@@ -47,7 +53,7 @@ class PublicOpenPlayBoardController extends Controller
         return Inertia::render('open-play-gate');
     }
 
-    /** Exchanges the pair for a grant held in the server session. */
+    /** Exchanges the pair for the board, if nobody else is holding it. */
     public function enter(Request $request, OpenPlayService $openPlay): RedirectResponse
     {
         $request->validate([
@@ -60,14 +66,26 @@ class PublicOpenPlayBoardController extends Controller
 
         $session = $openPlay->sessionForCode($request->string('code')->toString(), $request->string('key')->toString());
 
-        OpenPlayBoardAccess::grant($request, $session, $request->input('who'));
+        if (! OpenPlayBoardAccess::claim($request, $session, $request->input('who'))) {
+            return back()->withErrors([
+                'code' => 'This board is open on another device. It has to be released there before it can be opened here.',
+            ]);
+        }
 
-        $first = ! $session->organizer_token;
-        OpenPlayBoardAccess::claimHost($request, $session);
-
-        $this->log($request, $session, 'open_play.board_opened', $first ? 'Opened the board' : 'Joined the board');
+        OpenPlaySessionLog::record($request, $session, 'open_play.board_opened', 'Took the board');
 
         return to_route('open-play.board.public', ['code' => $session->session_code]);
+    }
+
+    /** Hand the board back, so the next person can take it with the same pair. */
+    public function release(Request $request, string $code, OpenPlayService $openPlay): RedirectResponse
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        OpenPlaySessionLog::record($request, $session, 'open_play.board_released', 'Released the board');
+        OpenPlayBoardAccess::release($request, $session);
+
+        return to_route('open-play.gate')->with('success', 'Board released. Anyone with the ID and key can take it now.');
     }
 
     public function show(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): Response|RedirectResponse
@@ -87,6 +105,10 @@ class PublicOpenPlayBoardController extends Controller
             $rotation->generate($session);
         }
 
+        /* Every load, including the eight second poll, is the heartbeat that
+           keeps this device's hold on the board alive. */
+        OpenPlayBoardAccess::touch($request, $session);
+
         $session->refresh()->load('branch');
 
         return Inertia::render('open-play-board', [
@@ -105,8 +127,8 @@ class PublicOpenPlayBoardController extends Controller
                 'starts_at' => substr((string) $session->start_time, 0, 5),
                 'ends_at' => substr((string) $session->end_time, 0, 5),
             ],
-            /* A label now, not a permission. Anyone here can run the board. */
-            'isOrganizer' => $this->isOrganizer($request, $session),
+            /* Whether this device is the one holding the board. */
+            'inControl' => OpenPlayBoardAccess::isHolder($request, $session),
             'you' => $this->actorName($request, $session),
             'courts' => $session->courts()->orderBy('court_number')->get(['courts.id', 'name']),
             'branchCourts' => Court::query()
@@ -130,7 +152,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayRotationService $rotation,
         PlayerIdentityService $identity,
     ): RedirectResponse {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
 
         /*
          * An id means they were picked from the club's own members, so they are
@@ -166,7 +188,7 @@ class PublicOpenPlayBoardController extends Controller
 
     public function score(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['team' => ['required', 'in:team_one,team_two']]);
@@ -178,7 +200,7 @@ class PublicOpenPlayBoardController extends Controller
 
     public function undo(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
     {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $scoring->undo($clubMatch);
@@ -200,7 +222,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayService $openPlay,
         OpenPlayRotationService $rotation,
     ): RedirectResponse {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
         $request->validate(['winner' => ['nullable', 'in:one,two']]);
@@ -246,7 +268,7 @@ class PublicOpenPlayBoardController extends Controller
      */
     public function start(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
     {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
 
         if ($session->status === 'live') {
             return back();
@@ -276,7 +298,7 @@ class PublicOpenPlayBoardController extends Controller
     /** Name, scoring and which courts are in play. */
     public function settings(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
     {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -383,7 +405,7 @@ class PublicOpenPlayBoardController extends Controller
     /** Take someone out, for a typo or for somebody who went home. */
     public function removePlayer(Request $request, string $code, int $player, OpenPlayService $openPlay): RedirectResponse
     {
-        $session = $this->requireGrant($request, $code, $openPlay);
+        $session = $this->requireControl($request, $code, $openPlay);
 
         $onCourt = OpenPlayMatch::query()
             ->withoutGlobalScope('organization')
@@ -519,6 +541,26 @@ class PublicOpenPlayBoardController extends Controller
         return $session;
     }
 
+    /**
+     * Only the device holding the board may change it.
+     *
+     * The grant says this browser got through the gate at some point. The hold
+     * says it is still the one in charge, which is a different question once
+     * somebody else has taken the board over.
+     */
+    private function requireControl(Request $request, string $code, OpenPlayService $openPlay): OpenPlaySession
+    {
+        $session = $this->requireGrant($request, $code, $openPlay);
+
+        abort_unless(
+            OpenPlayBoardAccess::isHolder($request, $session),
+            403,
+            'Another device is running this board now.',
+        );
+
+        return $session;
+    }
+
     /** Every action re-proves the match belongs to the session behind the code. */
     private function clubMatchFor(OpenPlaySession $session, OpenPlayMatch $match): ClubMatch
     {
@@ -628,20 +670,5 @@ class PublicOpenPlayBoardController extends Controller
                 'last_round' => (int) $row->last_round,
             ]])
             ->all();
-    }
-
-    /**
-     * Whether this device claimed the session first.
-     *
-     * This used to gate every control. It no longer does: on a real court the
-     * tablet gets put down and whoever is next to it keeps score, and locking
-     * that to one browser session meant a dead battery ended the session.
-     * Anyone holding the ID and key can run the board, and every action is
-     * signed in the activity log instead, so it is traceable rather than
-     * restricted.
-     */
-    private function isOrganizer(Request $request, OpenPlaySession $session): bool
-    {
-        return OpenPlayBoardAccess::isHost($request, $session);
     }
 }

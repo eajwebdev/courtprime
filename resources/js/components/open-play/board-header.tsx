@@ -1,7 +1,6 @@
 import { BrandIcon } from '@/components/marketing-artwork';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Check, Copy, History, ShieldCheck } from 'lucide-react';
+import { Check, Copy, History, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -16,14 +15,17 @@ import { useState } from 'react';
 export function BoardHeader({
     session,
     you,
-    isHost,
+    inControl,
     onShowActivity,
+    onRelease,
     activityCount,
 }: {
     session: any;
     you: string;
-    isHost: boolean;
+    /** Whether this device is the one holding the board. */
+    inControl: boolean;
     onShowActivity: () => void;
+    onRelease: () => void;
     activityCount: number;
 }) {
     const [copied, setCopied] = useState(false);
@@ -78,15 +80,7 @@ export function BoardHeader({
                 </button>
 
                 <div className="flex shrink-0 items-center gap-2">
-                    <span
-                        className={cn(
-                            'text-meta hidden items-center gap-1 rounded-full px-2.5 py-1 font-medium sm:inline-flex',
-                            isHost ? 'bg-primary text-primary-foreground' : 'bg-white/10 text-white/70',
-                        )}
-                    >
-                        {isHost && <ShieldCheck className="size-3" aria-hidden />}
-                        {isHost ? `${you} · host` : you}
-                    </span>
+                    <span className="text-meta hidden rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/70 sm:inline-flex">{you}</span>
 
                     <Button type="button" variant="onDeep" size="sm" onClick={onShowActivity} className="shrink-0">
                         <History className="size-4" />
@@ -97,6 +91,16 @@ export function BoardHeader({
                             </span>
                         )}
                     </Button>
+
+                    {/* Handing the board back is the only way somebody else can
+                        take it, so it lives in the chrome rather than behind a
+                        menu. */}
+                    {inControl && (
+                        <Button type="button" variant="onDeep" size="sm" onClick={onRelease} className="shrink-0">
+                            <LogOut className="size-4" />
+                            <span className="hidden sm:inline">Release</span>
+                        </Button>
+                    )}
                 </div>
             </div>
         </header>

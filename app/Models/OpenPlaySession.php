@@ -20,6 +20,7 @@ class OpenPlaySession extends Model
         'session_key',
         'organizer_token',
         'organizer_claimed_at',
+        'organizer_last_seen_at',
         'current_round',
         'auto_rotate',
         'target_score',
@@ -39,6 +40,7 @@ class OpenPlaySession extends Model
     {
         return [
             'organizer_claimed_at' => 'datetime',
+            'organizer_last_seen_at' => 'datetime',
             'session_date' => 'date',
             'auto_rotate' => 'boolean',
             'win_by_two' => 'boolean',

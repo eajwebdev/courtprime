@@ -2,8 +2,7 @@ import { DateRail } from '@/components/booking/date-rail';
 import { DiscoveryHero, FilterChip, FilterRow, Pagination } from '@/components/discovery/discovery-chrome';
 import { DiscoveryPage } from '@/components/discovery/discovery-page';
 import { EmptyState } from '@/components/empty-state';
-import { OpenPlayGuestJoin } from '@/components/open-play-guest-join';
-import { OpenPlayJoin } from '@/components/open-play-join';
+import { OpenPlayBoardEntry } from '@/components/open-play-board-entry';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { currency, time12h } from '@/lib/format';
@@ -64,8 +63,7 @@ function skillLabel(min: number | null, max: number | null) {
  * it is what opens the board.
  */
 export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
-    const { auth, flash } = usePage<SharedData>().props;
-    const signedIn = Boolean(auth?.user);
+    const { flash } = usePage<SharedData>().props;
 
     const [filters, setFilters] = useState({ date, search });
     const [freeOnly, setFreeOnly] = useState(false);
@@ -199,11 +197,11 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
                 <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
                     {boardUrl && (
                         <div className="border-success/30 bg-success-soft mb-6 rounded-xl border p-4 sm:p-5">
-                            <p className="text-label text-foreground font-semibold">You are in.</p>
+                            <p className="text-label text-foreground font-semibold">You have the board.</p>
                             <p className="text-meta text-secondary mt-0.5">
                                 {blocked
                                     ? 'Your browser blocked the new tab. Open the board here.'
-                                    : 'The session board opened in a new tab. Keep it open at the court.'}
+                                    : 'The board opened in a new tab. Keep it open at the court.'}
                             </p>
                             <Button asChild size="touch" className="mt-3 w-full sm:w-auto">
                                 <a href={boardUrl} target="_blank" rel="noopener noreferrer">
@@ -215,24 +213,11 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
                     )}
 
                     {/*
-                     * The pair is the way in, so it leads. A player handed one at
-                     * the desk does not have to find their court in the list
-                     * first, and a court that is not listed can still be joined.
+                     * The pair opens the board, it does not join a game. The
+                     * person holding it runs the session and adds the players,
+                     * so nothing here asks who they are.
                      */}
-                    {signedIn ? (
-                        <OpenPlayJoin className="border-border bg-surface mb-8 rounded-xl border p-4 sm:p-5" />
-                    ) : (
-                        <div className="mb-8 space-y-2">
-                            <OpenPlayGuestJoin className="border-border bg-surface rounded-xl border p-4 sm:p-5" />
-                            <p className="text-meta text-muted">
-                                Already have a CourtPrime account?{' '}
-                                <Link href="/login" className="text-primary font-medium hover:underline">
-                                    Sign in
-                                </Link>{' '}
-                                so this session counts towards your record.
-                            </p>
-                        </div>
-                    )}
+                    <OpenPlayBoardEntry className="border-border bg-surface mb-8 rounded-xl border p-4 sm:p-5" />
 
                     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
                         <h2 className="text-h2 text-foreground">

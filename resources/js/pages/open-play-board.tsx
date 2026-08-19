@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 
 type Props = {
     session: any;
-    isOrganizer: boolean;
+    inControl: boolean;
     you: string;
     courts: BoardCourt[];
     branchCourts: BoardCourt[];
@@ -29,6 +29,10 @@ type Props = {
 /**
  * The board the players run.
  *
+ * One device holds it at a time. The ID and key are the controls rather than an
+ * invitation, so entering them takes the board and does not put anyone in the
+ * rotation; the holder adds players here.
+ *
  * Two screens in one, decided by whether the session has started. Before:
  * choose courts, set what a win is, add everyone who turned up. After: the
  * courts, the queue and the scores.
@@ -38,7 +42,7 @@ type Props = {
  * 48px, and the layout gets wider rather than taller as the screen grows, so a
  * tablet in landscape shows the whole session without scrolling.
  */
-export default function OpenPlayBoard({ session, isOrganizer, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
+export default function OpenPlayBoard({ session, inControl, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
     const [showActivity, setShowActivity] = useState(false);
     const { errors } = usePage().props as any;
     const base = `/open-play/${session.session_code}`;
@@ -82,9 +86,14 @@ export default function OpenPlayBoard({ session, isOrganizer, you, courts, branc
             <BoardHeader
                 session={session}
                 you={you}
-                isHost={isOrganizer}
+                inControl={inControl}
                 activityCount={activity.length}
                 onShowActivity={() => setShowActivity(true)}
+                onRelease={() => {
+                    if (window.confirm('Release the board? Anyone with the ID and key can take it after that.')) {
+                        router.post(`${base}/release`);
+                    }
+                }}
             />
 
             <main

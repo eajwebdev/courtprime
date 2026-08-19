@@ -29,7 +29,12 @@ class SubscriptionBillingService
     /** Long enough to run a real week of open play and see the numbers land. */
     public const TRIAL_DAYS = 14;
 
-    /** How long a club keeps working after a bill falls due. */
+    /**
+     * Fallback grace, used only if BILLING_LOCK_GRACE_DAYS is unset. The real
+     * value is config('services.billing.lock_grace_days'), read through
+     * defaultGraceDays() below so a club that changes the env value sees it
+     * apply without a deploy touching this class.
+     */
     public const DEFAULT_GRACE_DAYS = 2;
 
     /**
@@ -65,8 +70,8 @@ class SubscriptionBillingService
                     'subscription_plan_id' => $plan->id,
                     'status' => 'trialing',
                     'billing_cycle' => 'monthly',
-                    'term_months' => 1,
-                    'grace_days' => self::DEFAULT_GRACE_DAYS,
+                    'term_months' => $this->defaultTermMonths(),
+                    'grace_days' => $this->defaultGraceDays(),
                     'trial_ends_at' => $now->addDays($days),
                     'current_period_starts_at' => $now,
                     'current_period_ends_at' => $now->addDays($days),
@@ -100,7 +105,7 @@ class SubscriptionBillingService
                     'status' => 'past_due',
                     'billing_cycle' => $this->cycleFor($term['months']),
                     'term_months' => $term['months'],
-                    'grace_days' => self::DEFAULT_GRACE_DAYS,
+                    'grace_days' => $this->defaultGraceDays(),
                     'current_period_starts_at' => $now,
                     'current_period_ends_at' => $now->addMonths($term['months']),
                     'cancelled_at' => null,
@@ -127,7 +132,7 @@ class SubscriptionBillingService
         $amount = (float) ($plan?->{$term['column']} ?? 0);
 
         $issued = CarbonImmutable::now();
-        $grace = (int) ($subscription->grace_days ?: self::DEFAULT_GRACE_DAYS);
+        $grace = (int) ($subscription->grace_days ?: $this->defaultGraceDays());
 
         $invoice = SubscriptionInvoice::query()->create([
             'organization_id' => $subscription->organization_id,
@@ -268,7 +273,7 @@ class SubscriptionBillingService
         }
 
         return $subscription->current_period_ends_at
-            ? CarbonImmutable::parse($subscription->current_period_ends_at)->addDays((int) ($subscription->grace_days ?: self::DEFAULT_GRACE_DAYS))
+            ? CarbonImmutable::parse($subscription->current_period_ends_at)->addDays((int) ($subscription->grace_days ?: $this->defaultGraceDays()))
             : null;
     }
 
@@ -297,6 +302,34 @@ class SubscriptionBillingService
                 ];
             })
             ->all();
+    }
+
+    /** From BILLING_LOCK_GRACE_DAYS. Falls back to DEFAULT_GRACE_DAYS if unset. */
+    public function defaultGraceDays(): int
+    {
+        return (int) config('services.billing.lock_grace_days', self::DEFAULT_GRACE_DAYS);
+    }
+
+    /** From BILLING_CYCLE_MONTHS. The term a new subscription starts on before a club picks one. */
+    public function defaultTermMonths(): int
+    {
+        return (int) config('services.billing.cycle_months', 1);
+    }
+
+    /** From BILLING_NOTIFY_DAYS. How long before an invoice is due the reminder goes out. */
+    public function notifyDaysBeforeDue(): int
+    {
+        return (int) config('services.billing.notify_days', 3);
+    }
+
+    /**
+     * From BILLING_MIN_AMOUNT. PayMongo has its own floor on what a QRPh
+     * source can be raised for; this catches a bill under it with a message
+     * that says why, before the API call does with one that does not.
+     */
+    public function minPayableAmount(): float
+    {
+        return (float) config('services.billing.min_amount', 0);
     }
 
     /** @return array{months:int, label:string, column:string} */

@@ -20,6 +20,7 @@ type Props = {
     plans: Plan[];
     invoices: any[];
     trialDays: number;
+    defaultTermMonths: number;
     canTakePayment: boolean;
 };
 
@@ -31,10 +32,10 @@ type Props = {
  * with what each saves, because the discount for committing is the reason to
  * read this page at all.
  */
-export default function Billing({ subscription, outstanding, plans, invoices, trialDays, canTakePayment }: Props) {
+export default function Billing({ subscription, outstanding, plans, invoices, trialDays, defaultTermMonths, canTakePayment }: Props) {
     const { flash, errors } = usePage().props as any;
     const [planId, setPlanId] = useState<number | null>(plans[0]?.id ?? null);
-    const [months, setMonths] = useState<number>(subscription?.term_months ?? 1);
+    const [months, setMonths] = useState<number>(subscription?.term_months ?? defaultTermMonths);
 
     const plan = plans.find((entry) => entry.id === planId) ?? plans[0] ?? null;
     const term = plan?.terms.find((entry) => entry.months === months) ?? plan?.terms[0] ?? null;

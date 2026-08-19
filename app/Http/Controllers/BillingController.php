@@ -82,6 +82,9 @@ class BillingController extends Controller
                 ])->all()
                 : [],
             'trialDays' => SubscriptionBillingService::TRIAL_DAYS,
+            /* From BILLING_CYCLE_MONTHS, so the term picker opens on the term
+               the club is set up to default to rather than always monthly. */
+            'defaultTermMonths' => $this->billing->defaultTermMonths(),
             /* The page says plainly when payment cannot be taken yet, rather
                than offering a button that throws. */
             'canTakePayment' => $this->gateway->configured(),

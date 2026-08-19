@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Organization;
 use App\Models\SubscriptionPlan;
+use App\Services\Payments\PayMongoQrPh;
 use App\Services\SubscriptionBillingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -166,5 +167,40 @@ class SubscriptionBillingTest extends TestCase
         $this->assertEqualsWithDelta(2400, $options[12]['saving'], 0.01, '12000 monthly against 9600 annual.');
         $this->assertSame(20, $options[12]['saving_percent']);
         $this->assertEqualsWithDelta(800, $options[12]['per_month'], 0.01);
+    }
+
+    public function test_grace_days_reads_from_the_billing_config(): void
+    {
+        config(['services.billing.lock_grace_days' => 5]);
+
+        $invoice = $this->billing->subscribe($this->organization, $this->plan, 1);
+
+        $this->assertSame(
+            CarbonImmutable::now()->addDays(5)->toDateString(),
+            CarbonImmutable::parse($invoice->grace_ends_on)->toDateString(),
+            'BILLING_LOCK_GRACE_DAYS should decide how long a bill can go unpaid before access is cut, not the class default.',
+        );
+    }
+
+    public function test_a_new_subscription_defaults_to_the_configured_term(): void
+    {
+        config(['services.billing.cycle_months' => 3]);
+
+        $subscription = $this->billing->startTrial($this->organization, $this->plan);
+
+        $this->assertSame(3, (int) $subscription->term_months, 'BILLING_CYCLE_MONTHS is the term a subscription opens on before a club chooses one.');
+    }
+
+    public function test_paymongo_refuses_a_bill_under_the_configured_minimum(): void
+    {
+        config(['services.paymongo.secret' => 'sk_test_fake']);
+        config(['services.billing.min_amount' => 6000]);
+
+        $invoice = $this->billing->subscribe($this->organization, $this->plan, 1);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('below the minimum');
+
+        app(PayMongoQrPh::class)->createPayment($invoice->fresh());
     }
 }

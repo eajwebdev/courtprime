@@ -39,6 +39,15 @@ class PayMongoQrPh
             throw new RuntimeException('PayMongo is not configured. Set PAYMONGO_SECRET_KEY before taking subscription payments.');
         }
 
+        $minimum = (float) config('services.billing.min_amount', 0);
+
+        if ($minimum > 0 && (float) $invoice->total_amount < $minimum) {
+            throw new RuntimeException(
+                'This invoice is below the minimum PayMongo will accept for QRPh (₱'.number_format($minimum, 2).'). '
+                .'Adjust the plan price or BILLING_MIN_AMOUNT.',
+            );
+        }
+
         $response = Http::withBasicAuth((string) config('services.paymongo.secret'), '')
             ->acceptJson()
             ->post(self::BASE.'/sources', [

@@ -29,6 +29,7 @@ class SubscriptionInvoice extends Model
         'payment_method',
         'payment_reference',
         'paid_at',
+        'reminder_sent_at',
         'notes',
     ];
 
@@ -41,6 +42,7 @@ class SubscriptionInvoice extends Model
             'due_on' => 'date',
             'grace_ends_on' => 'date',
             'paid_at' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'subtotal' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',

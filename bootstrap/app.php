@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        /* PayMongo is a server posting to us, so it has no session and no CSRF
+           token. The signature check in the controller is the guard. */
+        $middleware->validateCsrfTokens(except: ['webhooks/paymongo']);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

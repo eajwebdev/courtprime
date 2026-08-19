@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    /*
+     * QRPh subscription payments. Without these the billing page still shows
+     * what is owed, it just cannot raise a QR to pay it.
+     */
+    'paymongo' => [
+        'secret' => env('PAYMONGO_SECRET_KEY'),
+        'public' => env('PAYMONGO_PUBLIC_KEY'),
+        'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+    ],
+
 ];

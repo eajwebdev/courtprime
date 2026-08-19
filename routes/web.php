@@ -11,6 +11,7 @@ use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\CoachController;
 use App\Http\Controllers\CourtController;
 use App\Http\Controllers\CourtDiscoveryController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoPipelineController;
 use App\Http\Controllers\DemoRequestController;
@@ -42,6 +43,7 @@ use App\Http\Controllers\PublicClubController;
 use App\Http\Controllers\PublicLiveMatchController;
 use App\Http\Controllers\PublicOpenPlayBoardController;
 use App\Http\Controllers\PublicOpenPlayController;
+use App\Http\Controllers\PayMongoWebhookController;
 use App\Http\Controllers\PublicOpenPlayJoinController;
 use App\Http\Controllers\PublicRankingController;
 use App\Http\Controllers\PublicTournamentController;
@@ -120,6 +122,13 @@ Route::get('clubs/{slug}', [PublicClubController::class, 'show'])->name('clubs.p
  */
 Route::get('me/book', [PlayerBookingController::class, 'index'])->name('me.book');
 
+/*
+ * PayMongo posts here when a QRPh payment clears. Outside auth because it is a
+ * server calling us, and CSRF exempt for the same reason; the signature check
+ * in the controller is what makes it safe.
+ */
+Route::post('webhooks/paymongo', PayMongoWebhookController::class)->name('webhooks.paymongo');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('me', PlayerPortalController::class)->name('me');
@@ -131,6 +140,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('demo-pipeline', [DemoPipelineController::class, 'index'])->name('demo-pipeline.index');
     Route::post('demo-pipeline/{demoRequest}', [DemoPipelineController::class, 'update'])->name('demo-pipeline.update');
     Route::post('demo-pipeline/{demoRequest}/convert', [DemoPipelineController::class, 'convert'])->name('demo-pipeline.convert');
+    Route::get('billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::post('billing/trial', [BillingController::class, 'trial'])->name('billing.trial');
+    Route::post('billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
+    Route::post('billing/invoices/{invoice}/pay', [BillingController::class, 'pay'])->name('billing.pay');
+    Route::get('billing/return/{invoice}/{result}', [BillingController::class, 'index'])->name('billing.return');
+
     Route::get('subscription-plans', [SubscriptionPlanController::class, 'index'])->name('subscription-plans.index');
     Route::post('subscription-plans', [SubscriptionPlanController::class, 'store'])->name('subscription-plans.store');
     Route::post('subscription-plans/{subscriptionPlan}/features', [SubscriptionPlanController::class, 'storeFeature'])->name('subscription-plans.features.store');

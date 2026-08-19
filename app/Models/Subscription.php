@@ -16,6 +16,8 @@ class Subscription extends Model
         'subscription_plan_id',
         'status',
         'billing_cycle',
+        'term_months',
+        'grace_days',
         'trial_ends_at',
         'current_period_starts_at',
         'current_period_ends_at',

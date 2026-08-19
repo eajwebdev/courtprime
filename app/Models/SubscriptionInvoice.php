@@ -25,6 +25,10 @@ class SubscriptionInvoice extends Model
         'total_amount',
         'amount_paid',
         'status',
+        'grace_ends_on',
+        'payment_method',
+        'payment_reference',
+        'paid_at',
         'notes',
     ];
 
@@ -35,6 +39,8 @@ class SubscriptionInvoice extends Model
             'period_ends_on' => 'date',
             'issued_on' => 'date',
             'due_on' => 'date',
+            'grace_ends_on' => 'date',
+            'paid_at' => 'datetime',
             'subtotal' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',

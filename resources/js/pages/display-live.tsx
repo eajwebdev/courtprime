@@ -5,7 +5,7 @@ import { usePortraitTick } from '@/components/scoreboard/player-portrait';
 import { shellForWorkspace } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type DisplaySettings = {
@@ -19,8 +19,76 @@ type DisplaySettings = {
 
 type Props = { courts: ScoreboardCourt[]; displaySettings: DisplaySettings };
 
-/** How often the board pulls fresh scores. */
-const REFRESH_MS = 10000;
+/**
+ * How often the board pulls fresh scores.
+ *
+ * Short, because it is a scoreboard and a point that lands should show up while
+ * the people who saw it are still looking. It costs one small JSON response —
+ * the courts and nothing else — rather than the whole page.
+ */
+const REFRESH_MS = 3000;
+
+/**
+ * Keep the board current without re-rendering the page.
+ *
+ * `router.reload` re-renders from new props: every portrait remounts and
+ * restarts its cycle, and the scores blink, so a wall display flickered every
+ * time it refreshed. This fetches the courts and folds them into state
+ * instead, which React reconciles in place — the numbers change and nothing
+ * else moves.
+ *
+ * It heals by itself. A screen that has been on for three days has to survive
+ * the venue's wifi dropping without anybody noticing it did, so a failed poll
+ * is simply skipped and the next one tries again; the board goes on showing
+ * the last scores it knows rather than emptying itself.
+ */
+function useLiveCourts(initial: ScoreboardCourt[], search: string): ScoreboardCourt[] {
+    const [courts, setCourts] = useState(initial);
+
+    /* Server-rendered props win when the page itself navigates. */
+    useEffect(() => setCourts(initial), [initial]);
+
+    useEffect(() => {
+        let cancelled = false;
+        /* The branch and the display token travel with the page, so the feed
+           is asked the same question the page was. */
+        const url = `/display/live/feed${search}`;
+
+        const poll = async () => {
+            try {
+                const response = await fetch(url, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok) return;
+
+                const payload = await response.json();
+
+                if (!cancelled && Array.isArray(payload?.courts)) {
+                    setCourts(payload.courts);
+                }
+            } catch {
+                /* Offline, asleep, or the venue's router rebooted. Hold what is
+                   on screen and try again on the next tick. */
+            }
+        };
+
+        const timer = window.setInterval(poll, REFRESH_MS);
+        /* A tab that was in the background comes back current immediately
+           rather than showing a stale score until the next interval. */
+        const onVisible = () => document.visibilityState === 'visible' && poll();
+        document.addEventListener('visibilitychange', onVisible);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [search]);
+
+    return courts;
+}
 
 /**
  * How many courts fit a page at each width.
@@ -81,7 +149,7 @@ function useClock(): string {
  * designs. Idle courts recede: somebody glancing up from across the room needs
  * to find the game, not read an inventory of the building.
  */
-export default function DisplayLive({ courts, displaySettings }: Props) {
+export default function DisplayLive({ courts: initialCourts, displaySettings }: Props) {
     const { auth, workspace } = usePage<SharedData>().props;
     const { url } = usePage();
     const kiosk = url.includes('tv=1');
@@ -89,6 +157,10 @@ export default function DisplayLive({ courts, displaySettings }: Props) {
 
     const clock = useClock();
     const tick = usePortraitTick(displaySettings.portrait_seconds);
+
+    /* Whatever the page arrived with, kept current in place. */
+    const search = url.includes('?') ? `?${url.split('?')[1]}` : '';
+    const courts = useLiveCourts(initialCourts, search);
 
     const live = useMemo(() => courts.filter((court) => court.match), [courts]);
     const idle = useMemo(() => courts.filter((court) => !court.match), [courts]);
@@ -119,18 +191,6 @@ export default function DisplayLive({ courts, displaySettings }: Props) {
 
         return () => window.clearInterval(timer);
     }, [livePages.length, rotationSeconds, paused]);
-
-    /* This is a live scoreboard, so it refetches rather than showing whatever
-       was true when the kiosk was last opened. It polls rather than holding a
-       socket open: a screen that has been on for three days has to recover from
-       the venue's wifi dropping without anybody noticing it did. */
-    useEffect(() => {
-        const timer = window.setInterval(() => {
-            router.reload({ only: ['courts'] });
-        }, REFRESH_MS);
-
-        return () => window.clearInterval(timer);
-    }, []);
 
     const visibleLive = livePages[page] ?? livePages[0] ?? [];
     const accent = displaySettings.primary_color || 'var(--primary)';

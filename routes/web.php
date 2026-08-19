@@ -69,6 +69,12 @@ Route::get('request-demo', [DemoRequestController::class, 'create'])->name('demo
 Route::post('request-demo', [DemoRequestController::class, 'store'])->name('demo.store');
 Route::get('request-demo/confirmation/{demoRequest}', [DemoRequestController::class, 'confirmation'])->name('demo.requested');
 Route::get('display/live', [LiveCourtController::class, 'display'])->name('display.live');
+/* The board's own data, so a screen left on for days keeps its scores current
+   without re-rendering the page under whoever is watching it. Throttled: it is
+   public, and a wall display asks for it every few seconds. */
+Route::get('display/live/feed', [LiveCourtController::class, 'feed'])
+    ->middleware('throttle:120,1')
+    ->name('display.live.feed');
 /*
  * One branch's courtside screen. Public because it runs on a TV in the venue
  * that nobody signs into; the club can still put it behind a token in settings,

@@ -8,6 +8,7 @@ use App\Models\Court;
 use App\Models\Organization;
 use App\Services\ScoreboardLineupService;
 use App\Services\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -84,6 +85,48 @@ class LiveCourtController extends Controller
                 /* How long one portrait holds before the next. */
                 'portrait_seconds' => max((int) ($settings['scoreboard_portrait_seconds'] ?? 10), 4),
             ],
+        ]);
+    }
+
+    /**
+     * The same board as JSON, for the screen to keep itself current.
+     *
+     * The board used to ask Inertia for the whole page every ten seconds,
+     * which re-rendered it from new props: the portraits restarted their cycle
+     * and the scores blinked. This is the courts and nothing else, so the
+     * screen can fold new scores into what it is already showing.
+     *
+     * Gated exactly as the page is — same organization resolution, same token —
+     * because it answers the same question and must not be the softer way in.
+     */
+    public function feed(Request $request, TenantContext $tenantContext): JsonResponse
+    {
+        $organization = $this->displayOrganization($request, $tenantContext);
+
+        $branchId = $request->integer('branch') ?: null;
+
+        $courts = Court::query()
+            ->withoutGlobalScope('organization')
+            ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('branch_id')
+            ->orderBy('court_number')
+            ->get();
+
+        $liveMatches = ClubMatch::query()
+            ->withoutGlobalScope('organization')
+            ->whereIn('court_id', $courts->pluck('id'))
+            ->where('status', 'live')
+            ->orderByDesc('started_at')
+            ->get()
+            ->groupBy('court_id');
+
+        $lineups = $this->lineups->forMatches($liveMatches->flatten());
+
+        return response()->json([
+            'courts' => $courts
+                ->map(fn (Court $court) => $this->court($court, $liveMatches->get($court->id)?->first(), $lineups))
+                ->values(),
         ]);
     }
 

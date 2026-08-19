@@ -196,6 +196,44 @@ class LiveDisplayTest extends TestCase
         );
     }
 
+    /**
+     * The feed the screen polls answers the same question the page does, so it
+     * has to be shut the same way. A softer JSON endpoint beside a guarded page
+     * is the usual way a guarded page stops being guarded.
+     */
+    public function test_the_live_feed_is_gated_exactly_as_the_board_is(): void
+    {
+        [$one, $oneBranch, $oneCourt] = $this->club('Alpha Club', 'alpha-club');
+        [$two, $twoBranch, $twoCourt] = $this->club('Beta Club', 'beta-club');
+
+        $this->liveMatch($one, $oneBranch, $oneCourt, 'Alpha');
+        $this->liveMatch($two, $twoBranch, $twoCourt, 'Beta');
+
+        /* No branch, nobody signed in: same 404 the page gives. */
+        $this->getJson('/display/live/feed')->assertNotFound();
+
+        /* Named branch: that club only, never the other. */
+        $response = $this->getJson('/display/live/feed?branch='.$oneBranch->id);
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'courts');
+        $response->assertJsonPath('courts.0.name', 'Alpha Club Court 1');
+        $this->assertStringNotContainsString('Beta', $response->getContent());
+    }
+
+    public function test_the_live_feed_honours_the_display_token(): void
+    {
+        [$organization, $branch] = $this->club('Alpha Club', 'alpha-club');
+
+        $organization->update(['settings' => [
+            'live_display_token_required' => true,
+            'live_display_token_hash' => hash('sha256', 'letmein'),
+        ]]);
+
+        $this->getJson('/display/live/feed?branch='.$branch->id)->assertForbidden();
+        $this->getJson('/display/live/feed?branch='.$branch->id.'&token=letmein')->assertOk();
+    }
+
     public function test_a_signed_in_club_user_gets_their_own_club_without_naming_a_branch(): void
     {
         [$one, $oneBranch, $oneCourt] = $this->club('Alpha Club', 'alpha-club');

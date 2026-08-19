@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { currency } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Building2, Check, CreditCard, Sparkles } from 'lucide-react';
@@ -77,6 +79,9 @@ function TenantSubscriptionCard({
     const [newMonths, setNewMonths] = useState(1);
     const newPlan = plans.find((entry) => Number(entry.id) === newPlanId) ?? plans[0] ?? null;
     const newTerm = newPlan?.terms?.find((entry: any) => entry.months === newMonths) ?? newPlan?.terms?.[0] ?? null;
+    /* Moving an existing subscriber is worth saying out loud; a club with no
+       plan yet is simply being put on one. */
+    const changingPlan = Boolean(subscription?.subscription_plan_id) && Number(subscription?.subscription_plan_id) !== newPlanId;
 
     const trialForm = useForm({ plan_id: newPlanId ?? '' });
     const subscribeForm = useForm({ plan_id: newPlanId ?? '', term_months: newMonths });
@@ -209,67 +214,164 @@ function TenantSubscriptionCard({
 
                 {/* ---- Start a trial or subscribe: the path that keeps
                     term_months, grace_days and QRPh in sync -------------- */}
-                <div className="bg-primary-soft/30 border-primary/20 space-y-3 rounded-lg border p-3">
-                    <p className="text-sm font-semibold">Start or change subscription</p>
-                    <p className="text-muted-foreground text-xs">
-                        The trial is {trialDays} days, free. Subscribing raises an invoice the club pays by QRPh from its own billing page.
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                        {plans.map((plan) => (
-                            <button
-                                key={plan.id}
-                                type="button"
-                                onClick={() => setNewPlanId(Number(plan.id))}
-                                className={`rounded-md border px-3 py-1.5 text-sm ${
-                                    Number(plan.id) === newPlanId ? 'border-primary bg-primary/10 font-semibold' : 'bg-background'
-                                }`}
-                            >
-                                {plan.name}
-                            </button>
-                        ))}
+                <div className="bg-primary-soft/30 border-primary/20 space-y-4 rounded-lg border p-4">
+                    <div>
+                        <p className="text-sm font-semibold">Start or change subscription</p>
+                        <p className="text-muted-foreground text-xs">
+                            The trial is {trialDays} days, free. Subscribing raises an invoice the club pays by QRPh from its own billing page.
+                        </p>
                     </div>
 
+                    {/* Step 1. The whole plan, not just its name: choosing
+                        between three names told you nothing about what the club
+                        is being moved onto or what it costs them. */}
+                    <div>
+                        <p className="text-muted-foreground mb-1.5 text-[0.6875rem] font-semibold tracking-wide uppercase">1 · Plan</p>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                            {plans.map((plan) => {
+                                const active = Number(plan.id) === newPlanId;
+                                const current = Number(plan.id) === Number(subscription?.subscription_plan_id);
+
+                                return (
+                                    <button
+                                        key={plan.id}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => setNewPlanId(Number(plan.id))}
+                                        className={cn(
+                                            'rounded-lg border px-3 py-2.5 text-left transition-colors',
+                                            active ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:border-border-strong',
+                                        )}
+                                    >
+                                        <span className="flex items-baseline justify-between gap-2">
+                                            <span className="text-label text-foreground font-semibold">{plan.name}</span>
+                                            {current && <span className="text-meta text-primary font-semibold">current</span>}
+                                        </span>
+                                        <span data-numeric className="text-foreground mt-0.5 block text-sm font-semibold">
+                                            {currency(plan.monthly_price)}
+                                            <span className="text-muted font-normal">/mo</span>
+                                        </span>
+                                        {/* What they are actually buying. */}
+                                        <span className="text-meta text-muted mt-1 block">
+                                            <span data-numeric>{plan.branch_limit ?? '∞'}</span> branches ·{' '}
+                                            <span data-numeric>{plan.court_limit ?? '∞'}</span> courts ·{' '}
+                                            <span data-numeric>{plan.staff_limit ?? '∞'}</span> staff
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Step 2. Committing longer is the club's discount, so the
+                        saving is on the control that decides it. */}
                     {newPlan?.terms && (
-                        <div className="flex flex-wrap gap-2">
-                            {newPlan.terms.map((term: any) => (
-                                <button
-                                    key={term.months}
-                                    type="button"
-                                    onClick={() => setNewMonths(term.months)}
-                                    className={`rounded-md border px-3 py-1.5 text-sm ${
-                                        term.months === newMonths ? 'border-primary bg-primary/10 font-semibold' : 'bg-background'
-                                    }`}
-                                >
-                                    {term.label} · {currency(term.per_month)}/mo
-                                    {term.saving_percent > 0 && <span className="ml-1 text-emerald-600">save {term.saving_percent}%</span>}
-                                </button>
-                            ))}
+                        <div>
+                            <p className="text-muted-foreground mb-1.5 text-[0.6875rem] font-semibold tracking-wide uppercase">2 · Term</p>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                                {newPlan.terms.map((term: any) => {
+                                    const active = term.months === newMonths;
+
+                                    return (
+                                        <button
+                                            key={term.months}
+                                            type="button"
+                                            aria-pressed={active}
+                                            onClick={() => setNewMonths(term.months)}
+                                            className={cn(
+                                                'rounded-lg border px-3 py-2.5 text-left transition-colors',
+                                                active ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:border-border-strong',
+                                            )}
+                                        >
+                                            <span className="flex items-baseline justify-between gap-2">
+                                                <span className="text-label text-foreground font-semibold">{term.label}</span>
+                                                {term.saving_percent > 0 && (
+                                                    <span className="text-meta text-success font-semibold">save {term.saving_percent}%</span>
+                                                )}
+                                            </span>
+                                            <span data-numeric className="text-foreground mt-0.5 block text-sm font-semibold">
+                                                {currency(term.per_month)}
+                                                <span className="text-muted font-normal">/mo</span>
+                                            </span>
+                                            <span data-numeric className="text-meta text-muted mt-1 block">{currency(term.total)} billed now</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={trialForm.processing || !newPlanId || Boolean(subscription?.trial_ends_at)}
-                            onClick={startTrial}
-                        >
-                            <Sparkles className="mr-1.5 size-4" />
-                            {subscription?.trial_ends_at ? 'Trial already used' : `Start ${trialDays}-day trial`}
-                        </Button>
-                        <Button type="button" size="sm" disabled={subscribeForm.processing || !newPlanId} onClick={subscribeTenant}>
-                            <CreditCard className="mr-1.5 size-4" />
-                            Subscribe{newTerm ? ` · ${currency(newTerm.total)}` : ''}
-                        </Button>
-                        {(trialForm.errors as any).plan_id && <p className="text-xs text-red-600">{(trialForm.errors as any).plan_id}</p>}
+                    {/* Step 3. What is about to happen, in one line, before it
+                        happens — this raises a real bill against a real club. */}
+                    <div className="border-primary/20 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+                        <div className="min-w-0">
+                            <p className="text-label text-foreground font-semibold">
+                                {newPlan?.name ?? 'No plan'}
+                                {newTerm ? ` · ${newTerm.label}` : ''}
+                            </p>
+                            <p className="text-meta text-muted">
+                                {changingPlan && subscription?.plan?.name ? `Moving from ${subscription.plan.name}. ` : ''}
+                                {newTerm ? (
+                                    <>
+                                        Invoice for <span data-numeric>{currency(newTerm.total)}</span> raised now, covering{' '}
+                                        <span data-numeric>{newTerm.months}</span> {newTerm.months === 1 ? 'month' : 'months'}.
+                                    </>
+                                ) : (
+                                    'Pick a plan and a term.'
+                                )}
+                            </p>
+                        </div>
+
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={trialForm.processing || !newPlanId || Boolean(subscription?.trial_ends_at)}
+                                title={subscription?.trial_ends_at ? 'This club has already had its trial' : undefined}
+                                onClick={startTrial}
+                            >
+                                <Sparkles className="mr-1.5 size-4" />
+                                {subscription?.trial_ends_at ? 'Trial already used' : `Start ${trialDays}-day trial`}
+                            </Button>
+
+                            {/* Asked first: this bills a club, and the button
+                                used to do it on one click from a card that
+                                looks like every other card on the page. */}
+                            <ConfirmDialog
+                                trigger={
+                                    <Button type="button" size="sm" disabled={subscribeForm.processing || !newPlanId || !newTerm}>
+                                        <CreditCard className="mr-1.5 size-4" />
+                                        Subscribe{newTerm ? ` · ${currency(newTerm.total)}` : ''}
+                                    </Button>
+                                }
+                                title={`Put ${organization.name} on ${newPlan?.name ?? 'this plan'}?`}
+                                description={
+                                    newTerm
+                                        ? `This raises an invoice for ${currency(newTerm.total)} covering ${newTerm.months} ${
+                                              newTerm.months === 1 ? 'month' : 'months'
+                                          }. The club pays it by QRPh from its own billing page.`
+                                        : 'Pick a term first.'
+                                }
+                                confirmLabel="Subscribe"
+                                onConfirm={subscribeTenant}
+                            />
+                        </div>
                     </div>
 
+                    {(trialForm.errors as any).plan_id && (
+                        <p role="alert" className="text-meta text-danger">
+                            {(trialForm.errors as any).plan_id}
+                        </p>
+                    )}
+
                     {outstanding && (
-                        <form onSubmit={settleOutstanding} className="border-t pt-3">
-                            <p className="text-xs font-semibold">
-                                Outstanding: {outstanding.invoice_number} · {currency(outstanding.total_amount)}
+                        <form onSubmit={settleOutstanding} className="border-primary/20 border-t pt-3">
+                            <p className="text-label text-foreground font-semibold">
+                                Outstanding: {outstanding.invoice_number} · <span data-numeric>{currency(outstanding.total_amount)}</span>
+                            </p>
+                            <p className="text-meta text-muted mt-0.5">
+                                Only for money taken outside QRPh — cash at the desk, or a bank transfer.
                             </p>
                             <div className="mt-2 flex flex-wrap items-end gap-2">
                                 <Select
@@ -290,7 +392,7 @@ function TenantSubscriptionCard({
                                 </Button>
                             </div>
                             {!canTakePayment && (
-                                <p className="text-muted-foreground mt-1 text-xs">
+                                <p className="text-meta text-muted mt-1">
                                     QRPh is not connected, so the club cannot pay this online yet; this records an offline payment instead.
                                 </p>
                             )}

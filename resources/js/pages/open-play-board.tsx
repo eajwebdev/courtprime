@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FlashToast } from '@/components/flash-toast';
 import { ActivityFeed, type ActivityEntry } from '@/components/open-play/activity-feed';
 import { BoardHeader } from '@/components/open-play/board-header';
@@ -44,6 +45,7 @@ type Props = {
  */
 export default function OpenPlayBoard({ session, inControl, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
     const [showActivity, setShowActivity] = useState(false);
+    const [confirmRelease, setConfirmRelease] = useState(false);
     const { errors } = usePage().props as any;
     const base = `/open-play/${session.session_code}`;
     const started = Boolean(session.started);
@@ -64,7 +66,11 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
         return () => window.clearInterval(timer);
     }, []);
 
-    const post = (url: string, data: Record<string, string> = {}) => router.post(url, data, { preserveScroll: true, preserveState: true });
+    /* `onFinish` matters for scoring: the card holds its optimistic number
+       until the server has answered, so the score never drops back before it
+       jumps forward. */
+    const post = (url: string, data: Record<string, string> = {}, onFinish?: () => void) =>
+        router.post(url, data, { preserveScroll: true, preserveState: true, onFinish });
 
     return (
         /*
@@ -89,11 +95,7 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
                 inControl={inControl}
                 activityCount={activity.length}
                 onShowActivity={() => setShowActivity(true)}
-                onRelease={() => {
-                    if (window.confirm('Release the board? Anyone with the ID and key can take it after that.')) {
-                        router.post(`${base}/release`);
-                    }
-                }}
+                onRelease={() => setConfirmRelease(true)}
             />
 
             <main
@@ -135,6 +137,18 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
 
             <ActivityPanel open={showActivity} onClose={() => setShowActivity(false)} entries={activity} />
 
+            {/* The board's own dialog rather than the browser's, which showed
+                the host name and looked like a phishing prompt on a tablet. */}
+            <ConfirmDialog
+                open={confirmRelease}
+                onOpenChange={setConfirmRelease}
+                title="Release the board?"
+                description="This device stops being able to change the session. Anyone with the session ID and key can then take it."
+                confirmLabel="Release board"
+                variant="destructive"
+                onConfirm={() => router.post(`${base}/release`)}
+            />
+
             <FlashToast />
         </div>
     );
@@ -160,7 +174,7 @@ function LiveBoard({
     waiting: any[];
     results: any[];
     activity: ActivityEntry[];
-    post: (url: string, data?: Record<string, string>) => void;
+    post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
 }) {
     const busy = liveMatches.map((match) => match.court);
     const idle = courts.filter((court) => !busy.includes(court.name));

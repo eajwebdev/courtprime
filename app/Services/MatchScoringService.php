@@ -55,17 +55,33 @@ class MatchScoringService
         });
     }
 
-    public function undo(ClubMatch $match, ?int $userId = null): ClubMatch
+    /**
+     * Take back a point.
+     *
+     * With a team, it takes back that team's last point. Without one, the
+     * match's last point, whoever scored it.
+     *
+     * The team matters. The open play board undoes by double tapping the half
+     * you tapped by mistake, and without this it removed whichever point was
+     * scored most recently: double tapping your own half took a point off the
+     * other side whenever they had scored last.
+     */
+    public function undo(ClubMatch $match, ?int $userId = null, ?string $team = null): ClubMatch
     {
-        return DB::transaction(function () use ($match, $userId) {
+        return DB::transaction(function () use ($match, $userId, $team) {
             $last = ScoreEvent::query()
                 ->where('club_match_id', $match->id)
                 ->whereIn('event_type', ['score_increment', 'match_point'])
-                ->latest()
+                ->when($team, fn ($query) => $query->where('team', $team))
+                /* By id, not by timestamp: two points in the same second are
+                   otherwise ordered arbitrarily. */
+                ->latest('id')
                 ->first();
 
             if (! $last) {
-                throw ValidationException::withMessages(['match' => 'No score event to undo.']);
+                throw ValidationException::withMessages([
+                    'match' => $team ? 'That team has no point to take back.' : 'No score event to undo.',
+                ]);
             }
 
             $teamOneScore = max($match->team_one_score - ($last->team === 'team_one' ? 1 : 0), 0);

@@ -14,6 +14,7 @@ use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\SubscriptionFeatureGate;
 use App\Services\TenantContext;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,6 +22,7 @@ use Inertia\Response;
 class OpenPlayController extends Controller
 {
     public function index(
+        Request $request,
         OpenPlayService $openPlay,
         OpenPlayRotationService $rotation,
         TenantContext $tenantContext,
@@ -29,9 +31,21 @@ class OpenPlayController extends Controller
         $this->authorize('viewAny', OpenPlaySession::class);
         $subscriptionGate->ensureAnyFeatureEnabled($tenantContext->currentOrganization(), ['open_play'], 'Open Play');
 
+        /*
+         * The one being run, not the one created most recently.
+         *
+         * A club that lines up next week's sessions in advance was landing on
+         * an empty future session while tonight's was live underneath it.
+         * Live first, then open, then whatever is newest, and an explicit
+         * ?session= always wins so the list on the right can steer this page.
+         */
+        $requested = trim((string) $request->query('session', ''));
+
         $session = OpenPlaySession::query()
             ->with(['branch.courts', 'courts', 'players.player', 'queue.player', 'queue.court'])
-            ->latest()
+            ->when($requested !== '', fn ($query) => $query->where('session_code', strtoupper($requested)))
+            ->when($requested === '', fn ($query) => $query->orderByRaw("FIELD(status, 'live', 'open', 'scheduled', 'completed', 'cancelled')"))
+            ->orderByDesc('id')
             ->first();
 
         /* Courts free up while nobody is looking at the screen, so a visit is
@@ -42,7 +56,12 @@ class OpenPlayController extends Controller
         }
 
         return Inertia::render('open-play', [
-            'sessions' => OpenPlaySession::query()->withCount(['players', 'queue'])->with('branch')->latest()->paginate(10),
+            'sessions' => OpenPlaySession::query()
+                ->withCount(['players', 'queue'])
+                ->with('branch:id,name')
+                ->orderByRaw("FIELD(status, 'live', 'open', 'scheduled', 'completed', 'cancelled')")
+                ->orderByDesc('id')
+                ->paginate(10),
             'activeSession' => $session,
             'sessionCourts' => $session ? $session->courts()->orderBy('court_number')->get(['courts.id', 'name', 'court_number']) : [],
             'liveMatches' => $session ? $this->liveMatches($session) : [],

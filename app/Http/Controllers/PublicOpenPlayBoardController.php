@@ -241,7 +241,9 @@ class PublicOpenPlayBoardController extends Controller
         $session = $this->requireControl($request, $code, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
-        $scoring->undo($clubMatch);
+        $request->validate(['team' => ['nullable', 'in:team_one,team_two']]);
+
+        $scoring->undo($clubMatch, null, $request->input('team'));
 
         return back();
     }

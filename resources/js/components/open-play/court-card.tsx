@@ -29,7 +29,7 @@ export function CourtCard({
 }: {
     match: any;
     base: string;
-    post: (url: string, data?: Record<string, string>) => void;
+    post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
     target?: number;
     winByTwo?: boolean;
 }) {
@@ -62,14 +62,14 @@ export function CourtCard({
                 <TeamScore
                     players={one}
                     score={match.team_one_score}
-                    onScore={() => post(`${base}/matches/${match.id}/score`, { team: 'team_one' })}
-                    onUndo={() => post(`${base}/matches/${match.id}/undo`)}
+                    onScore={(done) => post(`${base}/matches/${match.id}/score`, { team: 'team_one' }, done)}
+                    onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_one' }, done)}
                 />
                 <TeamScore
                     players={two}
                     score={match.team_two_score}
-                    onScore={() => post(`${base}/matches/${match.id}/score`, { team: 'team_two' })}
-                    onUndo={() => post(`${base}/matches/${match.id}/undo`)}
+                    onScore={(done) => post(`${base}/matches/${match.id}/score`, { team: 'team_two' }, done)}
+                    onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_two' }, done)}
                 />
             </div>
 
@@ -112,7 +112,17 @@ export function CourtCard({
     );
 }
 
-function TeamScore({ players, score, onScore, onUndo }: { players: any[]; score: number; onScore: () => void; onUndo: () => void }) {
+function TeamScore({
+    players,
+    score,
+    onScore,
+    onUndo,
+}: {
+    players: any[];
+    score: number;
+    onScore: (done: () => void) => void;
+    onUndo: (done: () => void) => void;
+}) {
     const taps = useRef(0);
     const timer = useRef<number | undefined>(undefined);
     const [pending, setPending] = useState(0);
@@ -121,8 +131,10 @@ function TeamScore({ players, score, onScore, onUndo }: { players: any[]; score:
 
     /*
      * The request waits for the double tap window to close, but the number does
-     * not: `pending` moves the moment a finger lands, so scoring still feels
-     * instant while the second tap can still change what the first one meant.
+     * not: `pending` moves the moment a finger lands and is only cleared once
+     * the server has answered. Clearing it when the request went out instead
+     * made the score drop back to the old value for the length of the round
+     * trip and then jump forward again.
      */
     const tap = () => {
         taps.current += 1;
@@ -132,12 +144,13 @@ function TeamScore({ players, score, onScore, onUndo }: { players: any[]; score:
         timer.current = window.setTimeout(() => {
             const count = taps.current;
             taps.current = 0;
-            setPending(0);
+
+            const done = () => setPending(0);
 
             if (count === 1) {
-                onScore();
+                onScore(done);
             } else {
-                onUndo();
+                onUndo(done);
             }
         }, DOUBLE_TAP_MS);
     };

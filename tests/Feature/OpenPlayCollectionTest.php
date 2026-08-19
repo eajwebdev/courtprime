@@ -185,6 +185,26 @@ class OpenPlayCollectionTest extends TestCase
         $this->assertSame(0, $this->session->players()->count(), 'Nothing happened, so nothing is remembered.');
     }
 
+    public function test_the_session_board_cannot_take_payment(): void
+    {
+        /*
+         * The board is opened with an ID and key handed out at the desk, so
+         * anyone running a court could otherwise mark money as collected.
+         * There is no route for it there at all.
+         */
+        $this->post('/open-play/board', ['code' => 'OP-MONEY1', 'key' => '1234'])->assertRedirect();
+
+        $this->post('/open-play/OP-MONEY1/players/1/settle')->assertNotFound();
+    }
+
+    public function test_taking_payment_needs_a_signed_in_user(): void
+    {
+        $player = $this->addPlayer('A');
+
+        $this->post("/open-play/{$this->session->id}/collect/{$player->id}")
+            ->assertRedirect('/login');
+    }
+
     public function test_settling_clears_what_is_outstanding(): void
     {
         $players = collect(['A', 'B', 'C', 'D'])->map(fn ($name) => $this->addPlayer($name));

@@ -168,6 +168,26 @@ class OpenPlayController extends Controller
         return back()->with('success', 'Board signed out. Anyone with the ID and key can open it now.');
     }
 
+    /**
+     * Take entry money.
+     *
+     * Staff only, and deliberately not on the session board: that board is
+     * opened with an ID and key handed out at the desk, so anybody running a
+     * court could otherwise mark the money as collected. What is owed follows
+     * from who played, which the board decides; who has paid is the club's
+     * record, which is here.
+     */
+    public function settlePlayer(Request $request, OpenPlaySession $session, int $player, OpenPlayCollectionService $collections): RedirectResponse
+    {
+        $this->authorize('update', $session);
+
+        $data = $request->validate(['amount' => ['nullable', 'numeric', 'min:0', 'max:100000']]);
+
+        $collections->settle($session, $player, isset($data['amount']) ? (float) $data['amount'] : null);
+
+        return back()->with('success', 'Payment recorded.');
+    }
+
     /** Staff adding a walk-in who has no phone on them. */
     public function join(OpenPlaySession $session, Player $player, OpenPlayService $openPlay, OpenPlayRotationService $rotation)
     {

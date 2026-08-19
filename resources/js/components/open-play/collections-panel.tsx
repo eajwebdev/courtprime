@@ -29,6 +29,10 @@ export type CollectionSheet = {
 /**
  * What the club is owed for this session.
  *
+ * Staff side only. The session board is opened with an ID and key handed out
+ * at the desk, so anyone running a court could otherwise mark money as
+ * collected; taking payment sits behind a login instead.
+ *
  * Entry is charged per player, once, and only once they have played. Somebody
  * who checked in, waited and went home before a court came free owes nothing,
  * so they are on the list at zero rather than missing from it: staff can see
@@ -36,13 +40,13 @@ export type CollectionSheet = {
  *
  * Players who played and then left stay on the sheet, greyed but still owed.
  */
-export function CollectionsPanel({ base, sheet }: { base: string; sheet: CollectionSheet }) {
+export function CollectionsPanel({ sessionId, sheet }: { sessionId: number; sheet: CollectionSheet }) {
     const [settling, setSettling] = useState<number | null>(null);
 
     const take = (row: CollectionRow) => {
         setSettling(row.player_id);
         router.post(
-            `${base}/players/${row.player_id}/settle`,
+            `/open-play/${sessionId}/collect/${row.player_id}`,
             {},
             {
                 preserveScroll: true,

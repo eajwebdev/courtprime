@@ -159,7 +159,6 @@ class PublicOpenPlayBoardController extends Controller
                 'started' => $session->status === 'live',
                 'current_round' => $session->current_round,
                 'format' => $session->format,
-                'entry_fee' => $session->entry_fee,
                 'target_score' => (int) $session->target_score,
                 'win_by_two' => (bool) $session->win_by_two,
                 'max_players' => $session->max_players,
@@ -181,8 +180,6 @@ class PublicOpenPlayBoardController extends Controller
             'waiting' => $this->waiting($session),
             'results' => $this->results($session),
             'activity' => $this->activity($session),
-            /* What the club is owed, and by whom. */
-            'collections' => app(OpenPlayCollectionService::class)->sheet($session),
         ]);
     }
 
@@ -497,25 +494,6 @@ class PublicOpenPlayBoardController extends Controller
         return back()->with('success', $outcome === 'left'
             ? ($name ?? 'Player').' marked as gone. Their entry is still owed.'
             : ($name ?? 'Player').' removed.');
-    }
-
-    /** Take entry money at the court. */
-    public function settle(
-        Request $request,
-        string $code,
-        int $player,
-        OpenPlayService $openPlay,
-        OpenPlayCollectionService $collections,
-    ): RedirectResponse {
-        $session = $this->requireControl($request, $code, $openPlay);
-
-        $data = $request->validate(['amount' => ['nullable', 'numeric', 'min:0', 'max:100000']]);
-
-        $collections->settle($session, $player, isset($data['amount']) ? (float) $data['amount'] : null);
-
-        $this->log($request, $session, 'open_play.payment_taken', 'Took payment from '.($this->playerName($session, $player) ?? 'a player'));
-
-        return back()->with('success', 'Payment recorded.');
     }
 
     private function playerName(OpenPlaySession $session, int $playerId): ?string

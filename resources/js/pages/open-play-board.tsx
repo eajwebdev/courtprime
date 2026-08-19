@@ -3,7 +3,6 @@ import { FlashToast } from '@/components/flash-toast';
 import { ActivityFeed, type ActivityEntry } from '@/components/open-play/activity-feed';
 import { BoardHeader } from '@/components/open-play/board-header';
 import { BoardRail } from '@/components/open-play/board-rail';
-import { type CollectionSheet } from '@/components/open-play/collections-panel';
 import { CourtCard } from '@/components/open-play/court-card';
 import { RosterPanel, type RosterEntry } from '@/components/open-play/roster-panel';
 import { SessionSetup, type BoardCourt } from '@/components/open-play/session-setup';
@@ -26,7 +25,6 @@ type Props = {
     waiting: any[];
     results: any[];
     activity: ActivityEntry[];
-    collections: CollectionSheet;
 };
 
 /**
@@ -45,19 +43,7 @@ type Props = {
  * 48px, and the layout gets wider rather than taller as the screen grows, so a
  * tablet in landscape shows the whole session without scrolling.
  */
-export default function OpenPlayBoard({
-    session,
-    inControl,
-    you,
-    courts,
-    branchCourts,
-    roster,
-    liveMatches,
-    waiting,
-    results,
-    activity,
-    collections,
-}: Props) {
+export default function OpenPlayBoard({ session, inControl, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
     const [showActivity, setShowActivity] = useState(false);
     const [confirmRelease, setConfirmRelease] = useState(false);
     const { errors } = usePage().props as any;
@@ -74,7 +60,7 @@ export default function OpenPlayBoard({
             /* A partial reload: `reload` already preserves component state and
                scroll, so a refresh landing while someone is half way through
                typing a name leaves what they have typed alone. */
-            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session', 'roster', 'activity', 'collections'] });
+            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session', 'roster', 'activity'] });
         }, 8000);
 
         return () => window.clearInterval(timer);
@@ -128,7 +114,6 @@ export default function OpenPlayBoard({
                         waiting={waiting}
                         results={results}
                         activity={activity}
-                        collections={collections}
                         post={post}
                     />
                 ) : (
@@ -188,7 +173,6 @@ function LiveBoard({
     waiting,
     results,
     activity,
-    collections,
     post,
 }: {
     base: string;
@@ -199,7 +183,6 @@ function LiveBoard({
     waiting: any[];
     results: any[];
     activity: ActivityEntry[];
-    collections: CollectionSheet;
     post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
 }) {
     const busy = liveMatches.map((match) => match.court);
@@ -268,15 +251,7 @@ function LiveBoard({
                 </div>
             </div>
 
-            <BoardRail
-                base={base}
-                roster={roster}
-                waiting={waiting}
-                results={results}
-                activity={activity}
-                collections={collections}
-                needed={needed}
-            />
+            <BoardRail base={base} roster={roster} waiting={waiting} results={results} activity={activity} needed={needed} />
         </div>
     );
 }

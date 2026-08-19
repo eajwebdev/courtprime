@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { CollectionsPanel, type CollectionSheet } from '@/components/open-play/collections-panel';
 import { SessionCreateDialog } from '@/components/open-play/session-create-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ type Props = {
     sessions: any;
     activeSession: any;
     board: { held: boolean; since: string | null; last_seen: string | null; quiet: boolean } | null;
-    collections: any;
+    collections: CollectionSheet | null;
     sessionCourts: any[];
     liveMatches: any[];
     waiting: any[];
@@ -267,6 +268,20 @@ export default function OpenPlay({
                             New
                         </Button>
                     </div>
+
+                    {activeSession && collections && (
+                        <div className="mb-5">
+                            {/* Taking money is staff work, so it lives here and
+                                not on the board that runs on the session key. */}
+                            <div className="mb-2 flex items-baseline justify-between gap-3">
+                                <h2 className="text-h2 text-foreground">Collect</h2>
+                                <p className="text-meta text-muted">{activeSession.session_code}</p>
+                            </div>
+                            <div className="flex max-h-96 flex-col">
+                                <CollectionsPanel sessionId={activeSession.id} sheet={collections} />
+                            </div>
+                        </div>
+                    )}
 
                     <ul className="divide-border border-border bg-surface divide-y overflow-hidden rounded-xl border">
                         {sessions.data.map((session: any) => {

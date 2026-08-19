@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label';
 import { currency } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
-import { Check, Clock, Loader2, MapPin, Minus, Plus, TriangleAlert, Users, X } from 'lucide-react';
+import { Check, Clock, Loader2, LogIn, MapPin, Minus, Plus, TriangleAlert, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export type Slot = { start_time: string; end_time: string; available: boolean };
@@ -82,6 +82,7 @@ export function BookingPanel({
     date,
     initialStart = null,
     initialMinutes = null,
+    signedIn = true,
     onClose,
 }: {
     court: BookableCourt;
@@ -90,6 +91,8 @@ export function BookingPanel({
     initialStart?: string | null;
     /** A block length dragged out on the grid. */
     initialMinutes?: number | null;
+    /** A visitor can pick a slot; taking it is what needs an account. */
+    signedIn?: boolean;
     onClose?: () => void;
 }) {
     const rate = Number(court.has_membership_rate && court.member_hourly_rate ? court.member_hourly_rate : court.standard_hourly_rate);
@@ -151,6 +154,20 @@ export function BookingPanel({
 
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
+
+        /*
+         * A visitor gets this far on purpose: they can see what is free and
+         * choose a time without an account. Signing in happens here, carrying
+         * the court, the day and the time, so they come back to the slot they
+         * picked rather than to an empty grid.
+         */
+        if (!signedIn) {
+            const back = `/me/book?date=${encodeURIComponent(date)}&court=${court.id}&start=${encodeURIComponent(start ?? '')}&minutes=${minutes}`;
+            window.location.href = `/login?intended=${encodeURIComponent(back)}`;
+
+            return;
+        }
+
         form.post('/me/book', {
             preserveScroll: true,
             /*
@@ -350,9 +367,15 @@ export function BookingPanel({
                         <>
                             <Loader2 className="size-4 animate-spin" /> Confirming
                         </>
-                    ) : (
+                    ) : signedIn ? (
                         <>
                             <Check className="size-4" /> Confirm booking
+                        </>
+                    ) : (
+                        /* Says where the tap goes. Nobody likes a button that
+                           turns out to be a login wall. */
+                        <>
+                            <LogIn className="size-4" /> Sign in to book
                         </>
                     )}
                 </Button>

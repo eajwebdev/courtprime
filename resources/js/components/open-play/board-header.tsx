@@ -11,17 +11,19 @@ import { useState } from 'react';
  * The session ID and key live here rather than on a settings screen: the most
  * common thing anyone asks the person holding the tablet is "what's the code",
  * and the answer should be readable across a court without unlocking anything.
+ *
+ * No name is shown. The board is the session's, not one person's, and a name in
+ * the chrome read as though it belonged to whoever opened it. Who did what is
+ * in the history, which is where it is useful.
  */
 export function BoardHeader({
     session,
-    you,
     inControl,
     onShowActivity,
     onRelease,
     activityCount,
 }: {
     session: any;
-    you: string;
     /** Whether this device is the one holding the board. */
     inControl: boolean;
     onShowActivity: () => void;
@@ -80,8 +82,6 @@ export function BoardHeader({
                 </button>
 
                 <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-meta hidden rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/70 sm:inline-flex">{you}</span>
-
                     <Button type="button" variant="onDeep" size="sm" onClick={onShowActivity} className="shrink-0">
                         <History className="size-4" />
                         <span className="hidden sm:inline">History</span>

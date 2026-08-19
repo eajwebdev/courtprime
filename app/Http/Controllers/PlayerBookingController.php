@@ -8,17 +8,25 @@ use App\Models\PlayerMembership;
 use App\Services\CourtAvailabilityService;
 use App\Services\PlayerProfileResolver;
 use App\Services\ReservationService;
+use App\Support\NetworkClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use App\Support\NetworkClock;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PlayerBookingController extends Controller
 {
+    /**
+     * The booking grid, with or without an account.
+     *
+     * A visitor deciding whether to come down on Saturday needs to see what is
+     * free before signing up for anything, so this renders for guests too. What
+     * needs an account is taking a court, which is the POST, and the grid sends
+     * them to sign in at the moment they pick a time rather than at the door.
+     */
     public function index(Request $request, PlayerProfileResolver $profiles, CourtAvailabilityService $availability): Response
     {
-        $profile = $profiles->forUser($request->user());
+        $profile = $request->user() ? $profiles->forUser($request->user()) : null;
         /* Club-local today, not UTC today. See NetworkClock. */
         $date = $request->query('date', NetworkClock::today());
         $search = trim((string) $request->query('search', ''));
@@ -61,7 +69,7 @@ class PlayerBookingController extends Controller
                     'organization_id' => $court->branch?->organization?->id,
                     'organization' => $court->branch?->organization?->name,
                 ],
-                'has_membership_rate' => $this->hasActiveMembership($profile->id, (int) $court->organization_id),
+                'has_membership_rate' => $profile ? $this->hasActiveMembership($profile->id, (int) $court->organization_id) : false,
                 /*
                  * The whole day is returned, not just the first ten free slots.
                  * The booking grid needs the unavailable ones too so taken
@@ -72,12 +80,12 @@ class PlayerBookingController extends Controller
             ]);
 
         return Inertia::render('player-booking', [
-            'profile' => [
+            'profile' => $profile ? [
                 'courtprime_player_id' => $profile->courtprime_player_id,
                 'display_name' => $profile->display_name,
                 'gender' => $profile->gender,
                 'avatar_url' => $profile->avatar_url,
-            ],
+            ] : null,
             'date' => $date,
             'search' => $search,
             'selectedCourtId' => $selectedCourtId,

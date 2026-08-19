@@ -1,6 +1,7 @@
 import { BookingPanel, label12h, type BookableCourt } from '@/components/booking/booking-panel';
 import { CourtGrid, type GridSelection } from '@/components/booking/court-grid';
 import { DateRail } from '@/components/booking/date-rail';
+import { DiscoveryPage } from '@/components/discovery/discovery-page';
 import { EmptyState } from '@/components/empty-state';
 import { AthleteArtwork } from '@/components/marketing-artwork';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { LayoutGrid, List, MapPin, Search, X } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/me' },
@@ -30,7 +31,8 @@ const PERIODS = [
 type PeriodKey = (typeof PERIODS)[number]['key'];
 
 type Props = {
-    profile: { courtprime_player_id: string; display_name: string; gender?: string | null; avatar_url?: string | null };
+    /** Null for a visitor who has not signed in. The grid still renders. */
+    profile: { courtprime_player_id: string; display_name: string; gender?: string | null; avatar_url?: string | null } | null;
     date: string;
     search: string;
     selectedCourtId?: number | null;
@@ -38,13 +40,15 @@ type Props = {
 };
 
 export default function PlayerBooking({ profile, date, search, selectedCourtId: preselected = null, courts }: Props) {
+    const signedIn = Boolean(profile);
     const [filters, setFilters] = useState({ date, search });
     /* Discovery deep-links to an exact court. That used to jump straight into
        the panel, which skipped the grid entirely — the player landed on a list
        of time chips having never seen the day. Now the link lands on the grid
        with that court's venue chosen and its column marked, and the player
        picks the time there like everywhere else. */
-    const [selectedId, setSelectedId] = useState<number | null>(null);
+    /* Preselected when a link or a return from signing in names a court. */
+    const [selectedId, setSelectedId] = useState<number | null>(preselected);
     /* A ?court= deep link from Discover should land in the booking panel, not
        on a list the player has to search again. */
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -67,8 +71,23 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
     const [periodKey, setPeriodKey] = useState<PeriodKey>('any');
     /* Tapping a time in the list, or dragging a block in the grid, opens the
        panel already on that slot and length. */
-    const [pendingStart, setPendingStart] = useState<string | null>(null);
-    const [pendingMinutes, setPendingMinutes] = useState<number | null>(null);
+    /*
+     * Signing in mid booking comes back here with the slot in the URL, so the
+     * selection is restored from it. Being sent to sign in and returning to an
+     * empty grid is the same as losing the booking.
+     */
+    const restored = useMemo(() => {
+        if (typeof window === 'undefined') return { start: null as string | null, minutes: null as number | null };
+
+        const params = new URLSearchParams(window.location.search);
+        const start = params.get('start');
+        const minutes = Number(params.get('minutes'));
+
+        return { start: start || null, minutes: Number.isFinite(minutes) && minutes > 0 ? minutes : null };
+    }, []);
+
+    const [pendingStart, setPendingStart] = useState<string | null>(restored.start);
+    const [pendingMinutes, setPendingMinutes] = useState<number | null>(restored.minutes);
 
     const go = (next: Partial<typeof filters>) => {
         const merged = { ...filters, ...next };
@@ -216,7 +235,7 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
     };
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs} width="wide">
+        <BookingShell signedIn={signedIn}>
             <Head title="Book a court | CourtPrime" />
 
             <div>
@@ -232,7 +251,7 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
                         }}
                     />
                     <AthleteArtwork
-                        asset={athleteFor(profile.gender)}
+                        asset={athleteFor(profile?.gender)}
                         decorative
                         sizes="(max-width: 640px) 34vw, 200px"
                         className="pointer-events-none absolute -right-3 bottom-0 h-full w-auto max-w-[34%] object-contain object-bottom opacity-60 sm:-right-6 sm:max-w-[30%]"
@@ -243,23 +262,25 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
                     />
 
                     <div className="relative flex max-w-[70%] items-center gap-3 sm:max-w-none sm:gap-3.5">
-                        <div className="border-primary/40 size-11 shrink-0 overflow-hidden rounded-full border-2 bg-white/10 sm:size-14">
-                            {profile.avatar_url ? (
-                                <img src={profile.avatar_url} alt="" className="size-full object-cover" />
-                            ) : (
-                                <span className="flex size-full items-center justify-center text-base font-semibold text-white">
-                                    {String(profile.display_name ?? '')
-                                        .split(' ')
-                                        .filter(Boolean)
-                                        .slice(0, 2)
-                                        .map((part: string) => part[0]?.toUpperCase() ?? '')
-                                        .join('')}
-                                </span>
-                            )}
-                        </div>
+                        {profile && (
+                            <div className="border-primary/40 size-11 shrink-0 overflow-hidden rounded-full border-2 bg-white/10 sm:size-14">
+                                {profile.avatar_url ? (
+                                    <img src={profile.avatar_url} alt="" className="size-full object-cover" />
+                                ) : (
+                                    <span className="flex size-full items-center justify-center text-base font-semibold text-white">
+                                        {String(profile.display_name ?? '')
+                                            .split(' ')
+                                            .filter(Boolean)
+                                            .slice(0, 2)
+                                            .map((part: string) => part[0]?.toUpperCase() ?? '')
+                                            .join('')}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         <div className="min-w-0">
                             <p data-numeric className="text-eyebrow text-primary truncate uppercase">
-                                {profile.courtprime_player_id}
+                                {profile ? profile.courtprime_player_id : 'CourtPrime network'}
                             </p>
                             <h1 className="mt-0.5 text-[1.25rem] leading-tight font-semibold tracking-tight text-white sm:text-[1.75rem]">
                                 Book a court
@@ -532,7 +553,13 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
                         <div className="sticky top-24">
                             {selected ? (
                                 <div className="border-border bg-surface overflow-hidden rounded-xl border">
-                                    <BookingPanel court={selected} date={filters.date} initialStart={pendingStart} initialMinutes={pendingMinutes} />
+                                    <BookingPanel
+                                        court={selected}
+                                        date={filters.date}
+                                        initialStart={pendingStart}
+                                        initialMinutes={pendingMinutes}
+                                        signedIn={signedIn}
+                                    />
                                 </div>
                             ) : (
                                 <div className="border-border text-label text-muted rounded-xl border border-dashed px-5 py-10 text-center">
@@ -557,11 +584,35 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
                             date={filters.date}
                             initialStart={pendingStart}
                             initialMinutes={pendingMinutes}
+                            signedIn={signedIn}
                             onClose={() => setSheetOpen(false)}
                         />
                     )}
                 </SheetContent>
             </Sheet>
-        </AppLayout>
+        </BookingShell>
+    );
+}
+
+/**
+ * The same grid, in whichever shell fits who is looking at it.
+ *
+ * A signed-in player keeps their app shell and bottom tabs. A visitor gets the
+ * public discovery chrome, so booking is reachable from the network pages
+ * without an account and without looking like a page they broke into.
+ */
+function BookingShell({ signedIn, children }: { signedIn: boolean; children: ReactNode }) {
+    if (signedIn) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs} width="wide">
+                {children}
+            </AppLayout>
+        );
+    }
+
+    return (
+        <DiscoveryPage current="/find-courts">
+            <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+        </DiscoveryPage>
     );
 }

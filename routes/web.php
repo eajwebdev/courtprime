@@ -106,12 +106,18 @@ Route::post('find-tournaments/{tournamentId}/register', [PublicTournamentControl
 Route::get('leaderboards', PublicRankingController::class)->name('rankings.public');
 Route::get('clubs/{slug}', [PublicClubController::class, 'show'])->name('clubs.public.show');
 
+/*
+ * Booking is public to look at and private to do. Somebody deciding whether to
+ * come down on Saturday should see what is free without an account; taking the
+ * court is what needs one, and the POST below still requires it.
+ */
+Route::get('me/book', [PlayerBookingController::class, 'index'])->name('me.book');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('me', PlayerPortalController::class)->name('me');
     Route::get('me/profile', [PlayerProfileController::class, 'edit'])->name('me.profile');
     Route::post('me/profile', [PlayerProfileController::class, 'update'])->name('me.profile.update');
-    Route::get('me/book', [PlayerBookingController::class, 'index'])->name('me.book');
     Route::post('me/book', [PlayerBookingController::class, 'store'])->name('me.book.store');
     Route::get('me/wallet', PlayerWalletController::class)->name('me.wallet');
     /* Players join an open play session with the code the club shared. */

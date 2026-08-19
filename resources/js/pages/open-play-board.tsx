@@ -17,7 +17,6 @@ import { useEffect, useState } from 'react';
 type Props = {
     session: any;
     inControl: boolean;
-    you: string;
     courts: BoardCourt[];
     branchCourts: BoardCourt[];
     roster: RosterEntry[];
@@ -43,7 +42,7 @@ type Props = {
  * 48px, and the layout gets wider rather than taller as the screen grows, so a
  * tablet in landscape shows the whole session without scrolling.
  */
-export default function OpenPlayBoard({ session, inControl, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
+export default function OpenPlayBoard({ session, inControl, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
     const [showActivity, setShowActivity] = useState(false);
     const [confirmRelease, setConfirmRelease] = useState(false);
     const { errors } = usePage().props as any;
@@ -91,7 +90,6 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
 
             <BoardHeader
                 session={session}
-                you={you}
                 inControl={inControl}
                 activityCount={activity.length}
                 onShowActivity={() => setShowActivity(true)}

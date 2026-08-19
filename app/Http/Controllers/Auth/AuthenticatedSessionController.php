@@ -20,6 +20,16 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(Request $request): Response
     {
+        /*
+         * Public pages send people here mid task, the booking grid being the
+         * one that matters: they picked a court and a time, then hit the wall.
+         * Remembering the URL they came from means signing in drops them back
+         * on that selection rather than on a dashboard.
+         */
+        if ($intended = $request->query('intended')) {
+            $request->session()->put('url.intended', url($intended));
+        }
+
         return Inertia::render('auth/login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => $request->session()->get('status'),

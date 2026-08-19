@@ -9,7 +9,7 @@ import { SessionSetup, type BoardCourt } from '@/components/open-play/session-se
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Check, Circle, Loader2, Play, X } from 'lucide-react';
+import { Check, Circle, Loader2, Pause, Play, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -185,8 +185,11 @@ function LiveBoard({
 }) {
     const busy = liveMatches.map((match) => match.court);
     const idle = courts.filter((court) => !busy.includes(court.name));
-    const perMatch = session.format === 'singles' ? 2 : 4;
+    /* The server works out what a court takes, so the board never has to
+       infer it from the format string. */
+    const perMatch = session.capacity ?? (session.format === 'singles' ? 2 : 4);
     const needed = Math.max(0, perMatch - waiting.length);
+    const paused = session.auto_rotate === false;
 
     /*
      * The grid follows the number of courts rather than the breakpoint. A club
@@ -222,11 +225,34 @@ function LiveBoard({
                         </span>{' '}
                         checked in
                     </span>
+
+                    {/* Pausing is a state the board has to show, not just a
+                        button it has: a court that finishes and stays empty
+                        otherwise reads as broken. */}
+                    <button
+                        type="button"
+                        onClick={() => post(`${base}/rotation`, { auto_rotate: paused ? '1' : '0' })}
+                        className={cn(
+                            'text-meta ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors',
+                            paused ? 'bg-warning-soft text-warning' : 'text-muted hover:text-foreground',
+                        )}
+                    >
+                        {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}
+                        {paused ? 'Rotation paused · resume' : 'Pause rotation'}
+                    </button>
                 </div>
 
                 <div className={cn('grid content-start gap-4 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:overflow-y-auto', courtGrid)}>
                     {liveMatches.map((match) => (
-                        <CourtCard key={match.id} match={match} base={base} post={post} target={session.target_score} winByTwo={session.win_by_two} />
+                        <CourtCard
+                            key={match.id}
+                            match={match}
+                            base={base}
+                            post={post}
+                            target={session.target_score}
+                            winByTwo={session.win_by_two}
+                            waiting={waiting}
+                        />
                     ))}
 
                     {idle.map((court) => (

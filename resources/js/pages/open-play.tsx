@@ -52,8 +52,12 @@ export default function OpenPlay({
        an idle court look like a court that was never selected. */
     const busyCourts = liveMatches.map((match) => match.court);
     const idleCourts = sessionCourts.filter((court: any) => !busyCourts.includes(court.name));
-    /* Four is a match. Below that nobody can be called, however long they wait. */
-    const canCall = waiting.length >= 4 && idleCourts.length > 0;
+    /* What a court takes in this session's format. This used to be hardcoded to
+       four, which meant a singles session showed the wrong number of players as
+       next up and told an idle court it needed two more than it did. */
+    const perMatch = activeSession?.format === 'singles' ? 2 : 4;
+    const canCall = waiting.length >= perMatch && idleCourts.length > 0;
+    const shortBy = Math.max(0, perMatch - waiting.length);
 
     const releaseCourt = (matchId: number) => {
         router.post(`/open-play/${activeSession.id}/matches/${matchId}/complete`, {}, { preserveScroll: true });
@@ -192,9 +196,7 @@ export default function OpenPlay({
                                         <article key={court.id} className="border-border rounded-xl border border-dashed px-4 py-8 text-center">
                                             <p className="text-label text-foreground font-semibold">{court.name}</p>
                                             <p className="text-meta text-muted mt-1">
-                                                {waiting.length >= 4
-                                                    ? 'Assigning next match…'
-                                                    : `Idle · ${4 - waiting.length} more ${4 - waiting.length === 1 ? 'player' : 'players'} needed`}
+                                                {shortBy === 0 ? 'Assigning next match…' : `Idle · ${shortBy} more ${shortBy === 1 ? 'player' : 'players'} needed`}
                                             </p>
                                         </article>
                                     ))}
@@ -227,7 +229,9 @@ export default function OpenPlay({
                                                     data-numeric
                                                     className={cn(
                                                         'text-meta flex size-7 shrink-0 items-center justify-center rounded-full font-semibold',
-                                                        canCall && index < 4 ? 'bg-primary text-primary-foreground' : 'bg-surface-muted text-muted',
+                                                        canCall && index < perMatch
+                                                            ? 'bg-primary text-primary-foreground'
+                                                            : 'bg-surface-muted text-muted',
                                                     )}
                                                 >
                                                     {index + 1}
@@ -238,7 +242,9 @@ export default function OpenPlay({
                                                         <span data-numeric>{entry.games}</span> {entry.games === 1 ? 'game' : 'games'}
                                                     </p>
                                                 </div>
-                                                {canCall && index < 4 && <span className="text-meta text-primary shrink-0 font-medium">next up</span>}
+                                                {canCall && index < perMatch && (
+                                                    <span className="text-meta text-primary shrink-0 font-medium">next up</span>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>

@@ -1,6 +1,6 @@
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { History, LogIn, Play, Settings2, Trophy, UserMinus, UserPlus } from 'lucide-react';
+import { ArrowUpDown, Ban, History, LogIn, Pause, Play, Repeat2, Settings2, Trophy, UserMinus, UserPlus, Users } from 'lucide-react';
 
 export type ActivityEntry = {
     id: number;
@@ -21,6 +21,12 @@ const icons: Record<string, typeof History> = {
     'open_play.started': Play,
     'open_play.board_opened': LogIn,
     'open_play.player_joined': LogIn,
+    'open_play.match_cancelled': Ban,
+    'open_play.rotation_paused': Pause,
+    'open_play.rotation_resumed': Play,
+    'open_play.queue_reordered': ArrowUpDown,
+    'open_play.player_swapped': Repeat2,
+    'open_play.teams_arranged': Users,
 };
 
 /**

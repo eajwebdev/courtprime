@@ -105,11 +105,17 @@ class OpenPlayRotationService
     /**
      * Close out a finished match and immediately fill the court it freed.
      *
+     * `$forceOut` and `$keep` are staff's override of the automatic priority
+     * pick — see PaddleStackService::plan(). Empty by default, which is the
+     * automatic rotation exactly as it always ran.
+     *
+     * @param  array<int, int>  $forceOut
+     * @param  array<int, int>  $keep
      * @return Collection<int, OpenPlayMatch>
      */
-    public function completeMatch(OpenPlayMatch $match): Collection
+    public function completeMatch(OpenPlayMatch $match, array $forceOut = [], array $keep = []): Collection
     {
-        $created = DB::transaction(function () use ($match) {
+        $created = DB::transaction(function () use ($match, $forceOut, $keep) {
             /*
              * Locked and re-read before anything is counted.
              *
@@ -162,7 +168,7 @@ class OpenPlayRotationService
              * court unconditionally was only ever right when the queue happened
              * to be long.
              */
-            $plan = $this->stack->plan($session, $onCourt);
+            $plan = $this->stack->plan($session, $onCourt, $forceOut, $keep);
             $this->stack->apply($session, $plan, $locked->court_id);
 
             $next = array_merge($plan['stay'], $plan['in']);
@@ -191,6 +197,47 @@ class OpenPlayRotationService
         });
 
         /* Any other court the finished game freed up players for. */
+        return $created->concat($this->generate($match->session()->withoutGlobalScope('organization')->first()));
+    }
+
+    /**
+     * Void a match that never should have counted: wrong players, a
+     * double-booked court, a false start. Nothing is credited — no game, no
+     * win, no streak — and the players who were on it go back to the queue
+     * exactly as PaddleStackService::release() leaves them, behind whoever was
+     * already waiting.
+     *
+     * @return Collection<int, OpenPlayMatch>
+     */
+    public function cancelMatch(OpenPlayMatch $match): Collection
+    {
+        $created = DB::transaction(function () use ($match) {
+            $locked = OpenPlayMatch::query()
+                ->withoutGlobalScope('organization')
+                ->lockForUpdate()
+                ->find($match->id);
+
+            if (! $locked || $locked->status !== 'live') {
+                return collect();
+            }
+
+            $participantIds = $locked->participants()->pluck('player_id')->map(fn ($id) => (int) $id)->all();
+
+            $locked->update(['status' => 'cancelled']);
+
+            $clubMatch = ClubMatch::query()->withoutGlobalScope('organization')->find($locked->club_match_id);
+            $clubMatch?->update(['status' => 'cancelled', 'ended_at' => now()]);
+
+            $session = $locked->session()->withoutGlobalScope('organization')->first();
+
+            if ($session) {
+                $this->stack->release($session, $participantIds);
+            }
+
+            return collect();
+        });
+
+        /* The court this freed, and any other, gets a fresh look. */
         return $created->concat($this->generate($match->session()->withoutGlobalScope('organization')->first()));
     }
 
@@ -283,6 +330,9 @@ class OpenPlayRotationService
         return OpenPlayMatchPlayer::query()
             ->join('open_play_matches', 'open_play_matches.id', '=', 'open_play_match_players.open_play_match_id')
             ->where('open_play_matches.open_play_session_id', $session->id)
+            /* A cancelled match never happened, so it counts toward nobody's
+               games and cannot make the next round repeat its pairing. */
+            ->where('open_play_matches.status', '!=', 'cancelled')
             ->groupBy('open_play_match_players.player_id')
             ->selectRaw('open_play_match_players.player_id, COUNT(*) as games, MAX(open_play_matches.round) as last_round')
             ->get()
@@ -304,6 +354,7 @@ class OpenPlayRotationService
 
         $matches = OpenPlayMatch::query()
             ->where('open_play_session_id', $session->id)
+            ->where('status', '!=', 'cancelled')
             ->with('participants:id,open_play_match_id,player_id,team')
             ->get();
 
@@ -345,7 +396,7 @@ class OpenPlayRotationService
     /** How many players a court takes in this session's format. */
     public function playersPerMatch(OpenPlaySession $session): int
     {
-        return $session->format === 'singles' ? 2 : 4;
+        return $session->capacity();
     }
 
     /**

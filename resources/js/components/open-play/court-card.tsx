@@ -1,9 +1,10 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Loader2, Shuffle, Trophy } from 'lucide-react';
+import { Ban, Loader2, Shuffle, Trophy, Undo2, UserRoundPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -32,15 +33,19 @@ export function CourtCard({
     post,
     target,
     winByTwo,
+    waiting = [],
 }: {
     match: any;
     base: string;
     post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
     target?: number;
     winByTwo?: boolean;
+    /** The queue, so a player can be swapped in from it before the first point. */
+    waiting?: any[];
 }) {
     const [confirming, setConfirming] = useState(false);
     const [arranging, setArranging] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
 
     const one = match.teams?.one ?? [];
     const two = match.teams?.two ?? [];
@@ -151,17 +156,42 @@ export function CourtCard({
                     </Button>
                 </div>
             ) : (
-                <div className="border-border shrink-0 border-t px-3 py-3">
-                    <Button type="button" variant="outline" size="touch" className="w-full" onClick={finish}>
+                <div className="border-border flex shrink-0 items-center gap-2 border-t px-3 py-3">
+                    <Button type="button" variant="outline" size="touch" className="min-w-0 flex-1" onClick={finish}>
                         <Trophy className="size-4" />
                         {/* Says what will happen: a decided game is recorded, a
                             level one asks. */}
-                        {level ? 'End game early' : `Finish · ${scoreOne > scoreTwo ? 'Team A' : 'Team B'} wins`}
+                        <span className="truncate">{level ? 'End game early' : `Finish · ${scoreOne > scoreTwo ? 'Team A' : 'Team B'} wins`}</span>
+                    </Button>
+
+                    {/* Voiding is not finishing. A game called off never
+                        happened: nobody is credited with it and nobody's streak
+                        moves, which finishing at nil-nil would get wrong. */}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="touch"
+                        className="shrink-0"
+                        aria-label="Cancel this game"
+                        title="Cancel this game"
+                        onClick={() => setCancelling(true)}
+                    >
+                        <Ban className="size-4" />
                     </Button>
                 </div>
             )}
 
-            <ArrangeTeams open={arranging} onOpenChange={setArranging} base={base} match={match} one={one} two={two} />
+            <ArrangeTeams open={arranging} onOpenChange={setArranging} base={base} match={match} one={one} two={two} waiting={waiting} />
+
+            <ConfirmDialog
+                open={cancelling}
+                onOpenChange={setCancelling}
+                title={`Cancel the game on ${match.court}?`}
+                description="It counts for nobody: no game played, no streak, no result. Everyone on the court goes back into the queue behind whoever is already waiting."
+                confirmLabel="Cancel game"
+                variant="destructive"
+                onConfirm={() => post(`${base}/matches/${match.id}/cancel`)}
+            />
         </article>
     );
 }
@@ -327,6 +357,7 @@ function ArrangeTeams({
     match,
     one,
     two,
+    waiting = [],
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -334,8 +365,12 @@ function ArrangeTeams({
     match: any;
     one: any[];
     two: any[];
+    waiting?: any[];
 }) {
     const [teams, setTeams] = useState<Record<number, 'one' | 'two'>>({});
+    /* Keyed by who is on the court, valued by who takes their place. */
+    const [swaps, setSwaps] = useState<Record<number, number>>({});
+    const [swapping, setSwapping] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
 
     /* Reseed each time it opens, so a poll landing underneath does not move
@@ -347,6 +382,8 @@ function ArrangeTeams({
         one.forEach((player: any) => (next[player.id] = 'one'));
         two.forEach((player: any) => (next[player.id] = 'two'));
         setTeams(next);
+        setSwaps({});
+        setSwapping(null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -355,11 +392,16 @@ function ArrangeTeams({
     const onA = Object.values(teams).filter((side) => side === 'one').length;
     const even = onA === perSide;
 
+    /* Nobody can be brought on twice in one go. */
+    const taken = Object.values(swaps);
+    const available = waiting.filter((entry: any) => !taken.includes(entry.player_id));
+    const nameOf = (playerId: number) => waiting.find((entry: any) => entry.player_id === playerId)?.name ?? 'Player';
+
     const save = () => {
         setSaving(true);
         router.post(
             `${base}/matches/${match.id}/teams`,
-            { teams },
+            { teams, swaps },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -374,32 +416,109 @@ function ArrangeTeams({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Arrange {match.court}</DialogTitle>
-                    <DialogDescription>Tap a side to move a player. Both sides have to end up even.</DialogDescription>
+                    <DialogDescription>
+                        Tap a side to move a player, or swap one out for somebody waiting. Both sides have to end up even.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <ul className="space-y-2">
-                    {players.map((player: any) => (
-                        <li key={player.id} className="flex items-center gap-3">
-                            <span className="text-label text-foreground min-w-0 flex-1 truncate font-medium">{player.name}</span>
-                            <div className="border-border bg-surface-muted grid shrink-0 grid-cols-2 gap-1 rounded-lg border p-1">
-                                {(['one', 'two'] as const).map((side) => (
-                                    <button
-                                        key={side}
-                                        type="button"
-                                        aria-pressed={teams[player.id] === side}
-                                        onClick={() => setTeams((current) => ({ ...current, [player.id]: side }))}
+                    {players.map((player: any) => {
+                        const swappedFor = swaps[player.id];
+
+                        return (
+                            <li key={player.id} className="flex items-center gap-2">
+                                <span className="min-w-0 flex-1">
+                                    <span
                                         className={cn(
-                                            'text-meta h-9 w-20 rounded-md font-medium transition-colors',
-                                            teams[player.id] === side ? 'bg-primary text-primary-foreground' : 'text-muted hover:text-foreground',
+                                            'text-label block truncate font-medium',
+                                            swappedFor ? 'text-muted line-through' : 'text-foreground',
                                         )}
                                     >
-                                        {side === 'one' ? 'Team A' : 'Team B'}
-                                    </button>
-                                ))}
-                            </div>
-                        </li>
-                    ))}
+                                        {player.name}
+                                    </span>
+                                    {swappedFor && <span className="text-meta text-primary block truncate">{nameOf(swappedFor)} comes on</span>}
+                                </span>
+
+                                {/* Swapping is only worth offering when there is
+                                    somebody in the queue to swap for. */}
+                                {(available.length > 0 || swappedFor) && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="iconSm"
+                                        className="shrink-0"
+                                        aria-label={swappedFor ? `Undo swapping ${player.name}` : `Swap ${player.name} out`}
+                                        title={swappedFor ? 'Undo this swap' : 'Swap out for somebody waiting'}
+                                        onClick={() => {
+                                            if (swappedFor) {
+                                                setSwaps((current) =>
+                                                    Object.fromEntries(Object.entries(current).filter(([id]) => Number(id) !== player.id)),
+                                                );
+                                                setSwapping(null);
+
+                                                return;
+                                            }
+
+                                            setSwapping(swapping === player.id ? null : player.id);
+                                        }}
+                                    >
+                                        {swappedFor ? <Undo2 className="size-4" /> : <UserRoundPlus className="size-4" />}
+                                    </Button>
+                                )}
+
+                                <div className="border-border bg-surface-muted grid shrink-0 grid-cols-2 gap-1 rounded-lg border p-1">
+                                    {(['one', 'two'] as const).map((side) => (
+                                        <button
+                                            key={side}
+                                            type="button"
+                                            aria-pressed={teams[player.id] === side}
+                                            onClick={() => setTeams((current) => ({ ...current, [player.id]: side }))}
+                                            className={cn(
+                                                'text-meta h-9 w-16 rounded-md font-medium transition-colors',
+                                                teams[player.id] === side ? 'bg-primary text-primary-foreground' : 'text-muted hover:text-foreground',
+                                            )}
+                                        >
+                                            {side === 'one' ? 'Team A' : 'Team B'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </li>
+                        );
+                    })}
                 </ul>
+
+                {/* Who is available, in queue order, so the person picking can
+                    see they are taking somebody out of turn if they are. */}
+                {swapping !== null && (
+                    <div className="border-border max-h-48 overflow-y-auto rounded-lg border">
+                        <p className="border-border bg-surface-muted text-meta text-muted border-b px-3 py-2">Who comes on?</p>
+                        <ul className="divide-border divide-y">
+                            {available.map((entry: any) => (
+                                <li key={entry.player_id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSwaps((current) => ({ ...current, [swapping]: entry.player_id }));
+                                            setSwapping(null);
+                                        }}
+                                        className="hover:bg-surface-muted flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors"
+                                    >
+                                        <span data-numeric className="text-meta text-muted w-5 shrink-0">
+                                            {entry.position}
+                                        </span>
+                                        <span className="text-label text-foreground min-w-0 flex-1 truncate">{entry.name}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {Object.keys(swaps).length > 0 && (
+                    <p className="text-meta text-muted">
+                        Whoever comes off takes the spot in the queue of whoever comes on, so nobody else in the line moves.
+                    </p>
+                )}
 
                 {!even && (
                     <p role="alert" className="text-meta text-danger">

@@ -1,7 +1,9 @@
 import { ActivityFeed, type ActivityEntry } from '@/components/open-play/activity-feed';
 import { RosterPanel, type RosterEntry } from '@/components/open-play/roster-panel';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Trophy, Users } from 'lucide-react';
+import { router } from '@inertiajs/react';
+import { ChevronDown, ChevronsUp, ChevronUp, Trophy, Users } from 'lucide-react';
 import { useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -45,6 +47,17 @@ export function BoardRail({
     className?: string;
 }) {
     const [tab, setTab] = useState<Tab>('players');
+    const [editing, setEditing] = useState(false);
+
+    /*
+     * The stack keeps itself in order; this is for what it cannot know —
+     * somebody who stepped out to their car, or a beginner being moved up so
+     * they are not last all night. Off by default, because the queue is read
+     * far more often than it is edited and a row full of arrows invites
+     * fiddling with an order that is already fair.
+     */
+    const move = (playerId: number, position: number) =>
+        router.post(`${base}/queue/move`, { player_id: playerId, position }, { preserveScroll: true, preserveState: true });
 
     return (
         <aside className={cn('flex min-h-0 flex-col gap-3', className)}>
@@ -70,7 +83,22 @@ export function BoardRail({
             {tab === 'players' && <RosterPanel base={base} roster={roster} step={false} hideHeading className="min-h-0 flex-1" />}
 
             {tab === 'next' && (
-                <Panel icon={Users} title="Up next" empty={waiting.length === 0 ? 'Nobody waiting.' : null}>
+                <Panel
+                    icon={Users}
+                    title="Up next"
+                    empty={waiting.length === 0 ? 'Nobody waiting.' : null}
+                    action={
+                        waiting.length > 1 ? (
+                            <button
+                                type="button"
+                                onClick={() => setEditing((current) => !current)}
+                                className={cn('text-meta font-medium transition-colors', editing ? 'text-primary' : 'text-muted hover:text-foreground')}
+                            >
+                                {editing ? 'Done' : 'Reorder'}
+                            </button>
+                        ) : null
+                    }
+                >
                     <ul className="divide-border min-h-0 flex-1 divide-y overflow-y-auto">
                         {waiting.map((entry, index) => (
                             <li key={entry.player_id} className="flex items-center gap-3 px-4 py-2.5">
@@ -102,6 +130,44 @@ export function BoardRail({
                                         )}
                                     </p>
                                 </div>
+
+                                {editing && (
+                                    <div className="flex shrink-0 items-center gap-1">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="iconSm"
+                                            aria-label={`Move ${entry.name} to the front`}
+                                            title="Move to the front"
+                                            disabled={index === 0}
+                                            onClick={() => move(entry.player_id, 1)}
+                                        >
+                                            <ChevronsUp className="size-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="iconSm"
+                                            aria-label={`Move ${entry.name} up`}
+                                            title="Move up one"
+                                            disabled={index === 0}
+                                            onClick={() => move(entry.player_id, index)}
+                                        >
+                                            <ChevronUp className="size-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="iconSm"
+                                            aria-label={`Move ${entry.name} down`}
+                                            title="Move down one"
+                                            disabled={index === waiting.length - 1}
+                                            onClick={() => move(entry.player_id, index + 2)}
+                                        >
+                                            <ChevronDown className="size-4" />
+                                        </Button>
+                                    </div>
+                                )}
                             </li>
                         ))}
                     </ul>
@@ -159,12 +225,25 @@ function RailTab({ active, count, onClick, children }: { active: boolean; count:
     );
 }
 
-function Panel({ icon: Icon, title, empty, children }: { icon: typeof Users; title: string; empty: string | null; children: React.ReactNode }) {
+function Panel({
+    icon: Icon,
+    title,
+    empty,
+    action,
+    children,
+}: {
+    icon: typeof Users;
+    title: string;
+    empty: string | null;
+    action?: React.ReactNode;
+    children: React.ReactNode;
+}) {
     return (
         <div className="border-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
             <div className="border-border bg-surface-muted flex shrink-0 items-center gap-1.5 border-b px-4 py-2.5">
                 <Icon className="text-muted size-4 shrink-0" aria-hidden />
                 <p className="text-label text-foreground font-semibold">{title}</p>
+                {action && <span className="ml-auto shrink-0">{action}</span>}
             </div>
             {empty ? <p className="text-meta text-muted px-4 py-10 text-center">{empty}</p> : children}
         </div>

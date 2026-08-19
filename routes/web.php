@@ -109,6 +109,10 @@ Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function 
     Route::post('matches/{match}/teams', [PublicOpenPlayBoardController::class, 'arrangeTeams'])->name('open-play.board.teams');
     Route::post('matches/{match}/undo', [PublicOpenPlayBoardController::class, 'undo'])->name('open-play.board.undo');
     Route::post('matches/{match}/finish', [PublicOpenPlayBoardController::class, 'complete'])->name('open-play.board.finish');
+    Route::post('matches/{match}/cancel', [PublicOpenPlayBoardController::class, 'cancelMatch'])->name('open-play.board.cancel');
+    Route::post('rotation', [PublicOpenPlayBoardController::class, 'rotation'])->name('open-play.board.rotation');
+    Route::post('queue/reorder', [PublicOpenPlayBoardController::class, 'reorderQueue'])->name('open-play.board.queue.reorder');
+    Route::post('queue/move', [PublicOpenPlayBoardController::class, 'moveInQueue'])->name('open-play.board.queue.move');
 });
 Route::get('find-tournaments', [PublicTournamentController::class, 'index'])->name('tournaments.discovery');
 Route::post('find-tournaments/{tournamentId}/register', [PublicTournamentController::class, 'register'])->name('tournaments.discovery.register');

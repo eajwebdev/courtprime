@@ -82,4 +82,16 @@ class OpenPlaySession extends Model
     {
         return $this->hasMany(OpenPlayMatch::class);
     }
+
+    /**
+     * Players a court takes in this session's format.
+     *
+     * The one place this is decided. It used to be worked out separately in
+     * PaddleStackService, OpenPlayRotationService and twice in the frontend,
+     * and the frontend copy on the staff page was wrong for singles.
+     */
+    public function capacity(): int
+    {
+        return $this->format === 'singles' ? 2 : 4;
+    }
 }

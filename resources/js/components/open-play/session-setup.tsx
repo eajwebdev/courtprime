@@ -11,10 +11,19 @@ type SessionShape = {
     format: string;
     target_score: number;
     win_by_two: boolean;
+    max_consecutive_games: number | null;
     max_players: number | null;
 };
 
 const TARGETS = [11, 15, 21];
+
+/** Null is unlimited, which is what a club that lets a winning pair stay expects. */
+const STREAK_LIMITS: Array<{ value: number | null; label: string }> = [
+    { value: null, label: 'No limit' },
+    { value: 1, label: '1' },
+    { value: 2, label: '2' },
+    { value: 3, label: '3' },
+];
 
 /**
  * Everything about the session that the people at the court can change.
@@ -47,6 +56,7 @@ export function SessionSetup({
         format: session.format ?? 'doubles',
         target_score: Number(session.target_score ?? 11),
         win_by_two: Boolean(session.win_by_two),
+        max_consecutive_games: session.max_consecutive_games ?? null,
         max_players: session.max_players,
         court_ids: selectedCourtIds,
     });
@@ -181,6 +191,23 @@ export function SessionSetup({
                         <SegmentButton active={!form.data.win_by_two} onClick={() => form.setData('win_by_two', false)}>
                             First to {form.data.target_score}
                         </SegmentButton>
+                    </div>
+                </Field>
+
+                <Field
+                    label="Games in a row"
+                    hint="After this many back to back, a player is first off whenever anyone is waiting."
+                >
+                    <div className="grid grid-cols-4 gap-2">
+                        {STREAK_LIMITS.map((limit) => (
+                            <SegmentButton
+                                key={limit.label}
+                                active={(form.data.max_consecutive_games ?? null) === limit.value}
+                                onClick={() => form.setData('max_consecutive_games', limit.value)}
+                            >
+                                {limit.value === null ? limit.label : <span data-numeric>{limit.label}</span>}
+                            </SegmentButton>
+                        ))}
                     </div>
                 </Field>
 

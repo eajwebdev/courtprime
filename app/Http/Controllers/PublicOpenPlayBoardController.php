@@ -161,6 +161,11 @@ class PublicOpenPlayBoardController extends Controller
                 'started' => $session->status === 'live',
                 'current_round' => $session->current_round,
                 'format' => $session->format,
+                /* The one place the board learns how many a court takes, so it
+                   never has to guess from the format string itself. */
+                'capacity' => $session->capacity(),
+                'auto_rotate' => (bool) $session->auto_rotate,
+                'max_consecutive_games' => $session->max_consecutive_games,
                 'target_score' => (int) $session->target_score,
                 'win_by_two' => (bool) $session->win_by_two,
                 'max_players' => $session->max_players,
@@ -292,12 +297,17 @@ class PublicOpenPlayBoardController extends Controller
     }
 
     /**
-     * Rearrange who is on which team.
+     * Rearrange who is on which team, and swap players in or out.
      *
      * The rotation pairs people automatically, and it is good at it, but a
      * court full of regulars will still want to fix the teams themselves:
      * levelling up a beginner, keeping a pair together, or splitting two who
      * always partner. Auto is the default, not the rule.
+     *
+     * `swaps` exchanges somebody on this court for somebody in the queue. It is
+     * a straight exchange of places — the player coming off takes the spot in
+     * the line the player coming on gave up — so the queue behind them does not
+     * move and nobody gets cuts. See PaddleStackService::exchange().
      *
      * Only allowed before anybody has scored. Moving a player across the net
      * mid game would leave points recorded against a team they were not on.
@@ -315,14 +325,38 @@ class PublicOpenPlayBoardController extends Controller
         $data = $request->validate([
             'teams' => ['required', 'array'],
             'teams.*' => ['required', 'in:one,two'],
+            /* Keyed by the player on court, valued by the waiting player who
+               takes their place. */
+            'swaps' => ['nullable', 'array'],
+            'swaps.*' => ['required', 'integer'],
         ]);
 
         if ($clubMatch->team_one_score > 0 || $clubMatch->team_two_score > 0) {
             return back()->withErrors(['teams' => 'The game has started. Take the points back first.']);
         }
 
+        if ($data['swaps'] ?? []) {
+            $error = $this->applySwaps($request, $session, $match, $data['swaps']);
+
+            if ($error) {
+                return back()->withErrors(['teams' => $error]);
+            }
+
+            $match->refresh();
+        }
+
         $participants = $match->participants()->get();
         $wanted = collect($data['teams']);
+
+        /* A swap replaced somebody, so the sides posted from the board name a
+           player who is no longer on this court. The exchange already put the
+           incoming player on the outgoing player's side, which is the sensible
+           default, so there is nothing left to place. */
+        if ($wanted->keys()->diff($participants->pluck('player_id'))->isNotEmpty() && ($data['swaps'] ?? [])) {
+            $this->log($request, $session, 'open_play.teams_arranged', 'Swapped a player in', $match->court?->name);
+
+            return back()->with('success', 'Court updated.');
+        }
 
         /* Every player on the court has to be placed, and the sides have to
            come out even, or the rotation is handing four people two courts. */
@@ -367,11 +401,173 @@ class PublicOpenPlayBoardController extends Controller
     }
 
     /**
+     * Carry out the swaps posted with an arrange.
+     *
+     * Every id is re-checked against this session rather than trusted: the
+     * board runs on a shared code, so a player id from another club must not be
+     * seatable on this court.
+     *
+     * @param  array<int|string, int>  $swaps
+     * @return string|null An error to show, or null if every swap was made.
+     */
+    private function applySwaps(Request $request, OpenPlaySession $session, OpenPlayMatch $match, array $swaps): ?string
+    {
+        $stack = app(PaddleStackService::class);
+
+        return DB::transaction(function () use ($request, $session, $match, $swaps, $stack) {
+            foreach ($swaps as $outgoingId => $incomingId) {
+                $outgoingId = (int) $outgoingId;
+                $incomingId = (int) $incomingId;
+
+                if ($outgoingId === $incomingId) {
+                    continue;
+                }
+
+                if (! $match->participants()->where('player_id', $outgoingId)->exists()) {
+                    return 'That player is not on this court any more.';
+                }
+
+                $waiting = OpenPlayQueueEntry::query()
+                    ->withoutGlobalScope('organization')
+                    ->where('open_play_session_id', $session->id)
+                    ->where('player_id', $incomingId)
+                    ->whereIn('status', [OpenPlayQueueEntry::WAITING, OpenPlayQueueEntry::UP_NEXT])
+                    ->exists();
+
+                if (! $waiting) {
+                    return 'Whoever comes on has to be in the queue for this session.';
+                }
+
+                if (! $stack->exchange($session, $outgoingId, $incomingId)) {
+                    return 'That swap could not be made. The game may have moved on.';
+                }
+
+                $this->log(
+                    $request,
+                    $session,
+                    'open_play.player_swapped',
+                    'Swapped '.($this->playerName($session, $outgoingId) ?? 'a player').' for '.($this->playerName($session, $incomingId) ?? 'a player'),
+                    $match->court?->name,
+                );
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * Void a match that should never have counted.
+     *
+     * A cancelled game is not a played game: nobody is credited with it, no
+     * streak moves, and the players go back to the queue behind whoever was
+     * already waiting. This is the difference between "we called that one off"
+     * and "that one finished", which finishing a match with no score would
+     * otherwise blur.
+     */
+    public function cancelMatch(
+        Request $request,
+        string $code,
+        OpenPlayMatch $match,
+        OpenPlayService $openPlay,
+        OpenPlayRotationService $rotation,
+    ): RedirectResponse {
+        $session = $this->requireControl($request, $code, $openPlay);
+        $this->clubMatchFor($session, $match);
+
+        $rotation->cancelMatch($match);
+
+        $this->log($request, $session, 'open_play.match_cancelled', 'Cancelled a game', $match->court?->name);
+
+        return back()->with('success', 'Game cancelled. Nobody was credited with it.');
+    }
+
+    /**
+     * Stop and start the automatic rotation.
+     *
+     * Paused, a finished game empties its court back into the queue and no new
+     * match is drawn, so a session can break for food or a club night without
+     * the board dealing people onto courts nobody is standing on.
+     */
+    public function rotation(Request $request, string $code, OpenPlayService $openPlay, OpenPlayRotationService $rotation): RedirectResponse
+    {
+        $session = $this->requireControl($request, $code, $openPlay);
+
+        $data = $request->validate(['auto_rotate' => ['required', 'boolean']]);
+        $on = (bool) $data['auto_rotate'];
+
+        $session->update(['auto_rotate' => $on]);
+
+        if ($on) {
+            /* Resuming deals the waiting queue back out in order. */
+            $rotation->generate($session->refresh());
+        }
+
+        $this->log(
+            $request,
+            $session,
+            $on ? 'open_play.rotation_resumed' : 'open_play.rotation_paused',
+            $on ? 'Resumed the rotation' : 'Paused the rotation',
+        );
+
+        return back()->with('success', $on ? 'Rotation running again.' : 'Rotation paused. Courts finish, nothing new starts.');
+    }
+
+    /**
+     * Put the queue in the order staff says.
+     *
+     * The stack is FIFO and stays FIFO on its own; this exists for the things
+     * it cannot know — somebody who stepped out to their car, a pair who want
+     * to play together, a beginner being moved up so they are not last all
+     * night. Every one of them is logged.
+     */
+    public function reorderQueue(Request $request, string $code, OpenPlayService $openPlay): RedirectResponse
+    {
+        $session = $this->requireControl($request, $code, $openPlay);
+
+        $data = $request->validate([
+            'player_ids' => ['required', 'array', 'min:1'],
+            'player_ids.*' => ['required', 'integer'],
+        ]);
+
+        DB::transaction(fn () => app(PaddleStackService::class)->reorder($session, array_map('intval', $data['player_ids'])));
+
+        $this->log($request, $session, 'open_play.queue_reordered', 'Reordered the queue');
+
+        return back()->with('success', 'Queue updated.');
+    }
+
+    /** Move one player to a given place in the line, shifting everyone else along. */
+    public function moveInQueue(Request $request, string $code, OpenPlayService $openPlay): RedirectResponse
+    {
+        $session = $this->requireControl($request, $code, $openPlay);
+
+        $data = $request->validate([
+            'player_id' => ['required', 'integer'],
+            'position' => ['required', 'integer', 'min:1'],
+        ]);
+
+        DB::transaction(fn () => app(PaddleStackService::class)->moveToPosition($session, (int) $data['player_id'], (int) $data['position']));
+
+        $this->log(
+            $request,
+            $session,
+            'open_play.queue_reordered',
+            'Moved '.($this->playerName($session, (int) $data['player_id']) ?? 'a player').' to #'.$data['position'],
+        );
+
+        return back()->with('success', 'Queue updated.');
+    }
+
+    /**
      * Settle the match and roll the next one on.
      *
      * The winner is whoever the players say, defaulting to whoever is ahead on
      * the scoreboard, so a game called on the court is recorded the same way as
      * one played out to eleven.
+     *
+     * `force_out` and `keep_on` are the staff override of who rotates: the
+     * automatic pick is good, but it cannot know that somebody has to leave at
+     * nine or that a pair asked for one more.
      */
     public function complete(
         Request $request,
@@ -383,7 +579,13 @@ class PublicOpenPlayBoardController extends Controller
         $session = $this->requireControl($request, $code, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
-        $request->validate(['winner' => ['nullable', 'in:one,two']]);
+        $request->validate([
+            'winner' => ['nullable', 'in:one,two'],
+            'force_out' => ['nullable', 'array'],
+            'force_out.*' => ['integer'],
+            'keep_on' => ['nullable', 'array'],
+            'keep_on.*' => ['integer'],
+        ]);
 
         $winner = $request->input('winner') ?: match (true) {
             $clubMatch->team_one_score > $clubMatch->team_two_score => 'one',
@@ -400,7 +602,11 @@ class PublicOpenPlayBoardController extends Controller
             ]);
         });
 
-        $rotation->completeMatch($match);
+        $rotation->completeMatch(
+            $match,
+            array_map('intval', $request->input('force_out', [])),
+            array_map('intval', $request->input('keep_on', [])),
+        );
 
         $won = $winner === 'one' ? $clubMatch->team_one_name : $clubMatch->team_two_name;
 
@@ -465,6 +671,9 @@ class PublicOpenPlayBoardController extends Controller
             'format' => ['required', 'in:singles,doubles'],
             'target_score' => ['required', 'integer', 'min:7', 'max:31'],
             'win_by_two' => ['required', 'boolean'],
+            /* Null is unlimited, which is what a club that lets a winning pair
+               stay on expects. */
+            'max_consecutive_games' => ['nullable', 'integer', 'min:1', 'max:10'],
             'max_players' => ['nullable', 'integer', 'min:4', 'max:200'],
             'court_ids' => ['array'],
             'court_ids.*' => ['integer'],
@@ -502,11 +711,18 @@ class PublicOpenPlayBoardController extends Controller
             $changes[] = $data['format'];
         }
 
+        if ((int) $session->max_consecutive_games !== (int) ($data['max_consecutive_games'] ?? 0)) {
+            $changes[] = $data['max_consecutive_games']
+                ? 'max '.$data['max_consecutive_games'].' games in a row'
+                : 'no limit on games in a row';
+        }
+
         $session->update([
             'name' => $data['name'],
             'format' => $data['format'],
             'target_score' => $data['target_score'],
             'win_by_two' => $data['win_by_two'],
+            'max_consecutive_games' => $data['max_consecutive_games'] ?? null,
             'max_players' => $data['max_players'],
         ]);
 
@@ -591,13 +807,39 @@ class PublicOpenPlayBoardController extends Controller
             ->whereHas('participants', fn ($query) => $query->where('player_id', $player))
             ->exists();
 
-        /* Pulling someone out of a live match would leave three on the court
-           and a result nobody can record. Finish the game first. */
+        $name = $this->playerName($session, $player);
+
+        /*
+         * Somebody walking off a live court is the normal case, not an error:
+         * an ankle goes, a lift arrives. The front of the queue is seated in
+         * their place and the game carries on, because the score belongs to
+         * the team rather than to the seat. Only an empty queue leaves the
+         * court playing a player short.
+         */
         if ($onCourt) {
-            return back()->withErrors(['roster' => 'They are on court. Finish that match first.']);
+            $substitute = null;
+
+            DB::transaction(function () use ($session, $player, &$substitute) {
+                $substitute = app(PaddleStackService::class)->leave($session, $player);
+            });
+
+            $collections->removePlayer($session, $player);
+
+            $replacement = $substitute ? $this->playerName($session, $substitute) : null;
+
+            $this->log(
+                $request,
+                $session,
+                'open_play.player_removed',
+                'Took '.($name ?? 'a player').' off court',
+                $replacement ? $replacement.' came on in their place' : 'Nobody was waiting, so the court is a player short',
+            );
+
+            return back()->with('success', $replacement
+                ? ($name ?? 'Player').' is off. '.$replacement.' came on.'
+                : ($name ?? 'Player').' is off. Nobody was waiting to come on.');
         }
 
-        $name = $this->playerName($session, $player);
         $outcome = $collections->removePlayer($session, $player);
 
         $this->log(

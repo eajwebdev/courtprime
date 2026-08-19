@@ -152,10 +152,15 @@ class OpenPlayService
         });
     }
 
-    /** Take a player out of the stack, from a court or from the queue. */
-    public function leave(OpenPlaySession $session, Player $player): void
+    /**
+     * Take a player out of the stack, from a court or from the queue.
+     *
+     * @return int|null The player id seated in their place, when they were on a
+     *                  court and somebody was waiting to take it.
+     */
+    public function leave(OpenPlaySession $session, Player $player): ?int
     {
-        DB::transaction(fn () => app(PaddleStackService::class)->leave($session, $player->id));
+        return DB::transaction(fn () => app(PaddleStackService::class)->leave($session, $player->id));
     }
 
     public function checkIn(OpenPlaySession $session, Player $player): void

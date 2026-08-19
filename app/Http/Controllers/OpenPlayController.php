@@ -10,10 +10,13 @@ use App\Models\OpenPlayMatch;
 use App\Models\OpenPlaySession;
 use App\Models\OpenPlaySessionCourt;
 use App\Models\Player;
+use App\Services\OpenPlayCollectionService;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\SubscriptionFeatureGate;
 use App\Services\TenantContext;
+use App\Support\OpenPlayBoardAccess;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -70,6 +73,15 @@ class OpenPlayController extends Controller
             /* Kept so an owner can still override the automatic rotation. */
             'recommendedGroup' => $session ? $openPlay->recommendGroup($session, mode: 'skill_based') : [],
             'branches' => Branch::query()->with('courts:id,branch_id,name,court_number')->orderBy('name')->get(),
+            /* Who, if anyone, is holding the board, so the office can sign it
+               out when the tablet has gone home in somebody's bag. */
+            'board' => $session ? [
+                'held' => (bool) $session->organizer_token,
+                'since' => $session->organizer_claimed_at?->toIso8601String(),
+                'last_seen' => $session->organizer_last_seen_at?->toIso8601String(),
+                'quiet' => OpenPlayBoardAccess::hasGoneQuiet($session),
+            ] : null,
+            'collections' => $session ? app(OpenPlayCollectionService::class)->sheet($session) : null,
             'players' => Player::query()->orderByDesc('rating')->get(),
         ]);
     }
@@ -132,6 +144,28 @@ class OpenPlayController extends Controller
         $rotation->generate($session);
 
         return back()->with('success', "Session created. Share ID {$session->session_code} and key {$session->session_key}.");
+    }
+
+    /**
+     * Sign the board out from the office.
+     *
+     * A board is held by one device, and it is handed back by whoever is
+     * holding it. Players go home without doing that: the tablet gets put in a
+     * drawer, or the phone that opened it walks out of the building. This is
+     * how staff take the hold back so the next person can use the same ID and
+     * key.
+     */
+    public function releaseBoard(OpenPlaySession $session): RedirectResponse
+    {
+        $this->authorize('update', $session);
+
+        $session->update([
+            'organizer_token' => null,
+            'organizer_claimed_at' => null,
+            'organizer_last_seen_at' => null,
+        ]);
+
+        return back()->with('success', 'Board signed out. Anyone with the ID and key can open it now.');
     }
 
     /** Staff adding a walk-in who has no phone on them. */

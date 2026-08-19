@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SessionCreateDialog } from '@/components/open-play/session-create-dialog';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { currency, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Check, Copy, MonitorPlay, Plus, RotateCw } from 'lucide-react';
+import { Check, Copy, LogOut, MonitorPlay, Plus, RotateCw } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payloads come from OpenPlayController. */
@@ -16,6 +17,8 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Open Play', href: '/open-play' 
 type Props = {
     sessions: any;
     activeSession: any;
+    board: { held: boolean; since: string | null; last_seen: string | null; quiet: boolean } | null;
+    collections: any;
     sessionCourts: any[];
     liveMatches: any[];
     waiting: any[];
@@ -31,7 +34,16 @@ type Props = {
  * this page for, reading out the ID and seeing who is waiting, need no
  * scrolling at all.
  */
-export default function OpenPlay({ sessions, activeSession, sessionCourts = [], liveMatches = [], waiting = [], branches }: Props) {
+export default function OpenPlay({
+    sessions,
+    activeSession,
+    board,
+    collections,
+    sessionCourts = [],
+    liveMatches = [],
+    waiting = [],
+    branches,
+}: Props) {
     const [copied, setCopied] = useState(false);
     const [creating, setCreating] = useState(false);
 
@@ -88,7 +100,7 @@ export default function OpenPlay({ sessions, activeSession, sessionCourts = [], 
                                             </p>
                                         </div>
                                         <p className="text-meta mt-2 truncate text-white/55">
-                                            {activeSession.name} · {activeSession.branch?.name} · round{' '}
+                                            {activeSession.name} · {activeSession.branch?.name} · {activeSession.format ?? 'doubles'} · round{' '}
                                             <span data-numeric>{activeSession.current_round ?? 0}</span>
                                         </p>
                                     </div>
@@ -107,11 +119,42 @@ export default function OpenPlay({ sessions, activeSession, sessionCourts = [], 
                                     </div>
                                 </div>
 
-                                <dl className="mt-4 grid max-w-md grid-cols-3 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10">
+                                <dl className="mt-4 grid max-w-2xl grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 sm:grid-cols-4">
                                     <Metric label="Courts" value={sessionCourts.length} />
-                                    <Metric label="On court" value={liveMatches.length * 4} />
+                                    <Metric label="On court" value={liveMatches.length * (activeSession.format === 'singles' ? 2 : 4)} />
                                     <Metric label="Waiting" value={waiting.length} />
+                                    <Metric label="To collect" value={currency(collections?.outstanding ?? 0)} />
                                 </dl>
+
+                                {/* The board is held by one device. When that device
+                                    goes home in somebody's bag, this is how the desk
+                                    gets it back. */}
+                                <div className="mt-3 flex flex-wrap items-center gap-3">
+                                    <p className="text-meta text-white/55">
+                                        {board?.held
+                                            ? board.quiet
+                                                ? 'A device holds the board but has gone quiet.'
+                                                : 'A device is running the board now.'
+                                            : 'Nobody is holding the board.'}
+                                    </p>
+                                    {board?.held && (
+                                        <ConfirmDialog
+                                            trigger={
+                                                <Button type="button" variant="onDeep" size="sm">
+                                                    <LogOut className="size-4" />
+                                                    Sign out that device
+                                                </Button>
+                                            }
+                                            title="Sign the board out?"
+                                            description="Whoever is holding it loses control immediately. Anyone with the session ID and key can then open it."
+                                            confirmLabel="Sign out"
+                                            variant="destructive"
+                                            onConfirm={() =>
+                                                router.post(`/open-play/${activeSession.id}/release-board`, {}, { preserveScroll: true })
+                                            }
+                                        />
+                                    )}
+                                </div>
                             </section>
 
                             <section>

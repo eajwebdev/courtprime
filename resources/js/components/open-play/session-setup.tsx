@@ -8,6 +8,7 @@ export type BoardCourt = { id: number; name: string; status?: string | null };
 
 type SessionShape = {
     name: string;
+    format: string;
     target_score: number;
     win_by_two: boolean;
     max_players: number | null;
@@ -43,6 +44,7 @@ export function SessionSetup({
 }) {
     const form = useForm({
         name: session.name ?? '',
+        format: session.format ?? 'doubles',
         target_score: Number(session.target_score ?? 11),
         win_by_two: Boolean(session.win_by_two),
         max_players: session.max_players,
@@ -127,6 +129,17 @@ export function SessionSetup({
             </Column>
 
             <Column step="Step 2 of 3" title="Match settings" done>
+                <Field label="Format" hint={form.data.format === 'singles' ? 'Two on a court, one each side.' : 'Four on a court, two each side.'}>
+                    <div className="grid grid-cols-2 gap-2">
+                        <SegmentButton active={form.data.format === 'doubles'} onClick={() => form.setData('format', 'doubles')}>
+                            Doubles
+                        </SegmentButton>
+                        <SegmentButton active={form.data.format === 'singles'} onClick={() => form.setData('format', 'singles')}>
+                            Singles
+                        </SegmentButton>
+                    </div>
+                </Field>
+
                 <Field label="Games to" hint="Applies to every match this session creates from now on.">
                     <div className="grid grid-cols-4 gap-2">
                         {TARGETS.map((target) => (

@@ -21,6 +21,7 @@ class OpenPlaySessionStoreRequest extends FormRequest
     {
         return [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'format' => ['nullable', 'in:singles,doubles'],
             'name' => ['required', 'string', 'max:255'],
             'session_code' => ['nullable', 'string', 'max:32', 'regex:/^[A-Za-z0-9-]+$/'],
             'court_ids' => ['required', 'array', 'min:1'],

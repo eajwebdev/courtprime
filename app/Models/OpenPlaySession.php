@@ -23,6 +23,7 @@ class OpenPlaySession extends Model
         'organizer_last_seen_at',
         'current_round',
         'auto_rotate',
+        'format',
         'target_score',
         'win_by_two',
         'session_date',

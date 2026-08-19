@@ -69,7 +69,10 @@ class OpenPlayRotationService
 
             $available = $this->availablePlayers($session);
 
-            if ($available->count() < 4) {
+            /* Two for singles, four for doubles. */
+            $perMatch = $this->playersPerMatch($session);
+
+            if ($available->count() < $perMatch) {
                 return collect();
             }
 
@@ -78,14 +81,14 @@ class OpenPlayRotationService
             $created = collect();
 
             foreach ($freeCourts as $court) {
-                if ($available->count() < 4) {
+                if ($available->count() < $perMatch) {
                     break;
                 }
 
-                $four = $this->pickFour($available, $history);
-                $available = $available->reject(fn (array $entry) => in_array($entry['player_id'], $four->pluck('player_id')->all(), true))->values();
+                $group = $this->pickGroup($available, $history, $perMatch);
+                $available = $available->reject(fn (array $entry) => in_array($entry['player_id'], $group->pluck('player_id')->all(), true))->values();
 
-                $created->push($this->createMatch($session, $court, $four, $history, $round));
+                $created->push($this->createMatch($session, $court, $group, $history, $round));
             }
 
             if ($created->isNotEmpty()) {
@@ -284,8 +287,25 @@ class OpenPlayRotationService
      * @param  array{partners: array<string,int>, opponents: array<string,int>}  $history
      * @return Collection<int, array{player_id:int, rating:float, games:int, last_round:int, position:int}>
      */
-    private function pickFour(Collection $available, array $history): Collection
+    /** How many players a court takes in this session's format. */
+    public function playersPerMatch(OpenPlaySession $session): int
     {
+        return $session->format === 'singles' ? 2 : 4;
+    }
+
+    /**
+     * The players for one court.
+     *
+     * Singles needs no pairing search, the two at the front of the queue play
+     * each other, so the variety scoring only runs for doubles where there is
+     * an actual choice of partners.
+     */
+    private function pickGroup(Collection $available, array $history, int $size): Collection
+    {
+        if ($size < 4) {
+            return $available->take($size)->values();
+        }
+
         $core = $available->take(3);
 
         /* Only players tied on games with the next in line are eligible to be
@@ -331,7 +351,11 @@ class OpenPlayRotationService
         $players = $quartet->values()->all();
 
         if (count($players) < 4) {
-            return ['score' => 0.0, 'one' => array_slice($players, 0, 2), 'two' => array_slice($players, 2)];
+            /* Split down the middle. Slicing at two put both singles players on
+               the same side and left the other side empty. */
+            $half = max(1, intdiv(count($players), 2));
+
+            return ['score' => 0.0, 'one' => array_slice($players, 0, $half), 'two' => array_slice($players, $half)];
         }
 
         [$a, $b, $c, $d] = $players;
@@ -367,6 +391,11 @@ class OpenPlayRotationService
         $score = 0.0;
 
         foreach ([$one, $two] as $team) {
+            /* Singles has no partner to have played with before. */
+            if (count($team) < 2) {
+                continue;
+            }
+
             $key = $this->pairKey($team[0]['player_id'], $team[1]['player_id']);
             $score += self::PARTNER_PENALTY * ($history['partners'][$key] ?? 0);
         }
@@ -380,8 +409,8 @@ class OpenPlayRotationService
 
         /* Rule 7. Only bites when ratings actually differ, so an unrated club
            is scored purely on partner and opponent variety. */
-        $oneRating = $one[0]['rating'] + $one[1]['rating'];
-        $twoRating = $two[0]['rating'] + $two[1]['rating'];
+        $oneRating = array_sum(array_column($one, 'rating'));
+        $twoRating = array_sum(array_column($two, 'rating'));
         $score += self::IMBALANCE_PENALTY * abs($oneRating - $twoRating);
 
         return $score;
@@ -411,7 +440,7 @@ class OpenPlayRotationService
             'organization_id' => $session->organization_id,
             'branch_id' => $session->branch_id,
             'court_id' => $court->id,
-            'match_type' => 'doubles',
+            'match_type' => $session->format === 'singles' ? 'singles' : 'doubles',
             /* The session decides what a win is, not the column default. */
             'target_score' => $session->target_score,
             'win_by_two' => $session->win_by_two,
@@ -465,6 +494,11 @@ class OpenPlayRotationService
     private function recordHistory(array &$history, array $pairing): void
     {
         foreach ([$pairing['one'], $pairing['two']] as $team) {
+            /* Singles has no partners to remember. */
+            if (count($team) < 2) {
+                continue;
+            }
+
             $key = $this->pairKey($team[0]['player_id'], $team[1]['player_id']);
             $history['partners'][$key] = ($history['partners'][$key] ?? 0) + 1;
         }

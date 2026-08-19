@@ -28,6 +28,7 @@ export function SessionCreateDialog({ open, onOpenChange, branches }: { open: bo
     const form = useForm({
         branch_id: branches[0]?.id ?? '',
         name: 'Open Play',
+        format: 'doubles',
         session_code: '',
         court_ids: [] as number[],
         session_date: today(),
@@ -86,6 +87,18 @@ export function SessionCreateDialog({ open, onOpenChange, branches }: { open: bo
                                         {entry.name}
                                     </option>
                                 ))}
+                            </select>
+                        </Field>
+
+                        <Field label="Format" htmlFor="format" className="sm:col-span-2">
+                            <select
+                                id="format"
+                                className="border-border bg-surface text-foreground text-body h-10 w-full rounded-md border px-3"
+                                value={form.data.format}
+                                onChange={(event) => form.setData('format', event.target.value)}
+                            >
+                                <option value="doubles">Doubles · four on a court</option>
+                                <option value="singles">Singles · two on a court</option>
                             </select>
                         </Field>
 

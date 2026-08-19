@@ -8,10 +8,10 @@ use App\Models\ClubMatch;
 use App\Models\Court;
 use App\Models\OpenPlayMatch;
 use App\Models\OpenPlayPlayer;
-use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
 use App\Models\Player;
 use App\Services\MatchScoringService;
+use App\Services\OpenPlayCollectionService;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
@@ -158,6 +158,8 @@ class PublicOpenPlayBoardController extends Controller
                 'status' => $session->status,
                 'started' => $session->status === 'live',
                 'current_round' => $session->current_round,
+                'format' => $session->format,
+                'entry_fee' => $session->entry_fee,
                 'target_score' => (int) $session->target_score,
                 'win_by_two' => (bool) $session->win_by_two,
                 'max_players' => $session->max_players,
@@ -179,6 +181,8 @@ class PublicOpenPlayBoardController extends Controller
             'waiting' => $this->waiting($session),
             'results' => $this->results($session),
             'activity' => $this->activity($session),
+            /* What the club is owed, and by whom. */
+            'collections' => app(OpenPlayCollectionService::class)->sheet($session),
         ]);
     }
 
@@ -319,11 +323,13 @@ class PublicOpenPlayBoardController extends Controller
 
         /* The same two conditions the button shows, re-checked here: the
            checklist is a convenience, this is the rule. */
-        if ($courts < 1 || $players < 4) {
+        $needed = $rotation->playersPerMatch($session);
+
+        if ($courts < 1 || $players < $needed) {
             return back()->withErrors([
                 'start' => $courts < 1
                     ? 'Pick at least one court before starting.'
-                    : 'Four players are needed for the first match.',
+                    : $needed.' players are needed for the first match.',
             ]);
         }
 
@@ -342,6 +348,7 @@ class PublicOpenPlayBoardController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
+            'format' => ['required', 'in:singles,doubles'],
             'target_score' => ['required', 'integer', 'min:7', 'max:31'],
             'win_by_two' => ['required', 'boolean'],
             'max_players' => ['nullable', 'integer', 'min:4', 'max:200'],
@@ -377,8 +384,13 @@ class PublicOpenPlayBoardController extends Controller
             $changes[] = count($courtIds).' '.(count($courtIds) === 1 ? 'court' : 'courts').' in play';
         }
 
+        if ($session->format !== $data['format']) {
+            $changes[] = $data['format'];
+        }
+
         $session->update([
             'name' => $data['name'],
+            'format' => $data['format'],
             'target_score' => $data['target_score'],
             'win_by_two' => $data['win_by_two'],
             'max_players' => $data['max_players'],
@@ -442,9 +454,20 @@ class PublicOpenPlayBoardController extends Controller
         ]);
     }
 
-    /** Take someone out, for a typo or for somebody who went home. */
-    public function removePlayer(Request $request, string $code, int $player, OpenPlayService $openPlay): RedirectResponse
-    {
+    /**
+     * Take someone out, for a typo or for somebody who went home.
+     *
+     * Whether the row survives depends on whether they played. See
+     * OpenPlayCollectionService: a player with a game behind them stays on the
+     * sheet as gone, because the club is still owed their entry.
+     */
+    public function removePlayer(
+        Request $request,
+        string $code,
+        int $player,
+        OpenPlayService $openPlay,
+        OpenPlayCollectionService $collections,
+    ): RedirectResponse {
         $session = $this->requireControl($request, $code, $openPlay);
 
         $onCourt = OpenPlayMatch::query()
@@ -460,28 +483,49 @@ class PublicOpenPlayBoardController extends Controller
             return back()->withErrors(['roster' => 'They are on court. Finish that match first.']);
         }
 
-        $name = OpenPlayPlayer::query()
+        $name = $this->playerName($session, $player);
+        $outcome = $collections->removePlayer($session, $player);
+
+        $this->log(
+            $request,
+            $session,
+            'open_play.player_removed',
+            'Removed '.($name ?? 'a player'),
+            $outcome === 'left' ? 'Played already, so their entry stays on the sheet' : null,
+        );
+
+        return back()->with('success', $outcome === 'left'
+            ? ($name ?? 'Player').' marked as gone. Their entry is still owed.'
+            : ($name ?? 'Player').' removed.');
+    }
+
+    /** Take entry money at the court. */
+    public function settle(
+        Request $request,
+        string $code,
+        int $player,
+        OpenPlayService $openPlay,
+        OpenPlayCollectionService $collections,
+    ): RedirectResponse {
+        $session = $this->requireControl($request, $code, $openPlay);
+
+        $data = $request->validate(['amount' => ['nullable', 'numeric', 'min:0', 'max:100000']]);
+
+        $collections->settle($session, $player, isset($data['amount']) ? (float) $data['amount'] : null);
+
+        $this->log($request, $session, 'open_play.payment_taken', 'Took payment from '.($this->playerName($session, $player) ?? 'a player'));
+
+        return back()->with('success', 'Payment recorded.');
+    }
+
+    private function playerName(OpenPlaySession $session, int $playerId): ?string
+    {
+        return OpenPlayPlayer::query()
             ->withoutGlobalScope('organization')
             ->where('open_play_session_id', $session->id)
-            ->where('player_id', $player)
+            ->where('player_id', $playerId)
             ->with('player:id,name')
             ->first()?->player?->name;
-
-        OpenPlayQueueEntry::query()
-            ->withoutGlobalScope('organization')
-            ->where('open_play_session_id', $session->id)
-            ->where('player_id', $player)
-            ->delete();
-
-        OpenPlayPlayer::query()
-            ->withoutGlobalScope('organization')
-            ->where('open_play_session_id', $session->id)
-            ->where('player_id', $player)
-            ->delete();
-
-        $this->log($request, $session, 'open_play.player_removed', 'Removed '.($name ?? 'a player'));
-
-        return back()->with('success', ($name ?? 'Player').' removed.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -497,6 +541,9 @@ class PublicOpenPlayBoardController extends Controller
 
         return $session->players()
             ->withoutGlobalScope('organization')
+            /* People who have gone home are off the roster but still on the
+               collection sheet, which is where they are settled up. */
+            ->where('status', '!=', 'left')
             ->with('player:id,name,skill_level')
             ->get()
             ->map(fn (OpenPlayPlayer $entry) => [

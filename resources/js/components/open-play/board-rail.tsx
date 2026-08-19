@@ -1,4 +1,5 @@
 import { ActivityFeed, type ActivityEntry } from '@/components/open-play/activity-feed';
+import { CollectionsPanel, type CollectionSheet } from '@/components/open-play/collections-panel';
 import { RosterPanel, type RosterEntry } from '@/components/open-play/roster-panel';
 import { cn } from '@/lib/utils';
 import { Trophy, Users } from 'lucide-react';
@@ -6,7 +7,7 @@ import { useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
 
-type Tab = 'players' | 'next' | 'standings' | 'history';
+type Tab = 'players' | 'next' | 'money' | 'standings' | 'history';
 
 /**
  * The side of a running board.
@@ -23,6 +24,7 @@ export function BoardRail({
     waiting,
     results,
     activity,
+    collections,
     needed,
     className,
 }: {
@@ -31,6 +33,7 @@ export function BoardRail({
     waiting: any[];
     results: any[];
     activity: ActivityEntry[];
+    collections: CollectionSheet;
     needed: number;
     className?: string;
 }) {
@@ -41,13 +44,16 @@ export function BoardRail({
             <div
                 role="tablist"
                 aria-label="Board panels"
-                className="border-border bg-surface-muted grid shrink-0 grid-cols-4 gap-1 rounded-xl border p-1"
+                className="border-border bg-surface-muted grid shrink-0 grid-cols-5 gap-1 rounded-xl border p-1"
             >
                 <RailTab active={tab === 'players'} count={roster.length} onClick={() => setTab('players')}>
                     Players
                 </RailTab>
                 <RailTab active={tab === 'next'} count={waiting.length} onClick={() => setTab('next')}>
                     Up next
+                </RailTab>
+                <RailTab active={tab === 'money'} count={collections.unpaid} onClick={() => setTab('money')}>
+                    Money
                 </RailTab>
                 <RailTab active={tab === 'standings'} count={results.length} onClick={() => setTab('standings')}>
                     Table
@@ -85,6 +91,8 @@ export function BoardRail({
                     </ul>
                 </Panel>
             )}
+
+            {tab === 'money' && <CollectionsPanel base={base} sheet={collections} />}
 
             {tab === 'standings' && (
                 <Panel icon={Trophy} title="Standings" empty={results.length === 0 ? 'No results yet.' : null}>

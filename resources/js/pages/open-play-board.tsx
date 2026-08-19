@@ -3,6 +3,7 @@ import { FlashToast } from '@/components/flash-toast';
 import { ActivityFeed, type ActivityEntry } from '@/components/open-play/activity-feed';
 import { BoardHeader } from '@/components/open-play/board-header';
 import { BoardRail } from '@/components/open-play/board-rail';
+import { type CollectionSheet } from '@/components/open-play/collections-panel';
 import { CourtCard } from '@/components/open-play/court-card';
 import { RosterPanel, type RosterEntry } from '@/components/open-play/roster-panel';
 import { SessionSetup, type BoardCourt } from '@/components/open-play/session-setup';
@@ -25,6 +26,7 @@ type Props = {
     waiting: any[];
     results: any[];
     activity: ActivityEntry[];
+    collections: CollectionSheet;
 };
 
 /**
@@ -43,7 +45,19 @@ type Props = {
  * 48px, and the layout gets wider rather than taller as the screen grows, so a
  * tablet in landscape shows the whole session without scrolling.
  */
-export default function OpenPlayBoard({ session, inControl, you, courts, branchCourts, roster, liveMatches, waiting, results, activity }: Props) {
+export default function OpenPlayBoard({
+    session,
+    inControl,
+    you,
+    courts,
+    branchCourts,
+    roster,
+    liveMatches,
+    waiting,
+    results,
+    activity,
+    collections,
+}: Props) {
     const [showActivity, setShowActivity] = useState(false);
     const [confirmRelease, setConfirmRelease] = useState(false);
     const { errors } = usePage().props as any;
@@ -60,7 +74,7 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
             /* A partial reload: `reload` already preserves component state and
                scroll, so a refresh landing while someone is half way through
                typing a name leaves what they have typed alone. */
-            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session', 'roster', 'activity'] });
+            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session', 'roster', 'activity', 'collections'] });
         }, 8000);
 
         return () => window.clearInterval(timer);
@@ -114,6 +128,7 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
                         waiting={waiting}
                         results={results}
                         activity={activity}
+                        collections={collections}
                         post={post}
                     />
                 ) : (
@@ -133,7 +148,16 @@ export default function OpenPlayBoard({ session, inControl, you, courts, branchC
                 )}
             </main>
 
-            {!started && <StartBar base={base} courts={courts.length} players={roster.length} error={errors?.start} />}
+            {!started && (
+                <StartBar
+                    base={base}
+                    courts={courts.length}
+                    players={roster.length}
+                    /* Singles needs two on a court, doubles four. */
+                    needed={session.format === 'singles' ? 2 : 4}
+                    error={errors?.start}
+                />
+            )}
 
             <ActivityPanel open={showActivity} onClose={() => setShowActivity(false)} entries={activity} />
 
@@ -164,6 +188,7 @@ function LiveBoard({
     waiting,
     results,
     activity,
+    collections,
     post,
 }: {
     base: string;
@@ -174,11 +199,13 @@ function LiveBoard({
     waiting: any[];
     results: any[];
     activity: ActivityEntry[];
+    collections: CollectionSheet;
     post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
 }) {
     const busy = liveMatches.map((match) => match.court);
     const idle = courts.filter((court) => !busy.includes(court.name));
-    const needed = Math.max(0, 4 - waiting.length);
+    const perMatch = session.format === 'singles' ? 2 : 4;
+    const needed = Math.max(0, perMatch - waiting.length);
 
     /*
      * The grid follows the number of courts rather than the breakpoint. A club
@@ -200,6 +227,7 @@ function LiveBoard({
                             {session.current_round}
                         </span>
                     </span>
+                    <span className="capitalize">{session.format ?? 'doubles'}</span>
                     <span>
                         Games to{' '}
                         <span data-numeric className="text-foreground font-semibold">
@@ -240,7 +268,15 @@ function LiveBoard({
                 </div>
             </div>
 
-            <BoardRail base={base} roster={roster} waiting={waiting} results={results} activity={activity} needed={needed} />
+            <BoardRail
+                base={base}
+                roster={roster}
+                waiting={waiting}
+                results={results}
+                activity={activity}
+                collections={collections}
+                needed={needed}
+            />
         </div>
     );
 }
@@ -252,9 +288,9 @@ function LiveBoard({
  * the list of names, not at the top of the page, and the answer to "why can't I
  * start" has to be where their eyes already are.
  */
-function StartBar({ base, courts, players, error }: { base: string; courts: number; players: number; error?: string }) {
+function StartBar({ base, courts, players, needed, error }: { base: string; courts: number; players: number; needed: number; error?: string }) {
     const [starting, setStarting] = useState(false);
-    const ready = courts >= 1 && players >= 4;
+    const ready = courts >= 1 && players >= needed;
 
     const start = () => {
         setStarting(true);
@@ -266,7 +302,7 @@ function StartBar({ base, courts, players, error }: { base: string; courts: numb
             <div className="mx-auto flex w-full max-w-[120rem] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
                 <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     <Requirement met={courts >= 1} label={courts === 1 ? '1 court' : `${courts} courts`} />
-                    <Requirement met={players >= 4} label={`${players}/4 players`} />
+                    <Requirement met={players >= needed} label={`${players}/${needed} players`} />
                 </ul>
 
                 <div className="flex items-center gap-3">

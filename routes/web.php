@@ -96,6 +96,7 @@ Route::prefix('open-play/{code}')->middleware('throttle:120,1')->group(function 
     Route::post('settings', [PublicOpenPlayBoardController::class, 'settings'])->name('open-play.board.settings');
     Route::post('start', [PublicOpenPlayBoardController::class, 'start'])->name('open-play.board.start');
     Route::post('release', [PublicOpenPlayBoardController::class, 'release'])->name('open-play.board.release');
+    Route::post('players/{player}/settle', [PublicOpenPlayBoardController::class, 'settle'])->name('open-play.board.players.settle');
     Route::post('matches/{match}/score', [PublicOpenPlayBoardController::class, 'score'])->name('open-play.board.score');
     Route::post('matches/{match}/undo', [PublicOpenPlayBoardController::class, 'undo'])->name('open-play.board.undo');
     Route::post('matches/{match}/finish', [PublicOpenPlayBoardController::class, 'complete'])->name('open-play.board.finish');
@@ -171,6 +172,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('open-play', [OpenPlayController::class, 'index'])->name('open-play.index');
     Route::post('open-play', [OpenPlayController::class, 'store'])->name('open-play.store');
     Route::post('open-play/{session}/groups', [OpenPlayController::class, 'group'])->name('open-play.groups.store');
+    Route::post('open-play/{session}/release-board', [OpenPlayController::class, 'releaseBoard'])->name('open-play.release-board');
     Route::post('open-play/{session}/players/{player}', [OpenPlayController::class, 'join'])->name('open-play.join');
     Route::post('open-play/{session}/players/{player}/check-in', [OpenPlayController::class, 'checkIn'])->name('open-play.check-in');
     Route::post('open-play/{session}/matches/{match}/complete', [OpenPlayController::class, 'completeMatch'])->name('open-play.matches.complete');

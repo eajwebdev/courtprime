@@ -15,6 +15,8 @@ class OpenPlayPlayer extends Model
         'open_play_session_id',
         'player_id',
         'status',
+        'amount_paid',
+        'paid_at',
         'checked_in_at',
         'withdrawn_at',
     ];
@@ -23,6 +25,8 @@ class OpenPlayPlayer extends Model
     {
         return [
             'checked_in_at' => 'datetime',
+            'paid_at' => 'datetime',
+            'amount_paid' => 'decimal:2',
             'withdrawn_at' => 'datetime',
         ];
     }

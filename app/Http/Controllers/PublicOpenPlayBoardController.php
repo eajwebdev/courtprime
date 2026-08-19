@@ -255,7 +255,10 @@ class PublicOpenPlayBoardController extends Controller
     {
         $session = $this->requireGrant($request, $code, $openPlay);
 
-        OpenPlaySessionLog::record($request, $session, 'open_play.board_released', 'Released the board');
+        OpenPlaySessionLog::record($request, $session, 'open_play.board_released', 'Left the board');
+        /* Leaving means leaving: the courts this device was scoring go back
+           too, rather than staying locked against the people still here. */
+        OpenPlayCourtAccess::releaseAll($request, $session);
         OpenPlayBoardAccess::release($request, $session);
 
         return to_route('open-play.gate')->with('success', 'Board released. Anyone with the ID and key can take it now.');
@@ -328,6 +331,8 @@ class PublicOpenPlayBoardController extends Controller
             'roster' => $this->roster($session),
             'liveMatches' => $this->liveMatches($session),
             'waiting' => $this->waiting($session),
+            /* Who is next, and which two are on each side when they go on. */
+            'upNext' => $this->upNext($session, $rotation),
             'results' => $this->results($session),
             'activity' => $this->activity($session),
         ]);
@@ -1299,6 +1304,47 @@ class PublicOpenPlayBoardController extends Controller
                     ->all(),
             ])
             ->all();
+    }
+
+    /**
+     * The next match, as it would be drawn right now.
+     *
+     * A queue of names answers "when am I on" but not "who with", which in
+     * doubles is half the question. This pairs the front of the queue the way
+     * the real draw would and hands the board both sides, so the four people
+     * about to play can see the teams before they walk on.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function upNext(OpenPlaySession $session, OpenPlayRotationService $rotation): ?array
+    {
+        $stack = app(PaddleStackService::class);
+        $capacity = $stack->capacity($session);
+        $ids = $stack->upNext($session);
+
+        if ($ids === []) {
+            return null;
+        }
+
+        $names = Player::query()
+            ->withoutGlobalScope('organization')
+            ->whereIn('id', $ids)
+            ->pluck('name', 'id');
+
+        $named = fn (array $players) => array_values(array_map(
+            fn (int $id) => ['id' => $id, 'name' => (string) ($names[$id] ?? 'Player')],
+            $players,
+        ));
+
+        $pairing = $rotation->previewPairing($session, $ids);
+
+        return [
+            'ready' => $pairing !== null,
+            /* How many more are needed before these four can go on. */
+            'needed' => max(0, $capacity - count($ids)),
+            'teams' => $pairing ? ['one' => $named($pairing['one']), 'two' => $named($pairing['two'])] : null,
+            'players' => $named($ids),
+        ];
     }
 
     /** @return array<int, array<string, mixed>> */

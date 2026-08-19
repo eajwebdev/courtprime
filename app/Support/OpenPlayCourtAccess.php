@@ -145,12 +145,55 @@ final class OpenPlayCourtAccess
             ->update(['last_seen_at' => now()]);
     }
 
-    /** Hand back every court this browser holds, for signing out. */
+    /** Hand back every court this browser holds in one session. */
     public static function releaseAll(Request $request, OpenPlaySession $session): void
     {
         foreach (self::rows($session) as $hold) {
             self::release($request, $session, (int) $hold->court_id);
         }
+    }
+
+    /**
+     * Hand back every court this browser holds anywhere, for signing out.
+     *
+     * The proof of a hold lives in the server session, and logging out throws
+     * that away — so without this the court stays flagged as being scored by a
+     * token that no longer exists. It reads as taken on everybody else's board
+     * and cannot be picked up until the stale window runs out, which is ten
+     * minutes of nobody being able to score a court whose scorer went home.
+     *
+     * Walks the session's own keys rather than the database, because the
+     * question being answered is "what was this browser holding", and the
+     * session is the only thing that knows.
+     */
+    public static function releaseEverything(Request $request): void
+    {
+        $held = $request->session()->get(self::PREFIX);
+
+        if (! is_array($held)) {
+            return;
+        }
+
+        foreach ($held as $sessionId => $courts) {
+            if (! is_array($courts)) {
+                continue;
+            }
+
+            foreach ($courts as $courtId => $token) {
+                if (! is_string($token)) {
+                    continue;
+                }
+
+                OpenPlayCourtHold::query()
+                    ->withoutGlobalScope('organization')
+                    ->where('open_play_session_id', (int) $sessionId)
+                    ->where('court_id', (int) $courtId)
+                    ->where('token_hash', hash('sha256', $token))
+                    ->delete();
+            }
+        }
+
+        $request->session()->forget(self::PREFIX);
     }
 
     /** @return Collection<int, OpenPlayCourtHold> */

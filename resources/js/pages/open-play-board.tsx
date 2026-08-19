@@ -25,6 +25,7 @@ type Props = {
     roster: RosterEntry[];
     liveMatches: any[];
     waiting: any[];
+    upNext: { ready: boolean; needed: number; teams: { one: any[]; two: any[] } | null; players: any[] } | null;
     results: any[];
     activity: ActivityEntry[];
 };
@@ -55,6 +56,7 @@ export default function OpenPlayBoard({
     roster,
     liveMatches,
     waiting,
+    upNext = null,
     results,
     activity,
 }: Props) {
@@ -74,7 +76,9 @@ export default function OpenPlayBoard({
             /* A partial reload: `reload` already preserves component state and
                scroll, so a refresh landing while someone is half way through
                typing a name leaves what they have typed alone. */
-            router.reload({ only: ['liveMatches', 'waiting', 'results', 'session', 'roster', 'activity'] });
+            router.reload({
+                only: ['liveMatches', 'waiting', 'upNext', 'results', 'session', 'roster', 'activity', 'myCourts', 'courtHolders'],
+            });
         }, 8000);
 
         return () => window.clearInterval(timer);
@@ -128,6 +132,7 @@ export default function OpenPlayBoard({
                         roster={roster}
                         liveMatches={liveMatches}
                         waiting={waiting}
+                        upNext={upNext}
                         results={results}
                         activity={activity}
                         post={post}
@@ -168,7 +173,7 @@ export default function OpenPlayBoard({
                 open={confirmRelease}
                 onOpenChange={setConfirmRelease}
                 title="Release the board?"
-                description="This device stops being able to change the session. Anyone with the session ID and key can then take it."
+                description="This device stops scoring and stops being able to change the session. Any court it was keeping goes back, and anyone with the session ID and key can take it."
                 confirmLabel="Release board"
                 variant="destructive"
                 onConfirm={() => router.post(`${base}/release`)}
@@ -190,6 +195,7 @@ function LiveBoard({
     roster,
     liveMatches,
     waiting,
+    upNext,
     results,
     activity,
     post,
@@ -203,6 +209,7 @@ function LiveBoard({
     roster: RosterEntry[];
     liveMatches: any[];
     waiting: any[];
+    upNext: { ready: boolean; needed: number; teams: { one: any[]; two: any[] } | null; players: any[] } | null;
     results: any[];
     activity: ActivityEntry[];
     post: (url: string, data?: Record<string, string>, onFinish?: () => void) => void;
@@ -327,7 +334,7 @@ function LiveBoard({
                 </div>
             </div>
 
-            <BoardRail base={base} roster={roster} waiting={waiting} results={results} activity={activity} needed={needed} />
+            <BoardRail base={base} roster={roster} waiting={waiting} upNext={upNext} results={results} activity={activity} needed={needed} />
         </div>
     );
 }

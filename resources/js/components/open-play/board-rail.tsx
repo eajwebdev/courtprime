@@ -33,6 +33,7 @@ export function BoardRail({
     base,
     roster,
     waiting,
+    upNext = null,
     results,
     activity,
     needed,
@@ -41,6 +42,8 @@ export function BoardRail({
     base: string;
     roster: RosterEntry[];
     waiting: any[];
+    /** The next four and which two are on each side, as it would be drawn now. */
+    upNext?: { ready: boolean; needed: number; teams: { one: any[]; two: any[] } | null; players: any[] } | null;
     results: any[];
     activity: ActivityEntry[];
     needed: number;
@@ -99,6 +102,34 @@ export function BoardRail({
                         ) : null
                     }
                 >
+                    {/* Who is on next, and with whom. The list underneath is
+                        the order they will be called in; this is the game the
+                        front of it makes. */}
+                    {upNext && (
+                        <div className="border-border bg-surface-muted shrink-0 border-b px-4 py-3">
+                            {upNext.ready && upNext.teams ? (
+                                <>
+                                    <p className="text-meta text-muted mb-2">Next on court</p>
+                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                        <PairSide players={upNext.teams.one} />
+                                        <span className="text-meta text-muted font-semibold">vs</span>
+                                        <PairSide players={upNext.teams.two} align="right" />
+                                    </div>
+                                    <p className="text-meta text-muted mt-2">
+                                        Drawn from the front of the queue. A game finishing elsewhere can change it.
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-meta text-muted">
+                                    <span data-numeric className="text-foreground font-semibold">
+                                        {upNext.needed}
+                                    </span>{' '}
+                                    more {upNext.needed === 1 ? 'player' : 'players'} and the next game can be drawn.
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     <ul className="divide-border min-h-0 flex-1 divide-y overflow-y-auto">
                         {waiting.map((entry, index) => (
                             <li key={entry.player_id} className="flex items-center gap-3 px-4 py-2.5">
@@ -202,6 +233,19 @@ export function BoardRail({
                 </div>
             )}
         </aside>
+    );
+}
+
+/** One side of the next game: the two names that will be partners. */
+function PairSide({ players, align = 'left' }: { players: any[]; align?: 'left' | 'right' }) {
+    return (
+        <div className={cn('min-w-0', align === 'right' && 'text-right')}>
+            {players.map((player) => (
+                <p key={player.id} className="text-label text-foreground truncate font-semibold">
+                    {player.name}
+                </p>
+            ))}
+        </div>
     );
 }
 

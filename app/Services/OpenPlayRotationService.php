@@ -242,6 +242,36 @@ class OpenPlayRotationService
     }
 
     /**
+     * How the next lot would be split, without committing to it.
+     *
+     * The queue told people who was next but not who they would be playing
+     * with, which is the thing anybody waiting actually wants to know — a
+     * doubles session is four names, and which two are on your side decides
+     * whether you are looking forward to it.
+     *
+     * Scored by the same pairing rules the real draw uses, so what is shown is
+     * what would happen if the next court freed up now. It is a prediction, not
+     * a reservation: somebody leaving, or a game finishing on another court,
+     * changes it, and the board says so.
+     *
+     * @param  array<int, int>  $playerIds
+     * @return array{one: array<int, int>, two: array<int, int>}|null
+     */
+    public function previewPairing(OpenPlaySession $session, array $playerIds): ?array
+    {
+        if (count($playerIds) < $this->playersPerMatch($session)) {
+            return null;
+        }
+
+        $pairing = $this->bestPairing($this->entriesFor($playerIds), $this->history($session));
+
+        return [
+            'one' => array_map(fn (array $entry) => (int) $entry['player_id'], $pairing['one']),
+            'two' => array_map(fn (array $entry) => (int) $entry['player_id'], $pairing['two']),
+        ];
+    }
+
+    /**
      * Shape player ids into what the pairing scorer expects.
      *
      * @param  array<int, int>  $playerIds

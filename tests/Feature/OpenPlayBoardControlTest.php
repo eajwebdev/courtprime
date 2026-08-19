@@ -262,6 +262,53 @@ class OpenPlayBoardControlTest extends TestCase
         $this->assertDatabaseCount('open_play_court_holds', 2);
     }
 
+    /**
+     * Signing out stops you scoring.
+     *
+     * The proof of a court hold lives in the server session, and logging out
+     * throws that away — so without releasing first the court reads as taken
+     * by a token that no longer exists anywhere, and nobody can score it until
+     * the stale window runs out. A scorer who was not the host had nothing
+     * released at all.
+     */
+    public function test_signing_out_puts_down_every_court_that_device_was_scoring(): void
+    {
+        $session = $this->makeSession();
+        $court = $session->courts()->first();
+
+        $user = User::factory()->create([
+            'organization_id' => $session->organization_id,
+            'branch_id' => $session->branch_id,
+            'role_key' => 'front_desk',
+        ]);
+
+        $this->actingAs($user)->get('/open-play/OP-TEST01/board')->assertOk();
+        $this->actingAs($user)->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('open_play_court_holds', 1);
+
+        $this->actingAs($user)->post('/logout');
+
+        /* Nobody is scoring it, so the next person can pick it straight up. */
+        $this->assertDatabaseCount('open_play_court_holds', 0);
+    }
+
+    /** Handing the board back hands the courts back with it. */
+    public function test_leaving_the_board_puts_down_its_courts(): void
+    {
+        $session = $this->makeSession();
+        $court = $session->courts()->first();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+        $this->post("/open-play/OP-TEST01/courts/{$court->id}/claim")->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('open_play_court_holds', 1);
+
+        $this->post('/open-play/OP-TEST01/release')->assertRedirect('/open-play/board');
+
+        $this->assertDatabaseCount('open_play_court_holds', 0);
+    }
+
     /** A court put down is a court somebody else can pick up. */
     public function test_releasing_a_court_frees_it_for_the_next_person(): void
     {

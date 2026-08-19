@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Models\LoginAudit;
 use App\Services\TenantContext;
 use App\Support\OpenPlayBoardAccess;
+use App\Support\OpenPlayCourtAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -71,6 +72,10 @@ class AuthenticatedSessionController extends Controller
          * player at the club takes it straight over.
          */
         OpenPlayBoardAccess::releaseAll($request);
+        /* And every court this device was scoring, which is a separate hold:
+           a scorer who was not the host had nothing released at all, so their
+           court stayed locked against everybody for the stale window. */
+        OpenPlayCourtAccess::releaseEverything($request);
 
         Auth::guard('web')->logout();
 

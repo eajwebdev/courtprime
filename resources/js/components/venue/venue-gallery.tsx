@@ -1,5 +1,5 @@
+import { defaultVenueArt } from '@/lib/athlete';
 import { cn } from '@/lib/utils';
-import { ImageOff } from 'lucide-react';
 import { useState } from 'react';
 
 export type VenuePhoto = { id: number; url: string; caption?: string | null };
@@ -11,18 +11,38 @@ export type VenuePhoto = { id: number; url: string; caption?: string | null };
  * place rather than just naming it. Selection is local state and swaps the hero
  * without navigating, which keeps the directory scannable.
  *
- * Falls back to a single neutral panel when a club has not uploaded anything,
- * rather than inventing photos of a venue nobody has photographed.
+ * A club with no photos gets CourtPrime's own doubles artwork rather than a
+ * broken image icon. It is plainly illustration, not a photograph, so it fills
+ * the space without pretending to be a venue nobody has photographed, and the
+ * caption still says the photos are coming.
  */
 export function VenueGallery({ photos, name }: { photos: VenuePhoto[]; name: string }) {
     const [active, setActive] = useState(0);
 
     if (photos.length === 0) {
         return (
-            <div className="bg-surface-muted text-muted flex aspect-[16/9] items-center justify-center rounded-lg sm:aspect-[3/2]">
-                <span className="flex flex-col items-center gap-1.5">
-                    <ImageOff className="size-5" aria-hidden />
-                    <span className="text-meta">Photos coming soon</span>
+            <div className="bg-surface-deep relative flex aspect-[16/9] items-end justify-center overflow-hidden rounded-lg sm:aspect-[3/2]">
+                {/* The figures are portrait and the frame is landscape, so they
+                    are sized on height and allowed to run past the sides. A
+                    contained fit left them postage stamp sized in the middle. */}
+                <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                        background:
+                            'radial-gradient(20rem 14rem at 50% 85%, color-mix(in srgb, var(--primary) 24%, transparent) 0%, transparent 70%)',
+                    }}
+                />
+                <img
+                    src={defaultVenueArt(name)}
+                    alt=""
+                    aria-hidden
+                    loading="lazy"
+                    decoding="async"
+                    className="relative h-[112%] w-auto max-w-none object-contain object-bottom"
+                />
+                <span className="text-meta absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pt-6 pb-2 text-center text-white/80">
+                    Photos coming soon
                 </span>
             </div>
         );

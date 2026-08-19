@@ -5,7 +5,7 @@ import { OpenPlayBoardEntry } from '@/components/open-play-board-entry';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { athleteFor } from '@/lib/athlete';
+import { athleteFor, defaultAvatarFor } from '@/lib/athlete';
 import { currency, friendlyDate, statusLabel, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
@@ -88,8 +88,14 @@ export default function PlayerPortal({
                         {/* Leaves room for the figure instead of running under it. */}
                         <div className="flex max-w-[72%] items-center gap-3 sm:max-w-none sm:gap-3.5">
                             <div className="border-primary/40 size-14 shrink-0 overflow-hidden rounded-full border-2 bg-white/10 sm:size-16">
-                                {profile.avatar_url ? (
-                                    <img src={profile.avatar_url} alt="" className="size-full object-cover" />
+                                {/* Their photo, else the stock portrait for the
+                                    gender they stated, else initials. */}
+                                {(profile.avatar_url ?? defaultAvatarFor(profile.gender, profile.display_name)) ? (
+                                    <img
+                                        src={profile.avatar_url ?? (defaultAvatarFor(profile.gender, profile.display_name) as string)}
+                                        alt=""
+                                        className="size-full object-cover"
+                                    />
                                 ) : (
                                     <span className="text-h2 flex size-full items-center justify-center font-semibold text-white">
                                         {String(profile.display_name ?? '')

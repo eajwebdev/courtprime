@@ -18,9 +18,7 @@ use Inertia\Response;
 
 class AccountReceivableController extends Controller
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function index(TenantContext $tenantContext): Response
     {

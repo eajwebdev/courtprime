@@ -12,9 +12,7 @@ class ReservationReminderNotification extends Notification implements ShouldQueu
 {
     use Queueable;
 
-    public function __construct(private readonly Reservation $reservation)
-    {
-    }
+    public function __construct(private readonly Reservation $reservation) {}
 
     /**
      * @return array<int, string>

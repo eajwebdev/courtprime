@@ -9,8 +9,8 @@ use App\Models\Reservation;
 use App\Services\BranchClock;
 use App\Services\ReservationService;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 

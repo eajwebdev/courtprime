@@ -12,9 +12,7 @@ class MatchScoreUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(public ClubMatch $match)
-    {
-    }
+    public function __construct(public ClubMatch $match) {}
 
     public function broadcastOn(): array
     {

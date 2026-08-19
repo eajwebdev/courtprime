@@ -11,9 +11,7 @@ use Inertia\Response;
 
 class OperationsController extends Controller
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function __invoke(): Response
     {

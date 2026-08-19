@@ -30,13 +30,13 @@ class Reservation extends Model
         'payment_status',
         'booking_status',
         'source',
-            'notes',
-            'checked_in_at',
-            'playing_started_at',
-            'completed_at',
-            'cancelled_at',
-            'reminder_sent_at',
-            'checked_in_by',
+        'notes',
+        'checked_in_at',
+        'playing_started_at',
+        'completed_at',
+        'cancelled_at',
+        'reminder_sent_at',
+        'checked_in_by',
     ];
 
     protected function casts(): array

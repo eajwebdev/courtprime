@@ -9,9 +9,7 @@ use Throwable;
 
 class BranchClock
 {
-    public function __construct(private readonly TenantContext $tenantContext)
-    {
-    }
+    public function __construct(private readonly TenantContext $tenantContext) {}
 
     public function timezone(?Branch $branch = null): string
     {
@@ -40,7 +38,7 @@ class BranchClock
     }
 
     /**
-     * @return array{0: \Carbon\CarbonImmutable, 1: \Carbon\CarbonImmutable}
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      */
     public function dayRange(?CarbonImmutable $localDate = null, ?Branch $branch = null): array
     {

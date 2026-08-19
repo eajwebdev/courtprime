@@ -26,9 +26,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function __invoke(Request $request, TenantContext $tenantContext): Response
     {

@@ -10,9 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class CashierSessionService
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function open(User $user, Branch $branch, float $openingCash = 0): CashierSession
     {

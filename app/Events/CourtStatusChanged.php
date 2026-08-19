@@ -12,9 +12,7 @@ class CourtStatusChanged implements ShouldBroadcastNow
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(public Court $court)
-    {
-    }
+    public function __construct(public Court $court) {}
 
     public function broadcastOn(): array
     {

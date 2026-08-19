@@ -12,9 +12,7 @@ class TournamentBracketUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(public Tournament $tournament, public int $matchCount)
-    {
-    }
+    public function __construct(public Tournament $tournament, public int $matchCount) {}
 
     public function broadcastOn(): array
     {

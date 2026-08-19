@@ -12,9 +12,7 @@ class ReservationStatusChanged implements ShouldBroadcastNow
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(public Reservation $reservation)
-    {
-    }
+    public function __construct(public Reservation $reservation) {}
 
     public function broadcastOn(): array
     {

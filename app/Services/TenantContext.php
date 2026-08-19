@@ -12,9 +12,7 @@ use Illuminate\Support\Collection;
 
 class TenantContext
 {
-    public function __construct(private readonly Request $request)
-    {
-    }
+    public function __construct(private readonly Request $request) {}
 
     public function user(): ?User
     {
@@ -133,7 +131,7 @@ class TenantContext
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
     public function workspaces(): Collection
     {

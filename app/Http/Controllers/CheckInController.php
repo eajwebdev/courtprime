@@ -14,9 +14,7 @@ use Inertia\Response;
 
 class CheckInController extends Controller
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function index(): Response
     {

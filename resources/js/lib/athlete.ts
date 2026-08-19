@@ -52,28 +52,3 @@ export function defaultAvatarFor(gender?: string | null, seed?: string | number 
 
     return `/${set}_pickleball_default_${(hash % 3) + 1}.png`;
 }
-
-/**
- * A doubles scene, for a venue with no photos of its own yet.
- *
- * Mixed by default because it is the one that represents a club rather than a
- * category of player. The court and the club are the subject here, not who is
- * on it, so this does not take a gender.
- */
-export function defaultVenueArt(seed?: string | number | null): string {
-    const options = [
-        '/pickleball_doubles_mixed_1.png',
-        '/pickleball_doubles_mixed_2.png',
-        '/pickleball_doubles_male.png',
-        '/pickleball_doubles_female.png',
-    ];
-
-    const key = String(seed ?? '');
-    let hash = 0;
-
-    for (let index = 0; index < key.length; index += 1) {
-        hash = (hash * 31 + key.charCodeAt(index)) % 997;
-    }
-
-    return options[hash % options.length];
-}

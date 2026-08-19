@@ -1,5 +1,6 @@
 import { CountUp } from '@/components/count-up';
 import { revealProps } from '@/lib/motion';
+import { cn } from '@/lib/utils';
 import { motion, useReducedMotion } from 'framer-motion';
 
 export type NetworkStat = { key: string; label: string; value: number; suffix?: string };
@@ -14,6 +15,15 @@ export type NetworkStat = { key: string; label: string; value: number; suffix?: 
  * `+` is only appended once a number is large enough for the rounding to
  * actually mean "more than this".
  */
+/** Static classes, because Tailwind cannot see a class name built at runtime. */
+const WIDE_COLUMNS: Record<number, string> = {
+    1: 'lg:grid-cols-1',
+    2: 'lg:grid-cols-2',
+    3: 'lg:grid-cols-3',
+    4: 'lg:grid-cols-4',
+    5: 'lg:grid-cols-5',
+};
+
 export function SectionNetworkStats({ stats = [] }: { stats?: NetworkStat[] }) {
     const reduce = useReducedMotion();
 
@@ -24,7 +34,10 @@ export function SectionNetworkStats({ stats = [] }: { stats?: NetworkStat[] }) {
 
     return (
         <section aria-label="Network at a glance" className="border-border bg-surface border-y">
-            <div className="bg-border mx-auto grid w-full max-w-7xl grid-cols-2 gap-px sm:grid-cols-3 lg:grid-cols-5">
+            {/* The columns follow how many tiles there are. Fixed at five, a
+                network that has none of something left a cell of bare divider
+                colour where the missing tile would have been. */}
+            <div className={cn('bg-border mx-auto grid w-full max-w-7xl grid-cols-2 gap-px sm:grid-cols-3', WIDE_COLUMNS[Math.min(stats.length, 5)])}>
                 {stats.map((stat, index) => (
                     <motion.div
                         key={stat.key}

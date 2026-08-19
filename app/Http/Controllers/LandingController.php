@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PlatformRole;
 use App\Models\Branch;
 use App\Models\ClubMatch;
 use App\Models\Court;
 use App\Models\Organization;
-use App\Models\Player;
 use App\Models\SubscriptionPlan;
+use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -94,7 +95,11 @@ class LandingController extends Controller
     private function networkStats(): array
     {
         return Cache::remember('landing.network_stats', now()->addMinutes(10), function (): array {
-            return [
+            /* A tile reading zero is worse than one tile fewer: "0 registered
+               players" is an argument against the product, made by the
+               product. A network with none of something simply does not
+               mention it until it has some. */
+            return collect([
                 [
                     'key' => 'clubs',
                     'label' => 'Connected clubs',
@@ -119,7 +124,24 @@ class LandingController extends Controller
                 [
                     'key' => 'players',
                     'label' => 'Registered players',
-                    'value' => Player::query()->count(),
+                    /*
+                     * People who signed themselves up, not everybody with a
+                     * row in `players`.
+                     *
+                     * A club adds walk-ins at the open play board by typing a
+                     * name, and each one gets a club-side player record so
+                     * their games can be scored. Counting those made this page
+                     * claim as registered a crowd of people who have never
+                     * seen the site: it said sixteen when nobody had actually
+                     * registered at all.
+                     *
+                     * An account is what registering produces, and role_key
+                     * defaults to player, so the staff a club creates are not
+                     * counted either. A walk-in who later signs up with the
+                     * same email starts counting from that point, which is
+                     * when it becomes true of them.
+                     */
+                    'value' => User::query()->where('role_key', PlatformRole::Player->value)->count(),
                     'suffix' => '',
                 ],
                 [
@@ -128,7 +150,7 @@ class LandingController extends Controller
                     'value' => ClubMatch::query()->withoutGlobalScope('organization')->count(),
                     'suffix' => '',
                 ],
-            ];
+            ])->filter(fn (array $stat) => $stat['value'] > 0)->values()->all();
         });
     }
 

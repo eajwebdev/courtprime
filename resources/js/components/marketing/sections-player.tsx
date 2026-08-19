@@ -258,27 +258,26 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
                         <Link
                             href={`/find-courts?search=${encodeURIComponent(venue.name)}`}
                             title={venue.name}
-                            className="border-border bg-surface hover:border-primary/50 group flex h-full flex-col items-center gap-3 rounded-2xl border p-4 text-center transition-colors sm:p-5"
+                            className="border-border bg-surface hover:border-primary/50 group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border p-5 text-center transition-colors sm:p-6"
                         >
                             {/*
+                             * The mark, and nothing else. A logo wall answers
+                             * "who is on this" and the logo is the answer; the
+                             * name, the town and the court count are all on the
+                             * listing this links to.
+                             *
                              * The CourtPrime mark stands in until a club uploads
                              * its own. There is no logo on the organisation yet,
                              * so this is every club's mark today; when there is
                              * one, it swaps in here and nothing else moves.
                              */}
-                            <span className="bg-surface-muted ring-border flex size-20 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-[1.03] sm:size-24">
-                                <BrandIcon size={72} className="size-14 sm:size-16" alt={`${venue.name} on CourtPrime`} />
-                            </span>
+                            <BrandIcon
+                                size={96}
+                                className="size-16 shrink-0 transition-transform duration-300 group-hover:scale-105 sm:size-20"
+                                alt={`${venue.name} on CourtPrime`}
+                            />
 
-                            <span className="flex min-w-0 flex-col gap-0.5">
-                                <span className="text-label text-foreground line-clamp-2 font-semibold">{venue.name}</span>
-                                <span data-numeric className="text-meta text-muted">
-                                    {venue.courts} {venue.courts === 1 ? 'court' : 'courts'}
-                                    {venue.city ? ` · ${venue.city}` : ''}
-                                </span>
-                            </span>
-
-                            <span className="text-primary mt-auto flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide uppercase">
+                            <span className="text-primary flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide uppercase">
                                 <span className="bg-primary size-1.5 rounded-full" aria-hidden />
                                 Live
                                 <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -289,10 +288,8 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
 
                 {placeholders.map((index) => (
                     <motion.li key={`joining-${index}`} {...revealProps(reduce, { delay: Math.min(clubs.length + index, 8) * 0.04, y: 12 })}>
-                        <div className="border-border bg-surface-muted/30 flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-4 text-center sm:p-5">
-                            <span className="border-border-strong text-muted flex size-20 shrink-0 items-center justify-center rounded-2xl border border-dashed sm:size-24">
-                                <Shield className="size-8 sm:size-9" aria-hidden />
-                            </span>
+                        <div className="border-border bg-surface-muted/30 flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-5 text-center sm:p-6">
+                            <Shield className="text-muted/60 size-16 shrink-0 sm:size-20" strokeWidth={1.25} aria-hidden />
                             <span className="text-muted text-[0.6875rem] font-medium tracking-wide uppercase">Joining soon</span>
                         </div>
                     </motion.li>
@@ -302,11 +299,9 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
                 <motion.li {...revealProps(reduce, { delay: 0.4, y: 12 })}>
                     <Link
                         href="/request-demo"
-                        className="border-primary/40 bg-primary-soft hover:border-primary group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-4 text-center transition-colors sm:p-5"
+                        className="border-primary/40 bg-primary-soft hover:border-primary group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-5 text-center transition-colors sm:p-6"
                     >
-                        <span className="border-primary/50 text-primary flex size-20 shrink-0 items-center justify-center rounded-2xl border border-dashed sm:size-24">
-                            <Plus className="size-8 sm:size-9" aria-hidden />
-                        </span>
+                        <Plus className="text-primary size-16 shrink-0 sm:size-20" strokeWidth={1.25} aria-hidden />
                         <span className="text-primary flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide uppercase">
                             Add your club
                             <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />

@@ -20,7 +20,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('open_play_sessions', function (Blueprint $table) {
-            $table->string('organizer_token', 64)->nullable()->after('session_key');
+            /*
+             * Anchored to session_code, not session_key: `session_key` is added
+             * by the migration after this one, so anchoring there fails on a
+             * fresh MySQL install. Column order is cosmetic either way.
+             */
+            $table->string('organizer_token', 64)->nullable()->after('session_code');
             $table->timestamp('organizer_claimed_at')->nullable()->after('organizer_token');
         });
     }

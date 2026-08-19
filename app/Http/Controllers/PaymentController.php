@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Refund;
 use App\Services\ActivityTimelineService;
 use App\Services\BranchClock;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -15,9 +16,7 @@ use Inertia\Response;
 
 class PaymentController extends Controller
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function index(): Response
     {
@@ -74,6 +73,10 @@ class PaymentController extends Controller
         $payment->update([
             'status' => $amount >= $remaining ? 'refunded' : 'partially_refunded',
         ]);
+
+        /* Money leaving the club is the one payment event an owner always wants
+           to see without going looking for it. */
+        app(NotificationService::class)->refundIssued($refund);
 
         $timeline->record($payment, 'payment.refunded', 'Payment refund recorded', [
             'related' => $refund,

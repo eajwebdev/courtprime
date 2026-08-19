@@ -9,6 +9,19 @@ const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 const iso = (year: number, month: number, day: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
+/**
+ * The month to open on.
+ *
+ * Falls back to this month when nothing is selected: on a page where the date
+ * is an optional filter the value is legitimately empty, and `new Date('')` is
+ * an Invalid Date that renders the whole grid as NaN.
+ */
+const monthCursor = (value: string) => {
+    const date = new Date(`${value}T00:00:00`);
+
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+};
+
 type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -17,6 +30,8 @@ type Props = {
     onSelect: (value: string) => void;
     /** How far ahead clubs publish availability. */
     daysAhead?: number;
+    /** Earliest selectable day, as an offset from today. Booking passes 1. */
+    from?: number;
 };
 
 /**
@@ -27,15 +42,17 @@ type Props = {
  * calendar glyph opens the picker, and we had hidden it. This owns the
  * interaction instead of hoping the platform obliges.
  */
-export function DatePickerSheet({ open, onOpenChange, value, onSelect, daysAhead = 120 }: Props) {
+export function DatePickerSheet({ open, onOpenChange, value, onSelect, daysAhead = 120, from = 0 }: Props) {
     const today = localIsoDate(0);
+    /* Today still gets its marker even when it can no longer be chosen. */
+    const first = localIsoDate(from);
     const last = localIsoDate(daysAhead);
 
-    const [cursor, setCursor] = useState(() => new Date(`${value}T00:00:00`));
+    const [cursor, setCursor] = useState(() => monthCursor(value));
 
     /* Reopening on a different date should land on that date's month. */
     useEffect(() => {
-        if (open) setCursor(new Date(`${value}T00:00:00`));
+        if (open) setCursor(monthCursor(value));
     }, [open, value]);
 
     const grid = useMemo(() => {
@@ -53,7 +70,7 @@ export function DatePickerSheet({ open, onOpenChange, value, onSelect, daysAhead
     }, [cursor]);
 
     /* Guard rails so the arrows cannot walk out of the bookable window. */
-    const canGoBack = iso(grid.year, grid.month, 1) > today;
+    const canGoBack = iso(grid.year, grid.month, 1) > first;
     const canGoForward = iso(grid.year, grid.month, 28) < last;
 
     const step = (months: number) => setCursor(new Date(grid.year, grid.month + months, 1));
@@ -105,7 +122,7 @@ export function DatePickerSheet({ open, onOpenChange, value, onSelect, daysAhead
                         if (day === null) return <span key={`blank-${index}`} />;
 
                         const date = iso(grid.year, grid.month, day);
-                        const disabled = date < today || date > last;
+                        const disabled = date < first || date > last;
                         const selected = date === value;
 
                         return (

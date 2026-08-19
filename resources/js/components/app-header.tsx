@@ -1,6 +1,7 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { GlobalSearch } from '@/components/global-search';
 import { Icon } from '@/components/icon';
+import { NotificationBell } from '@/components/notification-bell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,7 +13,7 @@ import { primaryNavigationForWorkspace } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Bell, CalendarClock, CreditCard, Menu, Plus, Trophy, UserPlus, Users } from 'lucide-react';
+import { CalendarClock, CreditCard, Menu, Plus, Trophy, UserPlus, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
 
@@ -116,11 +117,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                     <QuickCreateItem href="/tournaments" icon={Trophy} label="Tournament" />
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            <Button asChild variant="ghost" size="icon" className="h-9 w-9">
-                                <Link href="/notifications">
-                                    <Bell className="!size-5 opacity-80" />
-                                </Link>
-                            </Button>
+                            <NotificationBell />
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>

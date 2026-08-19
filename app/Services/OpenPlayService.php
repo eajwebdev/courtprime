@@ -93,6 +93,15 @@ class OpenPlayService
         return $session;
     }
 
+    /**
+     * Put a player on the end of the stack.
+     *
+     * Joining never disturbs a game in progress: whoever is on court stays on
+     * court, and the new arrival waits behind everyone already waiting. The
+     * unique index on (session, player) is what makes a double tap harmless,
+     * and a player already on a court is left exactly where they are rather
+     * than being sent to the back of a queue they are not in.
+     */
     public function join(OpenPlaySession $session, Player $player): OpenPlayPlayer
     {
         return DB::transaction(function () use ($session, $player) {
@@ -105,17 +114,48 @@ class OpenPlayService
                 ],
             );
 
+            $queued = OpenPlayQueueEntry::query()
+                ->withoutGlobalScope('organization')
+                ->where('open_play_session_id', $session->id)
+                ->where('player_id', $player->id)
+                ->first();
+
+            /* Already playing, or already stood in line: joining again changes
+               nothing. Re-queueing them would move them behind people who
+               arrived after they did. */
+            if ($queued && in_array($queued->status, OpenPlayQueueEntry::ACTIVE_STATUSES, true)) {
+                return $entry;
+            }
+
+            $tail = (int) OpenPlayQueueEntry::query()
+                ->withoutGlobalScope('organization')
+                ->where('open_play_session_id', $session->id)
+                ->max('position');
+
             OpenPlayQueueEntry::query()->updateOrCreate(
                 ['open_play_session_id' => $session->id, 'player_id' => $player->id],
                 [
                     'organization_id' => $session->organization_id,
-                    'position' => OpenPlayQueueEntry::query()->where('open_play_session_id', $session->id)->max('position') + 1,
-                    'status' => 'waiting',
+                    'position' => $tail + 1,
+                    'status' => OpenPlayQueueEntry::WAITING,
+                    /* The clock the queue is ordered by. Someone rejoining after
+                       going home starts their wait now, not when they first
+                       arrived. */
+                    'queue_entered_at' => now(),
+                    'court_entered_at' => null,
+                    'assigned_court_id' => null,
+                    'consecutive_games_played' => 0,
                 ],
             );
 
             return $entry;
         });
+    }
+
+    /** Take a player out of the stack, from a court or from the queue. */
+    public function leave(OpenPlaySession $session, Player $player): void
+    {
+        DB::transaction(fn () => app(PaddleStackService::class)->leave($session, $player->id));
     }
 
     public function checkIn(OpenPlaySession $session, Player $player): void

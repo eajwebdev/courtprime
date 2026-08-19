@@ -1,13 +1,14 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { CommandMenu } from '@/components/global-search';
+import { NotificationBell } from '@/components/notification-bell';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
 
 /**
- * The context bar. Every authenticated shell carries the same four things:
+ * The context bar. Every authenticated shell carries the same five things:
  * a way back out (trigger), where you are (breadcrumbs), what scope you are in
- * (organisation / branch), and the ⌘K command menu.
+ * (organisation / branch), the ⌘K command menu, and anything waiting on you.
  */
 export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: BreadcrumbItemType[] }) {
     const { workspace } = usePage<SharedData>().props;
@@ -28,8 +29,12 @@ export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrum
                 )}
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1">
                 <CommandMenu />
+                {/* Every module in the app sits under this bar, so whatever is
+                    waiting is reachable without navigating away from the screen
+                    you are working on. */}
+                <NotificationBell />
             </div>
         </header>
     );

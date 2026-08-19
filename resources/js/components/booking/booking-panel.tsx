@@ -6,7 +6,32 @@ import { router, useForm } from '@inertiajs/react';
 import { Check, Clock, Loader2, LogIn, MapPin, Minus, Plus, TriangleAlert, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-export type Slot = { start_time: string; end_time: string; available: boolean };
+/**
+ * Why a slot is not free.
+ *
+ * `key` is stable across every slot one booking covers, so the grid can merge
+ * them into a single named block instead of matching on the label. Names arrive
+ * already shortened to a first name and last initial — see
+ * CourtAvailabilityService.
+ */
+export type SlotHold = {
+    key: string;
+    kind: 'booked' | 'open_play' | 'tournament' | 'coaching' | 'blocked' | 'closed';
+    title: string;
+    detail: string | null;
+    reference: string | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    is_yours: boolean;
+};
+
+export type Slot = {
+    start_time: string;
+    end_time: string;
+    available: boolean;
+    status?: string;
+    hold?: SlotHold | null;
+};
 
 export type BookableCourt = {
     id: number;
@@ -24,22 +49,22 @@ export type BookableCourt = {
     slots: Slot[];
 };
 
+/** One slot, one hour. The server generates the day the same way. */
+export const SLOT_MINUTES = 60;
+
+/** Four hours is the longest one booking may run. Enforced server-side too. */
+export const MAX_HOURS = 4;
+
 /*
- * Courts are sold in 30-minute slots and the server puts no ceiling on a
- * booking, so neither does this. Two hours covers a normal game; a group that
- * has taken a court for the afternoon needs four, and capping the UI at two
- * forced them to book twice.
+ * Courts are sold by the hour. Half hours went: nobody plays thirty minutes of
+ * pickleball, and offering it fragmented the day into gaps too short to sell.
+ * Two hours covers a normal game; four is the ceiling, and a group that wants
+ * the whole afternoon books the rest as a second slot.
  */
-const DURATIONS = [
-    { label: '30m', minutes: 30 },
-    { label: '1h', minutes: 60 },
-    { label: '1h 30m', minutes: 90 },
-    { label: '2h', minutes: 120 },
-    { label: '2h 30m', minutes: 150 },
-    { label: '3h', minutes: 180 },
-    { label: '3h 30m', minutes: 210 },
-    { label: '4h', minutes: 240 },
-];
+const DURATIONS = Array.from({ length: MAX_HOURS }, (_, index) => ({
+    label: `${index + 1}h`,
+    minutes: (index + 1) * SLOT_MINUTES,
+}));
 
 /* Always offered, so a short booking never has to hunt. Anything longer only
    appears when the court can actually honour it. */
@@ -61,18 +86,22 @@ export const label12h = (time: string) => {
 };
 
 /**
- * A duration is only offered when every 30-minute slot it spans is free, so the
- * user can never pick a length the court cannot actually honour.
+ * A duration is only offered when every hour it spans is free and it stays
+ * inside the four-hour ceiling, so the user can never pick a length the court
+ * cannot honour or the server would reject.
  */
 function durationFits(slots: Slot[], start: string, minutes: number) {
-    const needed = minutes / 30;
+    if (minutes > MAX_HOURS * SLOT_MINUTES) return false;
+
+    const needed = minutes / SLOT_MINUTES;
     const index = slots.findIndex((slot) => slot.start_time === start);
     if (index === -1) return false;
 
     for (let step = 0; step < needed; step++) {
         const slot = slots[index + step];
         if (!slot || !slot.available) return false;
-        if (step > 0 && toMinutes(slot.start_time) !== toMinutes(start) + step * 30) return false;
+        /* Consecutive on the clock, not merely consecutive in the array. */
+        if (step > 0 && toMinutes(slot.start_time) !== toMinutes(start) + step * SLOT_MINUTES) return false;
     }
     return true;
 }

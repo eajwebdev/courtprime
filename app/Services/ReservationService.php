@@ -15,6 +15,7 @@ class ReservationService
         private readonly ReservationPricingService $pricing,
         private readonly PlayerIdentityService $playerIdentity,
         private readonly BranchClock $clock,
+        private readonly NotificationService $notifications,
     ) {}
 
     public function create(array $data, bool $crossOrganizationCourtLookup = false): Reservation
@@ -138,6 +139,10 @@ class ReservationService
                 'cancelled_at' => now(),
             ]);
             $this->log($reservation, 'cancelled', $reason ?: 'Reservation cancelled.');
+
+            /* The court is sellable again, and somebody at the desk is the only
+               one who can act on that. */
+            $this->notifications->reservationCancelled($reservation, $reason);
 
             return $reservation->refresh();
         });

@@ -34,12 +34,14 @@ type Props = {
     /** Null for a visitor who has not signed in. The grid still renders. */
     profile: { courtprime_player_id: string; display_name: string; gender?: string | null; avatar_url?: string | null } | null;
     date: string;
+    /** Earliest day a court can be taken: tomorrow, never today. */
+    firstBookableDate: string;
     search: string;
     selectedCourtId?: number | null;
     courts: BookableCourt[];
 };
 
-export default function PlayerBooking({ profile, date, search, selectedCourtId: preselected = null, courts }: Props) {
+export default function PlayerBooking({ profile, date, firstBookableDate, search, selectedCourtId: preselected = null, courts }: Props) {
     const signedIn = Boolean(profile);
     const [filters, setFilters] = useState({ date, search });
     /* Discovery deep-links to an exact court. That used to jump straight into
@@ -334,7 +336,14 @@ export default function PlayerBooking({ profile, date, search, selectedCourtId: 
                     </button>
                 </form>
 
-                <DateRail value={filters.date} onChange={(next) => go({ date: next })} className="mt-3" />
+                {/* from=1: a court is taken a day ahead, so today is not on offer. */}
+                <DateRail value={filters.date} onChange={(next) => go({ date: next })} from={1} className="mt-3" />
+
+                {/* The rail simply starting on tomorrow reads as a bug unless the
+                    rule is stated. One line, next to the control it governs. */}
+                <p className="text-meta mt-2">
+                    Courts are booked a day ahead — {friendlyDate(firstBookableDate)} is the earliest. For a court today, call the club.
+                </p>
 
                 {/* A segmented control, not a scrolling chip row: four fixed
                     options fit the width, so nothing should need scrolling to

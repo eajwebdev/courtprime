@@ -15,9 +15,11 @@ function iso(date: Date) {
 /**
  * A month, with how busy each day is.
  *
- * The number under each date is bookings taken, so the shape of the week is
- * readable at a glance: which evenings are full, which Tuesday is empty. That
- * is the question a calendar is for, and a paginated list could not answer it.
+ * Each date carries the number of bookings taken on it, over a bar for relative
+ * load. A day with nothing on it is left blank, so the days that need attention
+ * are the only marks on the month and nobody has to open a date to find out
+ * whether anything is there. That is the question a calendar is for, and a
+ * paginated list could not answer it.
  */
 export function MonthCalendar({
     month,
@@ -103,17 +105,37 @@ export function MonthCalendar({
                                 data-numeric
                                 className={cn(
                                     'text-label leading-none font-medium',
-                                    isSelected ? '' : isToday ? 'text-primary font-semibold' : 'text-foreground',
+                                    isSelected ? '' : isToday ? 'text-primary font-semibold' : entry ? 'text-foreground' : 'text-muted',
                                 )}
                             >
                                 {date.getDate()}
                             </span>
 
-                            {/* A bar rather than a number: relative load reads
-                                faster than a count you have to compare by eye. */}
+                            {/*
+                             * The count, over a bar for relative load.
+                             *
+                             * The bar alone answered "which day is busiest" but
+                             * not "does this day have anything on it", which is
+                             * the question the calendar is opened for — and at a
+                             * glance one thin line looked much like none. A day
+                             * with bookings now says how many; an empty one is
+                             * left blank on purpose, so occupied days are the
+                             * only marks on the month.
+                             */}
+                            <span
+                                data-numeric
+                                aria-hidden
+                                className={cn(
+                                    'mt-0.5 text-[0.625rem] leading-none font-semibold tabular-nums',
+                                    entry ? (isSelected ? 'text-primary-foreground' : 'text-primary') : 'text-transparent',
+                                )}
+                            >
+                                {entry ? entry.bookings : '0'}
+                            </span>
+
                             <span
                                 aria-hidden
-                                className={cn('mt-1 h-1 rounded-full transition-all', isSelected ? 'bg-primary-foreground/70' : 'bg-primary')}
+                                className={cn('mt-1 h-0.5 rounded-full transition-all', isSelected ? 'bg-primary-foreground/70' : 'bg-primary/50')}
                                 style={{
                                     width: entry ? `${Math.max(18, Math.round((entry.bookings / busiest) * 70))}%` : 0,
                                     opacity: entry ? 1 : 0,

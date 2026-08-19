@@ -124,7 +124,7 @@ export default function CourtDiscovery({ date, search, branches }: Props) {
                         </button>
                     </form>
 
-                    <DateRail value={filters.date} onChange={(next) => apply({ date: next })} tone="deep" className="mt-3" />
+                    <DateRail value={filters.date} onChange={(next) => apply({ date: next })} tone="deep" from={1} className="mt-3" />
 
                     <FilterRow>
                         <FilterChip active={indoorOnly} onClick={() => setIndoorOnly((v) => !v)} icon={indoorOnly ? X : undefined}>

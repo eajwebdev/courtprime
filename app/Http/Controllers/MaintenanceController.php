@@ -12,6 +12,7 @@ use App\Models\MaintenanceWorkOrder;
 use App\Models\User;
 use App\Services\ActivityTimelineService;
 use App\Services\BranchClock;
+use App\Services\NotificationService;
 use App\Services\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -21,9 +22,7 @@ use Inertia\Response;
 
 class MaintenanceController extends Controller
 {
-    public function __construct(private readonly BranchClock $clock)
-    {
-    }
+    public function __construct(private readonly BranchClock $clock) {}
 
     public function index(TenantContext $tenantContext): Response
     {
@@ -118,6 +117,10 @@ class MaintenanceController extends Controller
                 'description' => $workOrder->description,
                 'metadata' => ['priority' => $workOrder->priority, 'status' => $workOrder->status],
             ]);
+
+            /* A court out of service is revenue stopping, so the club hears
+               about it rather than finding out from the booking grid. */
+            app(NotificationService::class)->maintenanceRaised($workOrder->refresh()->load(['court', 'branch']));
 
             return back()->with('success', 'CourtPrime maintenance work order created.');
         });

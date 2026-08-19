@@ -34,6 +34,14 @@ final class OpenPlayBoardAccess
      */
     private const STALE_AFTER_MINUTES = 10;
 
+    /**
+     * Where the holds live in the server session.
+     *
+     * The dots are Laravel's nesting, so every hold this browser has sits under
+     * one branch and `releaseAll` can find them without knowing the ids.
+     */
+    private const HOLDER_PREFIX = 'open-play.holder';
+
     public static function grantKey(int $sessionId): string
     {
         return "open_play_grant.{$sessionId}";
@@ -46,7 +54,7 @@ final class OpenPlayBoardAccess
 
     public static function holderKey(int $sessionId): string
     {
-        return "open-play.holder.{$sessionId}";
+        return self::HOLDER_PREFIX.'.'.$sessionId;
     }
 
     /**
@@ -117,6 +125,36 @@ final class OpenPlayBoardAccess
 
         $request->session()->forget(self::holderKey($session->id));
         $request->session()->forget(self::grantKey($session->id));
+    }
+
+    /**
+     * Hand back every board this browser holds.
+     *
+     * For signing out, which throws the server session away. The proof of the
+     * hold lives in that session, so without this the board is left flagged as
+     * held by a token that no longer exists anywhere: it reads as live on the
+     * desk, and the next player with the right ID and key is turned away until
+     * the stale window runs out. Releasing first means the board goes quiet the
+     * moment its holder leaves, and the pair works again straight away.
+     */
+    public static function releaseAll(Request $request): void
+    {
+        $held = $request->session()->get(self::HOLDER_PREFIX);
+
+        if (! is_array($held)) {
+            return;
+        }
+
+        $sessions = OpenPlaySession::query()
+            ->withoutGlobalScope('organization')
+            ->findMany(array_keys($held));
+
+        foreach ($sessions as $session) {
+            self::release($request, $session);
+        }
+
+        /* Holds pointing at sessions that no longer exist. */
+        $request->session()->forget(self::HOLDER_PREFIX);
     }
 
     /** The stored token is hashed, so the raw value never sits in the database. */

@@ -1,4 +1,4 @@
-import { label12h, type BookableCourt } from '@/components/booking/booking-panel';
+import { label12h, MAX_HOURS, SLOT_MINUTES, type BookableCourt, type SlotHold } from '@/components/booking/booking-panel';
 import { currency } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,14 +14,38 @@ const BOOKED_HATCH =
 const rateOf = (court: BookableCourt) =>
     Number(court.has_membership_rate && court.member_hourly_rate ? court.member_hourly_rate : court.standard_hourly_rate);
 
+/** What a held block is called in the legend and read out to a screen reader. */
+const KIND_LABEL: Record<SlotHold['kind'], string> = {
+    booked: 'Booked',
+    open_play: 'Open play',
+    tournament: 'Tournament',
+    coaching: 'Coaching',
+    blocked: 'Unavailable',
+    closed: 'Court closed',
+};
+
+/* The full sentence, for the hover tooltip and the accessible name. Everything
+   here is already public: a short name, what it is, and when it ends. */
+const describe = (court: BookableCourt, time: string, hold: SlotHold) =>
+    [
+        `${court.name} at ${label12h(time)}`,
+        hold.is_yours ? 'your booking' : `${KIND_LABEL[hold.kind].toLowerCase()} — ${hold.title}`,
+        hold.starts_at && hold.ends_at ? `${label12h(hold.starts_at)} to ${label12h(hold.ends_at)}` : null,
+        hold.detail,
+        hold.reference,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
 /**
  * A courts-by-time booking grid you drag across.
  *
- * Press a free cell and drag down the same column to take a longer block; the
- * range stops dead at the first booked slot, so a selection can never span
- * something that is already taken. A plain click takes a single 30-minute slot,
- * which is also what the keyboard does — the drag is an accelerator, never the
- * only way in.
+ * One row is one hour, which is how courts are sold. Press a free cell and drag
+ * down the same column to take a longer block; the range stops dead at the first
+ * booked slot and at four hours, so a selection can never span something already
+ * taken or run past what the server will accept. A plain click takes a single
+ * hour, which is also what the keyboard does — the drag is an accelerator, never
+ * the only way in.
  */
 export function CourtGrid({
     courts,
@@ -45,18 +69,29 @@ export function CourtGrid({
        started it. */
     const dragRef = useRef<Drag | null>(null);
 
-    /* Availability by court, keyed on start time, so a cell lookup is O(1). */
-    const openBy = useMemo(() => {
-        const map = new Map<number, Set<string>>();
+    /* Slots by court, keyed on start time, so a cell lookup is O(1). */
+    const slotBy = useMemo(() => {
+        const map = new Map<number, Map<string, BookableCourt['slots'][number]>>();
         for (const court of courts) {
-            map.set(court.id, new Set(court.slots.filter((slot) => slot.available).map((slot) => slot.start_time)));
+            map.set(court.id, new Map(court.slots.map((slot) => [slot.start_time, slot])));
         }
         return map;
     }, [courts]);
 
-    const isOpen = useCallback((courtId: number, index: number) => openBy.get(courtId)?.has(times[index]) ?? false, [openBy, times]);
+    const isOpen = useCallback((courtId: number, index: number) => slotBy.get(courtId)?.get(times[index])?.available ?? false, [slotBy, times]);
 
-    /* A drag stops at the first booked cell rather than jumping over it. */
+    /** What is holding a cell, or null when it is free. */
+    const holdAt = useCallback(
+        (courtId: number, index: number): SlotHold | null => slotBy.get(courtId)?.get(times[index])?.hold ?? null,
+        [slotBy, times],
+    );
+
+    /*
+     * A drag stops at the first booked cell rather than jumping over it, and at
+     * the four-hour ceiling rather than running to the end of the day. Stopping
+     * beats refusing: the block simply will not grow past four rows, so nobody
+     * drags out six hours and then gets told no on submit.
+     */
     const clamp = useCallback(
         (courtId: number, from: number, to: number) => {
             const step = to >= from ? 1 : -1;
@@ -64,6 +99,7 @@ export function CourtGrid({
 
             for (let index = from; step > 0 ? index <= to : index >= to; index += step) {
                 if (!isOpen(courtId, index)) break;
+                if (Math.abs(index - from) + 1 > MAX_HOURS) break;
                 last = index;
             }
 
@@ -80,7 +116,7 @@ export function CourtGrid({
             const low = Math.min(selection.from, selection.to);
             const high = Math.max(selection.from, selection.to);
 
-            onSelect({ court, start: times[low], minutes: (high - low + 1) * 30 });
+            onSelect({ court, start: times[low], minutes: (high - low + 1) * SLOT_MINUTES });
         },
         [courts, onSelect, times],
     );
@@ -151,8 +187,11 @@ export function CourtGrid({
         const from = times.indexOf(selection.start);
         if (from === -1) return null;
 
-        return { courtId: selection.courtId, from, to: from + Math.max(1, selection.minutes / 30) - 1 };
+        return { courtId: selection.courtId, from, to: from + Math.max(1, selection.minutes / SLOT_MINUTES) - 1 };
     }, [selection, times]);
+
+    /* The "Yours" key only earns its place when one of these is theirs. */
+    const mine = useMemo(() => courts.some((court) => court.slots.some((slot) => slot.hold?.is_yours)), [courts]);
 
     const columns = `3.5rem repeat(${courts.length}, minmax(5.5rem, 1fr))`;
 
@@ -186,51 +225,118 @@ export function CourtGrid({
                         ))}
                     </div>
 
-                    {/* Rows */}
-                    {times.map((time, index) => (
-                        <div key={time} className="border-border grid border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
-                            <span className="bg-surface text-muted sticky left-0 z-20 flex h-11 items-center justify-end pr-2 text-[0.6875rem] font-medium">
-                                {/* Only the hour reads at a glance; the half hour is implied. */}
-                                <span data-numeric>{time.endsWith(':00') ? label12h(time).replace(':00', '') : ''}</span>
-                            </span>
+                    {/*
+                     * Rows.
+                     *
+                     * The horizontal rule lives on each cell rather than on the
+                     * row, so the cells of one booking can drop the line between
+                     * them and read as a single block with one name on it.
+                     */}
+                    {times.map((time, index) => {
+                        const lastRow = index === times.length - 1;
 
-                            {courts.map((court) => {
-                                const open = isOpen(court.id, index);
-                                const dragging =
-                                    drag?.courtId === court.id && index >= Math.min(drag.from, drag.to) && index <= Math.max(drag.from, drag.to);
-                                const picked = !drag && chosen?.courtId === court.id && index >= chosen.from && index <= chosen.to;
-                                const active = dragging || picked;
+                        return (
+                            <div key={time} className="grid" style={{ gridTemplateColumns: columns }}>
+                                <span
+                                    className={cn(
+                                        'border-border bg-surface text-muted sticky left-0 z-20 flex h-11 items-center justify-end pr-2 text-[0.6875rem] font-medium',
+                                        !lastRow && 'border-b',
+                                    )}
+                                >
+                                    {/* Only the hour reads at a glance; the half hour is implied. */}
+                                    <span data-numeric>{time.endsWith(':00') ? label12h(time).replace(':00', '') : ''}</span>
+                                </span>
 
-                                return (
-                                    <button
-                                        key={court.id}
-                                        type="button"
-                                        data-cell
-                                        data-court={court.id}
-                                        data-index={index}
-                                        disabled={!open}
-                                        aria-label={`${court.name} at ${label12h(time)}${open ? '' : ' — unavailable'}`}
-                                        onPointerDown={(event) => {
-                                            if (!open) return;
-                                            /* Without this the browser starts a text
-                                               selection and swallows the drag. */
-                                            event.preventDefault();
-                                            beginDrag(court.id, index);
-                                        }}
-                                        /* pan-x leaves horizontal scrolling to the browser
-                                           while vertical drags select. */
-                                        className={cn(
-                                            'border-border h-11 touch-pan-x border-l transition-colors',
-                                            active && 'bg-primary',
-                                            !active && open && 'bg-surface hover:bg-primary-soft',
-                                            !open && 'bg-surface-muted cursor-not-allowed',
-                                        )}
-                                        style={!open ? { backgroundImage: BOOKED_HATCH } : undefined}
-                                    />
-                                );
-                            })}
-                        </div>
-                    ))}
+                                {courts.map((court) => {
+                                    const open = isOpen(court.id, index);
+                                    const dragging =
+                                        drag?.courtId === court.id && index >= Math.min(drag.from, drag.to) && index <= Math.max(drag.from, drag.to);
+                                    const picked = !drag && chosen?.courtId === court.id && index >= chosen.from && index <= chosen.to;
+                                    const active = dragging || picked;
+
+                                    const hold = open ? null : holdAt(court.id, index);
+                                    /* One booking can cover several rows. Only the
+                                       first of them carries the label, and the ones
+                                       under it lose their top rule. */
+                                    const opensRun = !!hold && holdAt(court.id, index - 1)?.key !== hold.key;
+                                    const closesRun = !!hold && holdAt(court.id, index + 1)?.key !== hold.key;
+
+                                    let rows = 1;
+                                    if (opensRun) {
+                                        while (index + rows < times.length && holdAt(court.id, index + rows)?.key === hold!.key) rows++;
+                                    }
+
+                                    return (
+                                        <button
+                                            key={court.id}
+                                            type="button"
+                                            data-cell
+                                            data-court={court.id}
+                                            data-index={index}
+                                            /*
+                                             * Held cells are aria-disabled rather than
+                                             * disabled. A disabled button receives no
+                                             * mouse events, so its tooltip never opens
+                                             * and it drops out of the tab order — which
+                                             * would put the name, the end time and the
+                                             * reference out of reach of exactly the
+                                             * people who cannot read them off the block.
+                                             * Pressing one still does nothing: the drag
+                                             * only ever starts on a free cell.
+                                             */
+                                            disabled={!open && !hold}
+                                            aria-disabled={!open}
+                                            aria-label={hold ? describe(court, time, hold) : `${court.name} at ${label12h(time)} — free`}
+                                            title={hold ? describe(court, time, hold) : undefined}
+                                            onPointerDown={(event) => {
+                                                if (!open) return;
+                                                /* Without this the browser starts a text
+                                                   selection and swallows the drag. */
+                                                event.preventDefault();
+                                                beginDrag(court.id, index);
+                                            }}
+                                            /* pan-x leaves horizontal scrolling to the browser
+                                               while vertical drags select. */
+                                            className={cn(
+                                                'border-border h-11 touch-pan-x overflow-hidden border-l transition-colors',
+                                                !lastRow && 'border-b',
+                                                /* Inside a booking, not at its end. */
+                                                hold && !closesRun && !lastRow && 'border-b-transparent',
+                                                active && 'bg-primary',
+                                                !active && open && 'bg-surface hover:bg-primary-soft',
+                                                hold && 'cursor-not-allowed',
+                                                hold && (hold.is_yours ? 'bg-primary-soft' : 'bg-surface-muted'),
+                                            )}
+                                            style={hold && !hold.is_yours ? { backgroundImage: BOOKED_HATCH } : undefined}
+                                        >
+                                            {hold && opensRun && (
+                                                <span className="flex h-full w-full flex-col justify-center overflow-hidden px-2 text-left">
+                                                    {/* Who holds it is the point of the block, so it
+                                                        is set at body metadata size rather than the
+                                                        smaller size the gutter and the rate use. */}
+                                                    <span
+                                                        className={cn(
+                                                            'truncate text-[0.75rem] leading-tight font-semibold',
+                                                            hold.is_yours ? 'text-primary' : 'text-secondary',
+                                                        )}
+                                                    >
+                                                        {hold.title}
+                                                    </span>
+                                                    {/* A single 30-minute block has no room for a
+                                                        second line, and its row already says when. */}
+                                                    {rows > 1 && hold.ends_at && (
+                                                        <span data-numeric className="text-muted truncate text-[0.6875rem] leading-tight">
+                                                            until {label12h(hold.ends_at)}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -239,12 +345,18 @@ export function CourtGrid({
                     <span className="border-border bg-surface size-3 rounded-sm border" /> Free
                 </span>
                 <span className="flex items-center gap-1.5">
-                    <span className="border-border size-3 rounded-sm border" style={{ backgroundImage: BOOKED_HATCH }} /> Booked
+                    <span className="border-border bg-surface-muted size-3 rounded-sm border" style={{ backgroundImage: BOOKED_HATCH }} /> Taken —
+                    named on the block
                 </span>
+                {mine && (
+                    <span className="flex items-center gap-1.5">
+                        <span className="bg-primary-soft border-border size-3 rounded-sm border" /> Yours
+                    </span>
+                )}
                 <span className="flex items-center gap-1.5">
                     <span className="bg-primary size-3 rounded-sm" /> Selected
                 </span>
-                <span className="ml-auto">Drag down a column for a longer session.</span>
+                <span className="ml-auto">Drag down a column for a longer session, up to {MAX_HOURS} hours.</span>
             </div>
         </div>
     );

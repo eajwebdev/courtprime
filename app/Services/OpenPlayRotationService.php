@@ -34,7 +34,10 @@ use Illuminate\Support\Facades\DB;
  */
 class OpenPlayRotationService
 {
-    public function __construct(private readonly MatchResultService $results) {}
+    public function __construct(
+        private readonly MatchResultService $results,
+        private readonly PaddleStackService $stack,
+    ) {}
 
     /** Weightings for the pairing score. Repeating a partner is the worst of the three. */
     private const PARTNER_PENALTY = 10.0;
@@ -106,14 +109,14 @@ class OpenPlayRotationService
      */
     public function completeMatch(OpenPlayMatch $match): Collection
     {
-        DB::transaction(function () use ($match) {
+        $created = DB::transaction(function () use ($match) {
             /*
              * Locked and re-read before anything is counted.
              *
              * Anyone holding the session key can finish a match, and on a
              * tablet passed between people two taps on Finish land within the
              * same second. Without this the second one credits every player
-             * with the win a second time.
+             * with the win a second time, and rotates the court twice.
              */
             $locked = OpenPlayMatch::query()
                 ->withoutGlobalScope('organization')
@@ -121,7 +124,7 @@ class OpenPlayRotationService
                 ->find($match->id);
 
             if (! $locked || $locked->status === 'completed') {
-                return;
+                return collect();
             }
 
             $locked->update(['status' => 'completed', 'completed_at' => now()]);
@@ -130,31 +133,83 @@ class OpenPlayRotationService
             /* The result reaches the players' records here, and only here. */
             $this->results->recordOpenPlay($locked);
 
-            /* Back to waiting, at the tail, so the queue reflects reality. */
-            $playerIds = $match->participants()->pluck('player_id')->all();
+            $session = $locked->session()->withoutGlobalScope('organization')->lockForUpdate()->first();
 
-            $tail = (int) OpenPlayQueueEntry::query()
-                ->where('open_play_session_id', $match->open_play_session_id)
-                ->max('position');
-
-            foreach ($playerIds as $index => $playerId) {
-                OpenPlayQueueEntry::query()
-                    ->where('open_play_session_id', $match->open_play_session_id)
-                    ->where('player_id', $playerId)
-                    ->update([
-                        'status' => 'waiting',
-                        'assigned_court_id' => null,
-                        'position' => $tail + $index + 1,
-                    ]);
-
-                OpenPlayPlayer::query()
-                    ->where('open_play_session_id', $match->open_play_session_id)
-                    ->where('player_id', $playerId)
-                    ->update(['status' => 'checked_in']);
+            if (! $session) {
+                return collect();
             }
+
+            $onCourt = $locked->participants()->pluck('player_id')->map(fn ($id) => (int) $id)->all();
+
+            /*
+             * A paused session empties the court instead of rotating into it.
+             *
+             * No next game is going to start, so nobody can be sent on: marking
+             * the incoming players as on court would strand them there with no
+             * match, invisible to both the queue and the board. Everyone who
+             * just played goes to the back of the queue and resuming deals them
+             * out again in order.
+             */
+            if (! $session->auto_rotate) {
+                $this->stack->apply($session, ['stay' => [], 'out' => $onCourt, 'in' => []], null);
+
+                return collect();
+            }
+
+            /*
+             * The stack decides how many come off. Nobody waiting means the
+             * same players carry on; one waiting means one swap. Emptying the
+             * court unconditionally was only ever right when the queue happened
+             * to be long.
+             */
+            $plan = $this->stack->plan($session, $onCourt);
+            $this->stack->apply($session, $plan, $locked->court_id);
+
+            $next = array_merge($plan['stay'], $plan['in']);
+
+            if (count($next) < $this->playersPerMatch($session) || ! $locked->court) {
+                /*
+                 * Not enough left to refill this court — players left, or the
+                 * court was pulled out of the session. Whoever is still stood on
+                 * it goes back into the queue rather than being held on a court
+                 * with no game, and generate() decides what can run.
+                 */
+                $this->stack->apply($session, ['stay' => [], 'out' => $plan['stay'], 'in' => []], null);
+
+                return collect();
+            }
+
+            $round = (int) $session->current_round + 1;
+            $history = $this->history($session);
+            $group = $this->entriesFor($next);
+
+            $created = collect([$this->createMatch($session, $locked->court, $group, $history, $round)]);
+
+            $session->update(['current_round' => $round, 'status' => 'live']);
+
+            return $created;
         });
 
-        return $this->generate($match->session);
+        /* Any other court the finished game freed up players for. */
+        return $created->concat($this->generate($match->session()->withoutGlobalScope('organization')->first()));
+    }
+
+    /**
+     * Shape player ids into what the pairing scorer expects.
+     *
+     * @param  array<int, int>  $playerIds
+     * @return Collection<int, array{player_id:int, rating:float}>
+     */
+    private function entriesFor(array $playerIds): Collection
+    {
+        $ratings = Player::query()
+            ->withoutGlobalScope('organization')
+            ->whereIn('id', $playerIds)
+            ->pluck('rating', 'id');
+
+        return collect($playerIds)
+            ->map(fn (int $id) => ['player_id' => $id, 'rating' => (float) ($ratings[$id] ?? 0)])
+            ->values();
     }
 
     /* ------------------------------------------------------------------ */
@@ -199,7 +254,7 @@ class OpenPlayRotationService
             ->with('player:id,rating')
             ->where('open_play_session_id', $session->id)
             ->whereNotIn('player_id', $playing)
-            ->whereIn('status', ['waiting', 'called'])
+            ->whereIn('status', [OpenPlayQueueEntry::WAITING, OpenPlayQueueEntry::UP_NEXT])
             ->orderBy('position')
             ->get()
             ->map(fn (OpenPlayQueueEntry $entry) => [
@@ -514,10 +569,27 @@ class OpenPlayRotationService
     /** @param  array<int, int>  $playerIds */
     private function markPlaying(OpenPlaySession $session, array $playerIds, int $courtId): void
     {
-        OpenPlayQueueEntry::query()
+        $now = now();
+
+        /* Going on court banks however long they stood in the queue and starts
+           the clock on this stint. `completeMatch` has usually done this
+           already; `generate` filling a cold court is the path that has not. */
+        foreach (OpenPlayQueueEntry::query()
+            ->withoutGlobalScope('organization')
             ->where('open_play_session_id', $session->id)
             ->whereIn('player_id', $playerIds)
-            ->update(['status' => 'called', 'assigned_court_id' => $courtId, 'called_at' => now()]);
+            ->get() as $entry) {
+            $waited = $entry->queue_entered_at ? (int) $now->diffInSeconds($entry->queue_entered_at, true) : 0;
+
+            $entry->update([
+                'status' => OpenPlayQueueEntry::ON_COURT,
+                'assigned_court_id' => $courtId,
+                'called_at' => $now,
+                'court_entered_at' => $entry->court_entered_at ?? $now,
+                'queue_entered_at' => null,
+                'total_waiting_seconds' => $entry->total_waiting_seconds + $waited,
+            ]);
+        }
 
         OpenPlayPlayer::query()
             ->where('open_play_session_id', $session->id)

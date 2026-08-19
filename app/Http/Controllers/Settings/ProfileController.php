@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Support\OpenPlayBoardAccess;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,6 +51,10 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        /* Same as signing out: the board this device holds is handed back
+           before the session that proves the hold is thrown away. */
+        OpenPlayBoardAccess::releaseAll($request);
 
         Auth::logout();
 

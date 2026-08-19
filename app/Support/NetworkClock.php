@@ -53,4 +53,19 @@ class NetworkClock
     {
         return self::now()->toDateString();
     }
+
+    /**
+     * The earliest day a player may book: tomorrow, never today.
+     *
+     * Same-day bookings are the club's to take at the desk, not the network's
+     * to hand out — a court that shows free at 6pm on a public grid may already
+     * have someone walking in for it, and a booking made an hour ahead leaves no
+     * time to tell anyone. A day of notice is what makes the grid trustworthy.
+     *
+     * The club's own timezone decides when tomorrow starts, not UTC.
+     */
+    public static function firstBookableDate(): string
+    {
+        return self::now()->addDay()->toDateString();
+    }
 }

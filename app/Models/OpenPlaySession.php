@@ -24,6 +24,7 @@ class OpenPlaySession extends Model
         'current_round',
         'auto_rotate',
         'format',
+        'max_consecutive_games',
         'target_score',
         'win_by_two',
         'session_date',

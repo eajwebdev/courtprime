@@ -16,8 +16,12 @@ class PlayerProfileUpdateRequest extends FormRequest
         return [
             'avatar.image' => 'Your profile photo must be an image file.',
             'avatar.max' => 'Your profile photo must be smaller than 4MB.',
-            'action_photo.image' => 'Your action shot must be an image file.',
-            'action_photo.max' => 'Your action shot must be smaller than 4MB.',
+            'action_photo.image' => 'Your first action shot must be an image file.',
+            'action_photo.max' => 'Your first action shot must be smaller than 4MB.',
+            'action_photo_two.image' => 'Your second action shot must be an image file.',
+            'action_photo_two.max' => 'Your second action shot must be smaller than 4MB.',
+            'action_photo_three.image' => 'Your third action shot must be an image file.',
+            'action_photo_three.max' => 'Your third action shot must be smaller than 4MB.',
         ];
     }
 
@@ -25,12 +29,17 @@ class PlayerProfileUpdateRequest extends FormRequest
     {
         return [
             'display_name' => ['required', 'string', 'max:255'],
-            /* Both photos are optional. 4MB covers a modern phone camera
-               without letting someone upload a RAW file. */
+            /* One profile photo and three action slots, every one optional.
+               4MB covers a modern phone camera without letting someone upload
+               a RAW file. */
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'action_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'action_photo_two' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'action_photo_three' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'remove_avatar' => ['sometimes', 'boolean'],
             'remove_action_photo' => ['sometimes', 'boolean'],
+            'remove_action_photo_two' => ['sometimes', 'boolean'],
+            'remove_action_photo_three' => ['sometimes', 'boolean'],
             'first_name' => ['nullable', 'string', 'max:120'],
             'last_name' => ['nullable', 'string', 'max:120'],
             'mobile_number' => ['nullable', 'string', 'max:50'],

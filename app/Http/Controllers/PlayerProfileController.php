@@ -24,6 +24,8 @@ class PlayerProfileController extends Controller
                 'display_name' => $profile->display_name,
                 'avatar_url' => $profile->avatar_url,
                 'action_photo_url' => $profile->action_photo_url,
+                'action_photo_two_url' => $profile->action_photo_two_url,
+                'action_photo_three_url' => $profile->action_photo_three_url,
                 'first_name' => $profile->first_name,
                 'last_name' => $profile->last_name,
                 'email' => $profile->email,
@@ -73,7 +75,18 @@ class PlayerProfileController extends Controller
         ]);
 
         $this->syncPhoto($profile, 'avatar_path', $request->file('avatar'), $request->boolean('remove_avatar'), 'player-avatars');
-        $this->syncPhoto($profile, 'action_photo_path', $request->file('action_photo'), $request->boolean('remove_action_photo'), 'player-action-photos');
+
+        /* The three action slots are addressed individually, so replacing the
+           second leaves the first and third alone. */
+        foreach (PlayerProfile::ACTION_PHOTO_COLUMNS as $field => $column) {
+            $this->syncPhoto(
+                $profile,
+                $column,
+                $request->file($field),
+                $request->boolean('remove_'.$field),
+                'player-action-photos',
+            );
+        }
 
         return back()->with('success', 'CourtPrime player profile saved.');
     }

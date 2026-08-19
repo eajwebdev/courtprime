@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Court;
 use App\Services\CourtAvailabilityService;
-use Illuminate\Http\Request;
 use App\Support\NetworkClock;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,8 +14,13 @@ class CourtDiscoveryController extends Controller
 {
     public function __invoke(Request $request, CourtAvailabilityService $availability): Response
     {
-        /* Club-local today, not UTC today. See NetworkClock. */
-        $date = $request->query('date', NetworkClock::today());
+        /*
+         * Discovery leads straight into booking, so it browses the same window
+         * booking sells: from tomorrow. Showing today's free slots here would be
+         * advertising a day the booking form refuses.
+         */
+        $firstBookable = NetworkClock::firstBookableDate();
+        $date = max((string) $request->query('date', $firstBookable), $firstBookable);
         $search = trim((string) $request->query('search', ''));
 
         $branches = Branch::query()
@@ -34,7 +39,12 @@ class CourtDiscoveryController extends Controller
                 });
             })
             ->orderBy('name')
-            ->get()
+            ->get();
+
+        /* One pass over every court on the page, not one per court. */
+        $days = $availability->slotsFor($branches->flatMap->courts, $date);
+
+        $branches = $branches
             ->map(fn (Branch $branch) => [
                 'id' => $branch->id,
                 'name' => $branch->name,
@@ -71,9 +81,10 @@ class CourtDiscoveryController extends Controller
                     'court_type' => $court->court_type,
                     'surface_type' => $court->surface_type,
                     'standard_hourly_rate' => $court->standard_hourly_rate,
-                    'available_slots' => collect($availability->slots($court, $date))->where('available', true)->count(),
+                    'available_slots' => collect($days[$court->id] ?? [])->where('available', true)->count(),
                 ])->values(),
-            ]);
+            ])
+            ->values();
 
         return Inertia::render('court-discovery', [
             'date' => $date,

@@ -135,41 +135,6 @@ export function DiscoveryHero({
     );
 }
 
-/** The glass search bar that sits inside a DiscoveryHero. */
-export function DiscoverySearchBar({ children, onSubmit }: { children: ReactNode; onSubmit: (event: React.FormEvent) => void }) {
-    return (
-        <form onSubmit={onSubmit} className="mt-5 rounded-2xl border border-white/12 bg-white/8 p-2 backdrop-blur-md sm:mt-8 sm:p-2.5">
-            <div className="flex flex-col gap-2 sm:flex-row">{children}</div>
-        </form>
-    );
-}
-
-/** A labelled field inside the search bar. */
-export function SearchField({
-    icon: Icon,
-    label,
-    className,
-    children,
-    trailing,
-}: {
-    icon: React.ElementType;
-    label: string;
-    className?: string;
-    children: ReactNode;
-    trailing?: ReactNode;
-}) {
-    return (
-        <div className={cn('bg-surface flex items-center gap-3 rounded-xl px-4 py-2.5', className)}>
-            <Icon className="text-primary size-4 shrink-0" aria-hidden />
-            <div className="min-w-0 flex-1">
-                <span className="text-muted block text-[0.6875rem] tracking-wider uppercase">{label}</span>
-                {children}
-            </div>
-            {trailing}
-        </div>
-    );
-}
-
 /**
  * One horizontally scrollable line of filters.
  *

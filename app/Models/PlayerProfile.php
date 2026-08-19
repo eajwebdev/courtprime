@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class PlayerProfile extends Model
 {
@@ -16,6 +17,8 @@ class PlayerProfile extends Model
         'last_name',
         'avatar_path',
         'action_photo_path',
+        'action_photo_two_path',
+        'action_photo_three_path',
         'email',
         'mobile_number',
         'birthday',
@@ -43,7 +46,7 @@ class PlayerProfile extends Model
      */
     public function getAvatarUrlAttribute(): ?string
     {
-        return $this->avatar_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path) : null;
+        return $this->avatar_path ? Storage::disk('public')->url($this->avatar_path) : null;
     }
 
     /**
@@ -51,7 +54,48 @@ class PlayerProfile extends Model
      */
     public function getActionPhotoUrlAttribute(): ?string
     {
-        return $this->action_photo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->action_photo_path) : null;
+        return $this->publicUrl($this->action_photo_path);
+    }
+
+    public function getActionPhotoTwoUrlAttribute(): ?string
+    {
+        return $this->publicUrl($this->action_photo_two_path);
+    }
+
+    public function getActionPhotoThreeUrlAttribute(): ?string
+    {
+        return $this->publicUrl($this->action_photo_three_path);
+    }
+
+    /**
+     * Every portrait this player has uploaded, avatar first, gaps closed up.
+     *
+     * The club scoreboard cycles this while they are on court. An empty list is
+     * the normal case and the caller falls back to the CourtPrime defaults, so
+     * a player who never uploads anything still gets a portrait on the TV.
+     *
+     * @return array<int, string>
+     */
+    public function getPortraitUrlsAttribute(): array
+    {
+        return array_values(array_filter([
+            $this->avatar_url,
+            $this->action_photo_url,
+            $this->action_photo_two_url,
+            $this->action_photo_three_url,
+        ]));
+    }
+
+    /** The three action slots, in order, keyed by the column behind each. */
+    public const ACTION_PHOTO_COLUMNS = [
+        'action_photo' => 'action_photo_path',
+        'action_photo_two' => 'action_photo_two_path',
+        'action_photo_three' => 'action_photo_three_path',
+    ];
+
+    private function publicUrl(?string $path): ?string
+    {
+        return $path ? Storage::disk('public')->url($path) : null;
     }
 
     protected function casts(): array

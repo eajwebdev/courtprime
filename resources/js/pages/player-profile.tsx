@@ -55,13 +55,37 @@ const PRIVACY = [
 
 /** Which fields belong to which tab, so errors can be routed to the right one. */
 const TABS = [
-    { id: 'photos', label: 'Photos', fields: ['avatar', 'action_photo'] },
+    { id: 'photos', label: 'Photos', fields: ['avatar', 'action_photo', 'action_photo_two', 'action_photo_three'] },
     { id: 'details', label: 'Details', fields: ['display_name', 'first_name', 'last_name', 'mobile_number', 'birthday', 'home_city', 'gender'] },
     { id: 'play', label: 'Play style', fields: ['preferred_playing_hand', 'preferred_match_type', 'skill_level'] },
     { id: 'privacy', label: 'Privacy', fields: [] },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+
+/**
+ * The three action slots.
+ *
+ * Each is addressed on its own so replacing the second leaves the other two
+ * alone, and each maps to the column of the same name on the server.
+ */
+const ACTION_SLOTS = [
+    { field: 'action_photo', removeField: 'remove_action_photo', urlKey: 'action_photo_url', label: 'Position 1', hint: 'Ready stance.' },
+    {
+        field: 'action_photo_two',
+        removeField: 'remove_action_photo_two',
+        urlKey: 'action_photo_two_url',
+        label: 'Position 2',
+        hint: 'Serve or drive.',
+    },
+    {
+        field: 'action_photo_three',
+        removeField: 'remove_action_photo_three',
+        urlKey: 'action_photo_three_url',
+        label: 'Position 3',
+        hint: 'Net play or celebration.',
+    },
+] as const;
 
 function initials(name: string) {
     return String(name ?? '')
@@ -88,8 +112,12 @@ export default function PlayerProfile({ profile }: { profile: any }) {
         skill_level: profile.skill_level ?? 'beginner',
         avatar: null as File | null,
         action_photo: null as File | null,
+        action_photo_two: null as File | null,
+        action_photo_three: null as File | null,
         remove_avatar: false,
         remove_action_photo: false,
+        remove_action_photo_two: false,
+        remove_action_photo_three: false,
         show_connected_clubs: Boolean(profile.privacy_settings?.show_connected_clubs),
         show_match_history: Boolean(profile.privacy_settings?.show_match_history),
         show_rating: Boolean(profile.privacy_settings?.show_rating),
@@ -240,7 +268,10 @@ export default function PlayerProfile({ profile }: { profile: any }) {
 
                 <div className="mt-5">
                     {tab === 'photos' && (
-                        <Panel title="Photos" description="Both optional. Without them we show your initials.">
+                        <Panel
+                            title="Photos"
+                            description="All optional. Without them your club's screens show a CourtPrime portrait, and lists show your initials."
+                        >
                             <PhotoUploadField
                                 label="Profile photo"
                                 hint="Head and shoulders. Used on bookings, check-in and leaderboards."
@@ -255,19 +286,36 @@ export default function PlayerProfile({ profile }: { profile: any }) {
                                 onRemove={() => form.setData('remove_avatar', true)}
                             />
 
+                            {/* Three slots, because the club scoreboard cycles them
+                                while you are on court. One photo means the same
+                                frame for a whole game. */}
                             <div className="border-border border-t pt-6">
-                                <PhotoUploadField
-                                    label="Action shot"
-                                    hint="Full body, on court. Shown on your public identity card."
-                                    shape="action"
-                                    currentUrl={profile.action_photo_url}
-                                    error={form.errors.action_photo as string | undefined}
-                                    onSelect={(file) => {
-                                        form.setData('action_photo', file);
-                                        if (file) form.setData('remove_action_photo', false);
-                                    }}
-                                    onRemove={() => form.setData('remove_action_photo', true)}
-                                />
+                                <div>
+                                    <h3 className="text-h3 text-foreground">Action shots</h3>
+                                    <p className="text-meta mt-1">
+                                        Up to three. They cycle on the club's courtside screen while you are playing, and the first one is your public
+                                        identity card.
+                                    </p>
+                                </div>
+
+                                <div className="mt-5 grid gap-6 sm:grid-cols-3">
+                                    {ACTION_SLOTS.map((slot) => (
+                                        <PhotoUploadField
+                                            key={slot.field}
+                                            label={slot.label}
+                                            hint={slot.hint}
+                                            shape="action"
+                                            layout="column"
+                                            currentUrl={profile[slot.urlKey]}
+                                            error={form.errors[slot.field] as string | undefined}
+                                            onSelect={(file) => {
+                                                form.setData(slot.field, file);
+                                                if (file) form.setData(slot.removeField, false);
+                                            }}
+                                            onRemove={() => form.setData(slot.removeField, true)}
+                                        />
+                                    ))}
+                                </div>
                             </div>
                         </Panel>
                     )}

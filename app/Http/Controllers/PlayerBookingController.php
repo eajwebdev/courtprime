@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PlayerBookingStoreRequest;
 use App\Models\Court;
+use App\Models\OrganizationPlayer;
 use App\Models\PlayerMembership;
 use App\Services\CourtAvailabilityService;
 use App\Services\PlayerProfileResolver;
@@ -27,11 +28,33 @@ class PlayerBookingController extends Controller
     public function index(Request $request, PlayerProfileResolver $profiles, CourtAvailabilityService $availability): Response
     {
         $profile = $request->user() ? $profiles->forUser($request->user()) : null;
-        /* Club-local today, not UTC today. See NetworkClock. */
-        $date = $request->query('date', NetworkClock::today());
+
+        /*
+         * The page opens on the first day it can actually sell, and a link to an
+         * earlier one is pulled forward rather than rendered as a grid where
+         * every slot would be refused on submit. Club-local, not UTC — see
+         * NetworkClock.
+         */
+        $firstBookable = NetworkClock::firstBookableDate();
+        $date = max((string) $request->query('date', $firstBookable), $firstBookable);
         $search = trim((string) $request->query('search', ''));
         /* Discovery links straight to a court, so the page can preselect it. */
         $selectedCourtId = $request->integer('court') ?: null;
+
+        /*
+         * The club-side player records behind this identity, so the grid can
+         * say "Your booking" instead of showing the player their own name back
+         * as if it were a stranger's.
+         */
+        $ownPlayerIds = $profile
+            ? OrganizationPlayer::query()
+                ->withoutGlobalScope('organization')
+                ->where('player_profile_id', $profile->id)
+                ->whereNotNull('legacy_player_id')
+                ->pluck('legacy_player_id')
+                ->map(fn ($id) => (int) $id)
+                ->all()
+            : [];
 
         $courts = Court::query()
             ->withoutGlobalScope('organization')
@@ -50,7 +73,12 @@ class PlayerBookingController extends Controller
             })
             ->orderBy('branch_id')
             ->orderBy('court_number')
-            ->get()
+            ->get();
+
+        /* Every court's day in two queries, rather than two per half hour. */
+        $days = $availability->slotsFor($courts, $date, $ownPlayerIds);
+
+        $courts = $courts
             ->map(fn (Court $court) => [
                 'id' => $court->id,
                 'name' => $court->name,
@@ -72,12 +100,14 @@ class PlayerBookingController extends Controller
                 'has_membership_rate' => $profile ? $this->hasActiveMembership($profile->id, (int) $court->organization_id) : false,
                 /*
                  * The whole day is returned, not just the first ten free slots.
-                 * The booking grid needs the unavailable ones too so taken
-                 * times render as disabled rather than silently disappearing,
-                 * and so a duration can be checked against contiguous slots.
+                 * The booking grid needs the taken ones too — each carrying who
+                 * or what is holding it — so a taken time reads as a named
+                 * block rather than silently disappearing, and so a duration
+                 * can be checked against contiguous slots.
                  */
-                'slots' => collect($availability->slots($court, $date))->values(),
-            ]);
+                'slots' => $days[$court->id] ?? [],
+            ])
+            ->values();
 
         return Inertia::render('player-booking', [
             'profile' => $profile ? [
@@ -87,6 +117,9 @@ class PlayerBookingController extends Controller
                 'avatar_url' => $profile->avatar_url,
             ] : null,
             'date' => $date,
+            /* The rail and the calendar both start here rather than at today. */
+            'firstBookableDate' => $firstBookable,
+            'maxHours' => CourtAvailabilityService::MAX_HOURS,
             'search' => $search,
             'selectedCourtId' => $selectedCourtId,
             'courts' => $courts,

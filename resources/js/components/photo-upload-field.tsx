@@ -13,6 +13,13 @@ type PhotoUploadFieldProps = {
     currentUrl?: string | null;
     /** `avatar` crops to a circle, `action` keeps a tall 3:4 frame. */
     shape?: 'avatar' | 'action';
+    /**
+     * `row` puts the preview beside its controls, which is right for a field
+     * that owns the full width. `column` stacks them from `sm` up, for fields
+     * sitting side by side in a grid where a row leaves no width for either
+     * half. Below `sm` a grid is one column again, so it stays a row there.
+     */
+    layout?: 'row' | 'column';
     error?: string;
     onSelect: (file: File | null) => void;
     onRemove: () => void;
@@ -27,7 +34,17 @@ type PhotoUploadFieldProps = {
  * is never blocked. Validation runs client-side first so an oversized file is
  * rejected before it is uploaded, then again server-side.
  */
-export function PhotoUploadField({ label, hint, currentUrl, shape = 'avatar', error, onSelect, onRemove, fallback = '' }: PhotoUploadFieldProps) {
+export function PhotoUploadField({
+    label,
+    hint,
+    currentUrl,
+    shape = 'avatar',
+    layout = 'row',
+    error,
+    onSelect,
+    onRemove,
+    fallback = '',
+}: PhotoUploadFieldProps) {
     const inputId = useId();
     const inputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
@@ -77,9 +94,9 @@ export function PhotoUploadField({ label, hint, currentUrl, shape = 'avatar', er
     const isAvatar = shape === 'avatar';
 
     return (
-        /* A row at every width. Stacking on a phone spent ~450px of screen on
-           one optional field, so the second photo was always below the fold. */
-        <div className="flex items-start gap-3 sm:gap-4">
+        /* A row by default. Stacking on a phone spent ~450px of screen on one
+           optional field, so the second photo was always below the fold. */
+        <div className={cn('flex items-start gap-3 sm:gap-4', layout === 'column' && 'sm:flex-col sm:gap-3')}>
             {/* Preview */}
             <div
                 className={cn(
@@ -100,7 +117,7 @@ export function PhotoUploadField({ label, hint, currentUrl, shape = 'avatar', er
                 )}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className={cn('min-w-0 flex-1', layout === 'column' && 'sm:w-full sm:flex-none')}>
                 <p className="text-label text-foreground font-medium">
                     {label} <span className="text-muted font-normal">(optional)</span>
                 </p>

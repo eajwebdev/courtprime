@@ -1,4 +1,5 @@
-import { DiscoveryHero, DiscoverySearchBar, SearchField } from '@/components/discovery/discovery-chrome';
+import { DateRail } from '@/components/booking/date-rail';
+import { DiscoveryHero } from '@/components/discovery/discovery-chrome';
 import { DiscoveryPage } from '@/components/discovery/discovery-page';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/status-badge';
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { Head, router, useForm } from '@inertiajs/react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CalendarDays, Check, MapPin, Search, Trophy, Users, X } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from the tournament controller. */
 type Props = { search: string; date?: string; tournaments: any };
@@ -26,6 +27,24 @@ export default function TournamentDiscovery({ search, date, tournaments }: Props
         event.preventDefault();
         router.get('/find-tournaments', filters, { preserveState: true, preserveScroll: true });
     };
+
+    const apply = (next: Partial<typeof filters>) => {
+        const merged = { ...filters, ...next };
+        setFilters(merged);
+        router.get('/find-tournaments', merged, { preserveState: true, preserveScroll: true });
+    };
+
+    /* Search runs as you type, as it does on /find-courts and /me/book. */
+    useEffect(() => {
+        if (filters.search === search) return;
+
+        const timer = setTimeout(() => {
+            router.get('/find-tournaments', filters, { preserveState: true, preserveScroll: true, replace: true });
+        }, 400);
+
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters.search, filters.date, search]);
 
     const rows: any[] = tournaments?.data ?? [];
 
@@ -45,51 +64,50 @@ export default function TournamentDiscovery({ search, date, tournaments }: Props
                     description="Public tournaments across connected venues, with every result tied to one global player identity."
                     artwork="/cp-model1.png"
                 >
-                    <DiscoverySearchBar onSubmit={submit}>
-                        <SearchField
-                            icon={Search}
-                            label="Tournament, club or city"
-                            className="flex-1"
-                            trailing={
-                                filters.search ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const next = { ...filters, search: '' };
-                                            setFilters(next);
-                                            router.get('/find-tournaments', next, { preserveState: true, preserveScroll: true });
-                                        }}
-                                        aria-label="Clear search"
-                                        className="text-muted hover:text-foreground rounded-full p-1"
-                                    >
-                                        <X className="size-4" />
-                                    </button>
-                                ) : undefined
-                            }
-                        >
-                            <Input
-                                value={filters.search}
-                                onChange={(event) => setFilters({ ...filters, search: event.target.value })}
-                                placeholder="e.g. Bacolod open"
-                                aria-label="Tournament, club or city"
-                                className="text-label h-7 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                            />
-                        </SearchField>
+                    {/* Same field and rail as /find-courts, /find-open-play and
+                        /me/book. This page kept a bare <input type="date"> and a
+                        Search button: the date picker was the browser's own grey
+                        dd/mm/yyyy control sitting in the middle of the hero, and
+                        the button asked for a second action the other three pages
+                        stopped needing once search ran as you type. */}
+                    <form onSubmit={submit} className="relative mt-5 sm:mt-7 sm:max-w-xl">
+                        <label htmlFor="q" className="sr-only">
+                            Tournament, club or city
+                        </label>
+                        <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-white/70" aria-hidden />
+                        <input
+                            id="q"
+                            type="search"
+                            value={filters.search}
+                            onChange={(event) => setFilters({ ...filters, search: event.target.value })}
+                            placeholder="Tournament, club or city"
+                            /* 16px on phones: anything smaller makes iOS zoom. */
+                            className="sm:text-label h-12 w-full rounded-xl border border-white/15 bg-white/8 pr-12 pl-10 text-base text-white backdrop-blur-md placeholder:text-white/45 [&::-webkit-search-cancel-button]:hidden"
+                        />
+                        {filters.search && (
+                            <button
+                                type="button"
+                                onClick={() => apply({ search: '' })}
+                                aria-label="Clear search"
+                                className="absolute top-1/2 right-1 flex size-10 -translate-y-1/2 items-center justify-center rounded-full text-white/60 hover:text-white"
+                            >
+                                <X className="size-4" />
+                            </button>
+                        )}
+                        <button type="submit" className="sr-only">
+                            Search
+                        </button>
+                    </form>
 
-                        <SearchField icon={CalendarDays} label="Starting from" className="sm:w-56">
-                            <Input
-                                type="date"
-                                value={filters.date}
-                                onChange={(event) => setFilters({ ...filters, date: event.target.value })}
-                                aria-label="Starting from"
-                                className="text-label h-7 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                            />
-                        </SearchField>
-
-                        <Button type="submit" size="touch" className="sm:w-auto sm:px-8">
-                            <Search className="size-4" /> Search
-                        </Button>
-                    </DiscoverySearchBar>
+                    {/*
+                     * No `from`: a tournament can be running today, unlike a court
+                     * booking, so today stays selectable. `clearable`, because the
+                     * date is one optional filter here rather than the subject of
+                     * the page — pressing the chosen day again goes back to every
+                     * upcoming tournament, which the old date input could do and a
+                     * rail otherwise could not.
+                     */}
+                    <DateRail value={filters.date} onChange={(next) => apply({ date: next })} tone="deep" clearable className="mt-3" />
                 </DiscoveryHero>
 
                 <section className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8">

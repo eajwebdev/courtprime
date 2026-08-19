@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\CourtPrimeNotification;
+use App\Services\NotificationService;
 use App\Services\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,10 +17,82 @@ class NotificationCenterController extends Controller
     {
         $query = $this->visibleNotifications($request, $tenantContext);
 
+        /* Unread first, because a notification centre is a queue of things not
+           yet dealt with, not an archive. */
+        $filter = $request->query('filter') === 'all' ? 'all' : 'unread';
+        $category = $request->query('category');
+
+        $rows = (clone $query)
+            ->when($filter === 'unread', fn ($builder) => $builder->whereNull('read_at'))
+            ->when($category, fn ($builder) => $builder->where('category', $category))
+            ->latest()
+            ->paginate(30)
+            ->withQueryString();
+
         return Inertia::render('notifications', [
-            'notifications' => (clone $query)->latest()->paginate(20),
+            'notifications' => $rows,
+            'filter' => $filter,
+            'category' => $category,
             'unreadCount' => (clone $query)->whereNull('read_at')->count(),
+            /* The kinds actually present, so the filter never offers a category
+               with nothing behind it. */
+            'categories' => (clone $query)
+                ->selectRaw('category, COUNT(*) as total, SUM(CASE WHEN read_at IS NULL THEN 1 ELSE 0 END) as unread')
+                ->groupBy('category')
+                ->orderByDesc('total')
+                ->get()
+                ->map(fn ($row) => [
+                    'category' => (string) $row->category,
+                    'total' => (int) $row->total,
+                    'unread' => (int) $row->unread,
+                ])
+                ->all(),
         ]);
+    }
+
+    /**
+     * The few most recent unread, for the header bell.
+     *
+     * Its own endpoint rather than a shared Inertia prop: the bell sits on every
+     * page in the app and most of them are never opened, so the query is paid
+     * for when somebody actually looks rather than on every page load.
+     */
+    public function recent(Request $request, TenantContext $tenantContext): JsonResponse
+    {
+        $rows = $this->visibleNotifications($request, $tenantContext)
+            ->whereNull('read_at')
+            ->latest()
+            ->limit(8)
+            ->get(['id', 'category', 'title', 'body', 'data', 'created_at']);
+
+        return response()->json([
+            'unread' => $this->visibleNotifications($request, $tenantContext)->whereNull('read_at')->count(),
+            'notifications' => $rows->map(fn ($row) => [
+                'id' => $row->id,
+                'category' => $row->category,
+                'title' => $row->title,
+                'body' => $row->body,
+                'url' => $row->data['url'] ?? null,
+                'created_at' => $row->created_at?->toIso8601String(),
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * Clear the whole queue.
+     *
+     * Reading thirty notifications one at a time is not triage, it is data
+     * entry. Only what the viewer can currently see is marked, so a category
+     * filter clears that category and nothing else.
+     */
+    public function markAllRead(Request $request, TenantContext $tenantContext): RedirectResponse
+    {
+        $marked = $this->visibleNotifications($request, $tenantContext)
+            ->whereNull('read_at')
+            ->when($request->query('category'), fn ($builder) => $builder->where('category', $request->query('category')))
+            ->update(['read_at' => now()]);
+
+        return back()->with('success', $marked === 1 ? '1 notification marked as read.' : $marked.' notifications marked as read.');
     }
 
     public function markRead(Request $request, CourtPrimeNotification $courtPrimeNotification, TenantContext $tenantContext): RedirectResponse
@@ -32,30 +106,7 @@ class NotificationCenterController extends Controller
 
     private function visibleNotifications(Request $request, TenantContext $tenantContext)
     {
-        $user = $request->user();
-        $organizationId = $tenantContext->currentOrganizationId();
-        $profileId = $user->playerProfile?->id;
-
-        return CourtPrimeNotification::query()
-            ->where(function ($query) use ($user, $organizationId, $profileId) {
-                $query->where('user_id', $user->id);
-
-                if ($profileId) {
-                    $query->orWhere('player_profile_id', $profileId);
-                }
-
-                if ($organizationId) {
-                    $query->orWhere(function ($query) use ($organizationId) {
-                        $query->where('organization_id', $organizationId)->whereNull('user_id')->whereNull('player_profile_id');
-                    });
-                }
-
-                if ($user->is_superadmin) {
-                    $query->orWhere(function ($query) {
-                        $query->whereNull('organization_id')->whereNull('user_id')->whereNull('player_profile_id');
-                    });
-                }
-            });
+        return app(NotificationService::class)->visibleTo($request->user(), $tenantContext->currentOrganizationId());
     }
 
     private function canAccess(Request $request, TenantContext $tenantContext, CourtPrimeNotification $notification): bool

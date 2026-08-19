@@ -56,7 +56,7 @@ export function SectionPricing({ plans }: { plans: Plan[] }) {
                     className="border-primary/25 bg-primary-soft text-label text-primary mx-auto -mt-2 mb-10 flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-center font-medium"
                 >
                     <Sparkles className="size-4 shrink-0" aria-hidden />
-                    Founding club offer. First 50 clubs keep this rate for 12 months.
+                    Founding club offer. First 6 clubs keep this rate for 12 months.
                 </motion.p>
             )}
 

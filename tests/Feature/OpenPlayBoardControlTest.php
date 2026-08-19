@@ -7,6 +7,7 @@ use App\Models\Court;
 use App\Models\OpenPlaySession;
 use App\Models\OpenPlaySessionCourt;
 use App\Models\Organization;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -98,6 +99,62 @@ class OpenPlayBoardControlTest extends TestCase
 
         $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
             ->assertRedirect('/open-play/OP-TEST01/board');
+    }
+
+    /**
+     * Signing out puts the board down.
+     *
+     * The proof of the hold lives in the server session, and logging out throws
+     * that away. Without releasing first, the board stayed flagged as held by a
+     * token nobody could present any more: live on the desk, and shut against
+     * the next player with the right pair until the stale window ran out.
+     */
+    public function test_signing_out_releases_the_board_so_another_player_can_take_it(): void
+    {
+        $session = $this->makeSession();
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user);
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
+            ->assertRedirect('/open-play/OP-TEST01/board');
+
+        $this->assertNotNull($session->refresh()->organizer_token);
+
+        $this->post('/logout')->assertRedirect('/');
+
+        /* Nobody is holding it: the desk reads it as free, and so does the gate. */
+        $this->assertNull($session->refresh()->organizer_token);
+        $this->assertNull($session->organizer_claimed_at);
+
+        /* Another player, another browser, same ID and key. */
+        $this->flushSession();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])
+            ->assertRedirect('/open-play/OP-TEST01/board');
+
+        $this->assertNotNull($session->refresh()->organizer_token);
+    }
+
+    /**
+     * Signing out elsewhere does not reach across and drop a board that another
+     * device is running. The hold belongs to the browser, not to the account.
+     */
+    public function test_signing_out_leaves_a_board_held_by_a_different_device_alone(): void
+    {
+        $session = $this->makeSession();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        $held = $session->refresh()->organizer_token;
+
+        /* A different browser, signed in, holding no board. */
+        $this->flushSession();
+        $this->actingAs(User::factory()->create());
+
+        $this->post('/logout')->assertRedirect('/');
+
+        $this->assertSame($held, $session->refresh()->organizer_token);
     }
 
     public function test_a_device_that_is_not_holding_the_board_cannot_change_it(): void

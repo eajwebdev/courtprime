@@ -17,6 +17,16 @@ type Tab = 'players' | 'next' | 'standings' | 'history';
  * that what is on screen is complete. Tabs give whichever one is being used the
  * full height, and the counts stay visible on the tabs that are not.
  */
+/** "just now", then minutes, then hours — the resolution a queue is read at. */
+function waitLabel(seconds?: number | null) {
+    const total = Math.max(0, Number(seconds ?? 0));
+
+    if (total < 60) return 'just now';
+    if (total < 3600) return `${Math.floor(total / 60)}m`;
+
+    return `${Math.floor(total / 3600)}h ${Math.floor((total % 3600) / 60)}m`;
+}
+
 export function BoardRail({
     base,
     roster,
@@ -64,20 +74,32 @@ export function BoardRail({
                     <ul className="divide-border min-h-0 flex-1 divide-y overflow-y-auto">
                         {waiting.map((entry, index) => (
                             <li key={entry.player_id} className="flex items-center gap-3 px-4 py-2.5">
+                                {/* The server decides who is up next, because it
+                                    knows whether this is singles or doubles. The
+                                    board used to assume four. */}
                                 <span
                                     data-numeric
                                     className={cn(
                                         'text-meta flex size-7 shrink-0 items-center justify-center rounded-full font-semibold',
-                                        needed === 0 && index < 4 ? 'bg-primary text-primary-foreground' : 'bg-surface-muted text-muted',
+                                        entry.up_next && needed === 0 ? 'bg-primary text-primary-foreground' : 'bg-surface-muted text-muted',
                                     )}
                                 >
-                                    {index + 1}
+                                    {entry.position ?? index + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <p className="text-label text-foreground truncate font-medium">{entry.name}</p>
                                     <p className="text-meta text-muted">
-                                        <span data-numeric>{entry.games}</span> {entry.games === 1 ? 'game' : 'games'} ·{' '}
-                                        <span data-numeric>{entry.wins}</span> won
+                                        {/* How long they have stood there is the
+                                            thing somebody waiting actually wants
+                                            to see, ahead of their record. */}
+                                        <span data-numeric>{waitLabel(entry.waiting_seconds)}</span> waiting · <span data-numeric>{entry.games}</span>{' '}
+                                        {entry.games === 1 ? 'game' : 'games'}
+                                        {entry.consecutive_games > 0 && (
+                                            <>
+                                                {' · '}
+                                                <span data-numeric>{entry.consecutive_games}</span> in a row
+                                            </>
+                                        )}
                                     </p>
                                 </div>
                             </li>

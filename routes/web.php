@@ -5,6 +5,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ApiCredentialController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\BranchPhotoController;
+use App\Http\Controllers\BranchScoreboardController;
 use App\Http\Controllers\CashierSessionController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\CoachController;
@@ -66,6 +67,12 @@ Route::get('request-demo', [DemoRequestController::class, 'create'])->name('demo
 Route::post('request-demo', [DemoRequestController::class, 'store'])->name('demo.store');
 Route::get('request-demo/confirmation/{demoRequest}', [DemoRequestController::class, 'confirmation'])->name('demo.requested');
 Route::get('display/live', [LiveCourtController::class, 'display'])->name('display.live');
+/*
+ * One branch's courtside screen. Public because it runs on a TV in the venue
+ * that nobody signs into; the club can still put it behind a token in settings,
+ * and this honours the same one as the club-wide display.
+ */
+Route::get('display/scoreboard/{branch}', BranchScoreboardController::class)->name('display.scoreboard');
 Route::get('live/matches/{match}', [PublicLiveMatchController::class, 'show'])->name('matches.public.show');
 Route::get('player-identities/{courtprimePlayerId}', [PlayerIdentityController::class, 'publicProfile'])->name('player-identities.public');
 Route::get('player-qr/{courtprimePlayerId}', [PlayerIdentityController::class, 'qrProfile'])->middleware('signed')->name('player-identities.qr');
@@ -202,6 +209,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('support-tickets', [SupportTicketController::class, 'store'])->name('support-tickets.store');
     Route::post('support-tickets/{supportTicket}/messages', [SupportTicketController::class, 'message'])->name('support-tickets.messages.store');
     Route::get('notifications', [NotificationCenterController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/recent', [NotificationCenterController::class, 'recent'])->name('notifications.recent');
+    Route::post('notifications/read-all', [NotificationCenterController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('notifications/{courtPrimeNotification}/read', [NotificationCenterController::class, 'markRead'])->name('notifications.read');
     Route::get('pos', [POSController::class, 'index'])->name('pos.index');
     Route::post('pos', [POSController::class, 'store'])->name('pos.store');

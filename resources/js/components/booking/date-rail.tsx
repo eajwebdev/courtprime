@@ -39,18 +39,38 @@ export function DateRail({
     onChange,
     tone = 'surface',
     days = 7,
+    from = 0,
+    clearable = false,
     className,
 }: {
     value: string;
     onChange: (value: string) => void;
     tone?: 'surface' | 'deep';
     days?: number;
+    /**
+     * Day the rail starts on, as an offset from today. Booking passes 1: courts
+     * are taken a day ahead, so offering today would be offering a day every
+     * slot on it would refuse.
+     */
+    from?: number;
+    /**
+     * Whether "no date" is a legal state. Booking always has a day selected, so
+     * it leaves this off; discovery pages where the date is one optional filter
+     * turn it on, and pressing the selected day again clears back to any date.
+     */
+    clearable?: boolean;
     className?: string;
 }) {
     const [calendarOpen, setCalendarOpen] = useState(false);
-    const cells = useMemo(() => Array.from({ length: days }, (_, offset) => dayCell(offset)), [days]);
+    const cells = useMemo(() => Array.from({ length: days }, (_, offset) => dayCell(offset + from)), [days, from]);
 
-    const custom = !cells.some((cell) => cell.value === value);
+    /*
+     * An empty value means no date is chosen, which is a real state on a page
+     * where the date is an optional filter. Treating it as a custom date lit up
+     * the trailing cell as selected and labelled it "Date —".
+     */
+    const chosen = Boolean(value);
+    const custom = chosen && !cells.some((cell) => cell.value === value);
     const customLabel = labelFor(value);
 
     const idle =
@@ -77,7 +97,7 @@ export function DateRail({
                         <button
                             key={cell.value}
                             type="button"
-                            onClick={() => onChange(cell.value)}
+                            onClick={() => onChange(active && clearable ? '' : cell.value)}
                             aria-pressed={active}
                             className={cn(cellClass, active ? 'border-primary bg-primary text-primary-foreground' : idle)}
                         >
@@ -113,7 +133,9 @@ export function DateRail({
                 </button>
             </div>
 
-            <DatePickerSheet open={calendarOpen} onOpenChange={setCalendarOpen} value={value} onSelect={onChange} />
+            {/* The calendar honours the same floor, or the rail would refuse
+                today while the sheet behind it still offered it. */}
+            <DatePickerSheet open={calendarOpen} onOpenChange={setCalendarOpen} value={value} onSelect={onChange} from={from} />
         </>
     );
 }

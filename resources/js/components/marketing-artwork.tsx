@@ -148,7 +148,149 @@ export function MarketingVisualFrame({ className, children }: { className?: stri
     );
 }
 
-function ArtworkImage({ src, alt, className, priority, width, height, sizes }: ArtworkProps & { src: string }) {
+/**
+ * Stand-in portraits for a player who has uploaded none.
+ *
+ * Three per gender, faceless and brand-coloured on purpose: a stock photo of a
+ * stranger would read as a claim about who is on court, and a blank silhouette
+ * reads as a broken image. All six are transparent PNGs in the navy/pink
+ * palette, so they composite on `bg-surface-deep` and nowhere light.
+ *
+ * Gender comes from the player's stated field only, never inferred from a name.
+ * Anything unset or withheld uses the female set, matching `athleteFor`.
+ */
+const DEFAULT_PORTRAITS = {
+    male: ['/male_pickleball_default_1.png', '/male_pickleball_default_2.png', '/male_pickleball_default_3.png'],
+    female: ['/female_pickleball_default_1.png', '/female_pickleball_default_2.png', '/female_pickleball_default_3.png'],
+} as const;
+
+export function defaultPortraits(gender?: string | null): readonly string[] {
+    switch (String(gender ?? '').toLowerCase()) {
+        case 'male':
+        case 'man':
+            return DEFAULT_PORTRAITS.male;
+        default:
+            return DEFAULT_PORTRAITS.female;
+    }
+}
+
+/**
+ * Stand-in artwork for a doubles pair.
+ *
+ * A team that has uploaded nothing reads better as one pair than as two
+ * near-identical singles silhouettes side by side, so a doubles side with no
+ * photos of its own gets the team art for its composition instead.
+ *
+ * Composition is read from stated gender only. A pair counts as men's or
+ * women's doubles only when *both* players have said so; anything else — a
+ * genuine mix, or a player who has not filled it in — uses the mixed art. That
+ * is the honest default: it asserts nothing about somebody who never told us,
+ * where picking one of the single-gender pieces would.
+ */
+const DOUBLES_PORTRAITS = {
+    male: ['/pickleball_doubles_male.png'],
+    female: ['/pickleball_doubles_female.png'],
+    mixed: ['/pickleball_doubles_mixed_1.png', '/pickleball_doubles_mixed_2.png'],
+} as const;
+
+export function doublesPortraits(genders: readonly (string | null | undefined)[]): readonly string[] {
+    const stated = genders.map((gender) => {
+        switch (String(gender ?? '').toLowerCase()) {
+            case 'male':
+            case 'man':
+                return 'male';
+            case 'female':
+            case 'woman':
+                return 'female';
+            default:
+                return null;
+        }
+    });
+
+    if (stated.length > 0 && stated.every((gender) => gender === 'male')) {
+        return DOUBLES_PORTRAITS.male;
+    }
+
+    if (stated.length > 0 && stated.every((gender) => gender === 'female')) {
+        return DOUBLES_PORTRAITS.female;
+    }
+
+    return DOUBLES_PORTRAITS.mixed;
+}
+
+/**
+ * A doubles pair, full body, for scoreboards and courtside screens.
+ *
+ * `object-contain` unlike the single portrait: these are standing figures in a
+ * 4:5 frame, and covering a square crop would cut them off at the knees and the
+ * shoulders. They carry no background, so they need a dark surface under them.
+ */
+export function TeamPortrait({
+    src,
+    className,
+    alt,
+    priority = false,
+    decorative = true,
+    width = 1122,
+    height = 1402,
+    sizes = '(max-width: 768px) 30vw, 260px',
+    onError,
+}: ArtworkProps & { src: string; onError?: () => void }) {
+    return (
+        <ArtworkImage
+            src={src}
+            alt={decorative ? '' : (alt ?? 'CourtPrime doubles pair')}
+            width={width}
+            height={height}
+            sizes={sizes}
+            priority={priority}
+            onError={onError}
+            className={cn('object-contain select-none', className)}
+        />
+    );
+}
+
+/**
+ * The portraits to cycle for one player: their own uploads if they have any,
+ * otherwise the CourtPrime defaults for their stated gender.
+ */
+export function portraitsFor(player: { photos?: string[] | null; gender?: string | null }): readonly string[] {
+    return player.photos?.length ? player.photos : defaultPortraits(player.gender);
+}
+
+/**
+ * One player's portrait, square, for scoreboards and courtside screens.
+ *
+ * Sized by the caller through `className`. `object-cover` rather than contain:
+ * these are square frames inside a circle or a rounded tile, and a contained
+ * image would float in a box of empty space.
+ */
+export function PlayerPortrait({
+    src,
+    className,
+    alt,
+    priority = false,
+    decorative = true,
+    width = 512,
+    height = 512,
+    sizes = '(max-width: 768px) 25vw, 220px',
+    onError,
+}: ArtworkProps & { src: string; onError?: () => void }) {
+    return (
+        <ArtworkImage
+            src={src}
+            alt={decorative ? '' : (alt ?? 'CourtPrime player')}
+            width={width}
+            height={height}
+            sizes={sizes}
+            priority={priority}
+            onError={onError}
+            className={cn('object-cover select-none', className)}
+        />
+    );
+}
+
+function ArtworkImage({ src, alt, className, priority, width, height, sizes, onError }: ArtworkProps & { src: string; onError?: () => void }) {
     return (
         <img
             src={src}
@@ -160,6 +302,7 @@ function ArtworkImage({ src, alt, className, priority, width, height, sizes }: A
             height={height}
             sizes={sizes}
             aria-hidden={alt === '' ? true : undefined}
+            onError={onError}
             className={className}
         />
     );

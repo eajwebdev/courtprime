@@ -8,12 +8,14 @@ use App\Models\ClubMatch;
 use App\Models\Court;
 use App\Models\OpenPlayMatch;
 use App\Models\OpenPlayPlayer;
+use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
 use App\Models\Player;
 use App\Services\MatchScoringService;
 use App\Services\OpenPlayCollectionService;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
+use App\Services\PaddleStackService;
 use App\Services\PlayerIdentityService;
 use App\Support\NetworkClock;
 use App\Support\OpenPlayBoardAccess;
@@ -790,21 +792,36 @@ class PublicOpenPlayBoardController extends Controller
 
         $stats = $this->stats($session);
 
-        return $session->queue()
-            ->withoutGlobalScope('organization')
-            ->with('player:id,name')
-            ->whereNotIn('player_id', $playing)
-            ->orderBy('position')
-            ->get()
-            ->map(fn ($entry) => [
-                'player_id' => $entry->player_id,
-                'name' => $entry->player?->name,
-                'games' => $stats[$entry->player_id]['games'] ?? 0,
-                'wins' => $stats[$entry->player_id]['wins'] ?? 0,
-                'last_round' => $stats[$entry->player_id]['last_round'] ?? null,
-            ])
-            ->sortBy([['games', 'asc'], ['last_round', 'asc']])
+        /*
+         * Queue order, not a leaderboard.
+         *
+         * This used to re-sort by games played, which showed people a different
+         * order from the one they would actually be called in. The stack is
+         * FIFO, so the board shows the stack.
+         */
+        $stack = app(PaddleStackService::class);
+        $upNext = $stack->upNext($session);
+        $now = now();
+
+        return $stack->waitingQueue($session, $playing)
             ->values()
+            ->map(function (OpenPlayQueueEntry $entry, int $index) use ($stats, $upNext, $now) {
+                $waitingSince = $entry->queue_entered_at ?? $entry->created_at;
+
+                return [
+                    'player_id' => $entry->player_id,
+                    'name' => $entry->player?->name,
+                    'position' => $index + 1,
+                    /* Up next is the front of the queue, marked so the people
+                       who should be picking their paddles up can see it. */
+                    'up_next' => in_array((int) $entry->player_id, $upNext, true),
+                    'waiting_seconds' => $waitingSince ? (int) $now->diffInSeconds($waitingSince, true) : 0,
+                    'joined_at' => $entry->created_at?->toIso8601String(),
+                    'games' => $stats[$entry->player_id]['games'] ?? 0,
+                    'wins' => $stats[$entry->player_id]['wins'] ?? 0,
+                    'consecutive_games' => (int) $entry->consecutive_games_played,
+                ];
+            })
             ->all();
     }
 

@@ -7,8 +7,8 @@ import AppLayout from '@/layouts/app-layout';
 import { currency, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { CalendarDays, Clock, Plus, Users } from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { CalendarDays, Check, Clock, LogIn, Play, Plus, Users } from 'lucide-react';
 import { useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from ReservationController. */
@@ -147,6 +147,14 @@ export default function Reservations({ date, month, monthLoad, reservations, cou
                                             {entry.payment_status}
                                         </p>
                                     </div>
+
+                                    {/* The next step, on the row.
+                                        Moving a booking along meant opening the
+                                        check-in screen, finding the same row
+                                        again and coming back. The action a
+                                        booking is actually waiting for is one
+                                        button, here. */}
+                                    <NextStep reservation={entry} />
                                 </li>
                             ))}
                         </ul>
@@ -163,5 +171,40 @@ export default function Reservations({ date, month, monthLoad, reservations, cou
 
             <BookingFormDialog open={open} onOpenChange={setOpen} courts={courts} seed={seed} />
         </AppLayout>
+    );
+}
+
+/**
+ * The one action a booking is waiting for, if any.
+ *
+ * Confirmed wants checking in, checked in wants starting, playing wants
+ * finishing. Anything already finished or cancelled is done and shows nothing,
+ * rather than a disabled button taking up the same room.
+ */
+function NextStep({ reservation }: { reservation: any }) {
+    const form = useForm({});
+
+    const step = {
+        confirmed: { label: 'Check in', icon: LogIn, url: `/check-in/${reservation.id}` },
+        checked_in: { label: 'Start', icon: Play, url: `/check-in/${reservation.id}/start` },
+        playing: { label: 'Finish', icon: Check, url: `/check-in/${reservation.id}/complete` },
+    }[reservation.booking_status as string];
+
+    if (!step) return <span className="w-24 shrink-0" aria-hidden />;
+
+    const Icon = step.icon;
+
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={form.processing}
+            onClick={() => form.post(step.url, { preserveScroll: true })}
+            className="w-24 shrink-0"
+        >
+            <Icon className="size-4" />
+            {step.label}
+        </Button>
     );
 }

@@ -2,14 +2,14 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\CourtPrimeNotification;
-use App\Models\DemoRequest;
 use App\Models\AccountReceivable;
+use App\Models\DemoRequest;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\SupportTicket;
 use App\Services\BranchClock;
+use App\Services\NotificationService;
 use App\Services\TenantContext;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -110,10 +110,10 @@ class HandleInertiaRequests extends Middleware
                 '/demo-pipeline' => $user->is_superadmin
                     ? DemoRequest::query()->whereIn('status', ['new', 'contacted', 'qualified'])->count()
                     : 0,
-                '/notifications' => CourtPrimeNotification::query()
-                    ->where('user_id', $user->id)
-                    ->whereNull('read_at')
-                    ->count(),
+                /* The same rule the notification centre and the header bell
+                   read, so the badge can never count something the page does
+                   not list — club-wide alerts included. */
+                '/notifications' => app(NotificationService::class)->unreadCountFor($user, $tenantContext->currentOrganizationId()),
             ];
         });
     }

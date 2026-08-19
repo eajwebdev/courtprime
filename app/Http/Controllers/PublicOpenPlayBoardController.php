@@ -225,8 +225,27 @@ class PublicOpenPlayBoardController extends Controller
         return back()->with('success', $player->name.' is in the rotation.');
     }
 
-    public function score(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
-    {
+    /**
+     * Add a point, and finish the game if that point won it.
+     *
+     * The scoring service completes the underlying club match once a score
+     * reaches the target, but the open play match stayed live, so the board
+     * kept the court on screen and the next tap was rejected with "completed
+     * matches cannot be scored". The optimistic number went up and then fell
+     * back, which is what a winning point looked like.
+     *
+     * A game that is won is over: the result is recorded and the court rolls
+     * on, without anybody being asked who won a game the score already
+     * settled.
+     */
+    public function score(
+        Request $request,
+        string $code,
+        OpenPlayMatch $match,
+        OpenPlayService $openPlay,
+        MatchScoringService $scoring,
+        OpenPlayRotationService $rotation,
+    ): RedirectResponse {
         $session = $this->requireControl($request, $code, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
 
@@ -234,7 +253,28 @@ class PublicOpenPlayBoardController extends Controller
 
         $scoring->increment($clubMatch, $request->string('team')->toString());
 
-        return back();
+        $clubMatch->refresh();
+
+        if ($clubMatch->status !== 'completed') {
+            return back();
+        }
+
+        $winner = $clubMatch->team_one_score > $clubMatch->team_two_score ? 'one' : 'two';
+
+        $match->update(['winner_team' => $winner]);
+        $rotation->completeMatch($match);
+
+        $this->log(
+            $request,
+            $session,
+            'open_play.match_finished',
+            'Won on the last point',
+            trim(($match->court?->name ? $match->court->name.' | ' : '')
+                .($winner === 'one' ? $clubMatch->team_one_name : $clubMatch->team_two_name).' won'
+                .' ('.$clubMatch->team_one_score.'-'.$clubMatch->team_two_score.')'),
+        );
+
+        return back()->with('success', 'Game won. Next match is up.');
     }
 
     public function undo(Request $request, string $code, OpenPlayMatch $match, OpenPlayService $openPlay, MatchScoringService $scoring): RedirectResponse
@@ -247,6 +287,81 @@ class PublicOpenPlayBoardController extends Controller
         $scoring->undo($clubMatch, null, $request->input('team'));
 
         return back();
+    }
+
+    /**
+     * Rearrange who is on which team.
+     *
+     * The rotation pairs people automatically, and it is good at it, but a
+     * court full of regulars will still want to fix the teams themselves:
+     * levelling up a beginner, keeping a pair together, or splitting two who
+     * always partner. Auto is the default, not the rule.
+     *
+     * Only allowed before anybody has scored. Moving a player across the net
+     * mid game would leave points recorded against a team they were not on.
+     */
+    public function arrangeTeams(
+        Request $request,
+        string $code,
+        OpenPlayMatch $match,
+        OpenPlayService $openPlay,
+        OpenPlayRotationService $rotation,
+    ): RedirectResponse {
+        $session = $this->requireControl($request, $code, $openPlay);
+        $clubMatch = $this->clubMatchFor($session, $match);
+
+        $data = $request->validate([
+            'teams' => ['required', 'array'],
+            'teams.*' => ['required', 'in:one,two'],
+        ]);
+
+        if ($clubMatch->team_one_score > 0 || $clubMatch->team_two_score > 0) {
+            return back()->withErrors(['teams' => 'The game has started. Take the points back first.']);
+        }
+
+        $participants = $match->participants()->get();
+        $wanted = collect($data['teams']);
+
+        /* Every player on the court has to be placed, and the sides have to
+           come out even, or the rotation is handing four people two courts. */
+        if ($wanted->count() !== $participants->count() || $wanted->keys()->diff($participants->pluck('player_id'))->isNotEmpty()) {
+            return back()->withErrors(['teams' => 'Place everyone on the court.']);
+        }
+
+        $perSide = intdiv($participants->count(), 2);
+
+        if ($wanted->filter(fn ($side) => $side === 'one')->count() !== $perSide) {
+            return back()->withErrors(['teams' => 'The sides have to be even.']);
+        }
+
+        DB::transaction(function () use ($participants, $wanted, $match, $clubMatch) {
+            foreach ($participants as $participant) {
+                $participant->update(['team' => $wanted[$participant->player_id]]);
+            }
+
+            /* The club match carries the team names that show on a result, so
+               they are rebuilt from who is now on each side. */
+            $names = Player::query()
+                ->withoutGlobalScope('organization')
+                ->whereIn('id', $participants->pluck('player_id'))
+                ->pluck('name', 'id');
+
+            $label = fn (string $side) => $participants
+                ->filter(fn ($entry) => $wanted[$entry->player_id] === $side)
+                ->map(fn ($entry) => (string) ($names[$entry->player_id] ?? 'Player'))
+                ->implode(' / ');
+
+            $clubMatch->update([
+                'team_one_name' => $label('one'),
+                'team_two_name' => $label('two'),
+            ]);
+
+            $match->touch();
+        });
+
+        $this->log($request, $session, 'open_play.teams_arranged', 'Rearranged the teams', $match->court?->name);
+
+        return back()->with('success', 'Teams updated.');
     }
 
     /**

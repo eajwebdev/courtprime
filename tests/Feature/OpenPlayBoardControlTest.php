@@ -163,6 +163,65 @@ class OpenPlayBoardControlTest extends TestCase
             ->assertRedirect('/open-play/OP-TEST01/board');
     }
 
+    public function test_the_winning_point_finishes_the_game_by_itself(): void
+    {
+        $session = $this->makeSession();
+        $session->update(['target_score' => 11, 'win_by_two' => false]);
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        foreach (['A Player', 'B Player', 'C Player', 'D Player'] as $name) {
+            $this->post('/open-play/OP-TEST01/players', ['name' => $name])->assertRedirect();
+        }
+
+        $this->post('/open-play/OP-TEST01/start')->assertRedirect();
+
+        $match = $session->matches()->where('status', 'live')->firstOrFail();
+
+        /*
+         * Ten points is a live game; the eleventh wins it. Before this, the
+         * eleventh completed the club match but left the open play match live,
+         * so the court stayed on screen and the next tap was rejected.
+         */
+        for ($point = 1; $point <= 11; $point++) {
+            $this->post("/open-play/OP-TEST01/matches/{$match->id}/score", ['team' => 'team_one'])->assertRedirect();
+        }
+
+        $match->refresh();
+
+        $this->assertSame('completed', $match->status);
+        $this->assertSame('one', $match->winner_team);
+    }
+
+    public function test_teams_cannot_be_rearranged_once_the_game_has_started(): void
+    {
+        $session = $this->makeSession();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        foreach (['A Player', 'B Player', 'C Player', 'D Player'] as $name) {
+            $this->post('/open-play/OP-TEST01/players', ['name' => $name])->assertRedirect();
+        }
+
+        $this->post('/open-play/OP-TEST01/start')->assertRedirect();
+
+        $match = $session->matches()->where('status', 'live')->firstOrFail();
+        $players = $match->participants()->pluck('player_id');
+
+        $this->post("/open-play/OP-TEST01/matches/{$match->id}/score", ['team' => 'team_one'])->assertRedirect();
+
+        /* Moving somebody across the net now would leave that point recorded
+           against a team they were not on. */
+        $this->post("/open-play/OP-TEST01/matches/{$match->id}/teams", [
+            'teams' => [
+                $players[0] => 'one',
+                $players[1] => 'two',
+                $players[2] => 'one',
+                $players[3] => 'two',
+            ],
+        ])->assertSessionHasErrors('teams');
+    }
+
     public function test_opening_a_board_does_not_add_the_person_to_the_rotation(): void
     {
         $session = $this->makeSession();

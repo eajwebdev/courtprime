@@ -1,7 +1,9 @@
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Trophy } from 'lucide-react';
+import { Loader2, Shuffle, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -17,9 +19,12 @@ const DOUBLE_TAP_MS = 300;
  * touching, and a small button next to a very large target is the one you hit
  * by mistake reaching across a net post.
  *
- * Finishing asks who won rather than assuming the scoreboard is the whole
- * story, so a game called on court is recorded the same way as one played out
- * to the target.
+ * A game played out to the target finishes itself, and nobody is asked who won
+ * a game the score already settled. Finishing early asks only when the score
+ * cannot answer it, which is when the sides are level.
+ *
+ * Teams are drawn automatically and can be rearranged before the first point,
+ * because a court full of regulars will want to fix the pairings themselves.
  */
 export function CourtCard({
     match,
@@ -35,14 +40,34 @@ export function CourtCard({
     winByTwo?: boolean;
 }) {
     const [confirming, setConfirming] = useState(false);
+    const [arranging, setArranging] = useState(false);
 
     const one = match.teams?.one ?? [];
     const two = match.teams?.two ?? [];
     const label = (players: any[]) => players.map((player: any) => player.name).join(' / ');
 
+    const scoreOne = match.team_one_score ?? 0;
+    const scoreTwo = match.team_two_score ?? 0;
+    const started = scoreOne > 0 || scoreTwo > 0;
+    const level = scoreOne === scoreTwo;
+
+    /*
+     * The score answers "who won" unless the sides are level, so finishing
+     * early only asks when it genuinely cannot be read off the board.
+     */
+    const finish = () => {
+        if (level) {
+            setConfirming(true);
+
+            return;
+        }
+
+        post(`${base}/matches/${match.id}/finish`, { winner: scoreOne > scoreTwo ? 'one' : 'two' });
+    };
+
     return (
         <article className="border-border bg-surface flex h-full flex-col overflow-hidden rounded-xl border">
-            <div className="border-border bg-surface-muted flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2">
+            <div className="border-border bg-surface-muted flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
                 <p className="text-label text-foreground font-semibold">{match.court}</p>
                 <p className="text-meta text-muted">
                     {target ? (
@@ -57,10 +82,27 @@ export function CourtCard({
                     ) : null}
                     round <span data-numeric>{match.round}</span>
                 </p>
+
+                {/* Only before the first point: moving somebody across the net
+                    mid game would leave points against a team they were not
+                    on. */}
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={started}
+                    title={started ? 'Take the points back to rearrange' : 'Rearrange the teams'}
+                    onClick={() => setArranging(true)}
+                >
+                    <Shuffle className="size-4" />
+                    <span className="hidden sm:inline">Teams</span>
+                </Button>
             </div>
 
             <div className="bg-border grid min-h-0 flex-1 grid-cols-2 gap-px">
                 <TeamScore
+                    side="Team A"
                     players={one}
                     score={match.team_one_score}
                     against={match.team_two_score}
@@ -70,6 +112,7 @@ export function CourtCard({
                     onUndo={(done) => post(`${base}/matches/${match.id}/undo`, { team: 'team_one' }, done)}
                 />
                 <TeamScore
+                    side="Team B"
                     players={two}
                     score={match.team_two_score}
                     against={match.team_one_score}
@@ -82,7 +125,7 @@ export function CourtCard({
 
             {confirming ? (
                 <div className="border-border shrink-0 border-t px-3 py-3">
-                    <p className="text-meta text-muted mb-2 text-center">Who won?</p>
+                    <p className="text-meta text-muted mb-2 text-center">Level at {scoreOne}. Who won?</p>
                     <div className="grid grid-cols-2 gap-2">
                         <Button
                             type="button"
@@ -109,17 +152,22 @@ export function CourtCard({
                 </div>
             ) : (
                 <div className="border-border shrink-0 border-t px-3 py-3">
-                    <Button type="button" variant="outline" size="touch" className="w-full" onClick={() => setConfirming(true)}>
+                    <Button type="button" variant="outline" size="touch" className="w-full" onClick={finish}>
                         <Trophy className="size-4" />
-                        Finish match
+                        {/* Says what will happen: a decided game is recorded, a
+                            level one asks. */}
+                        {level ? 'End game early' : `Finish · ${scoreOne > scoreTwo ? 'Team A' : 'Team B'} wins`}
                     </Button>
                 </div>
             )}
+
+            <ArrangeTeams open={arranging} onOpenChange={setArranging} base={base} match={match} one={one} two={two} />
         </article>
     );
 }
 
 function TeamScore({
+    side,
     players,
     score,
     against,
@@ -128,6 +176,8 @@ function TeamScore({
     onScore,
     onUndo,
 }: {
+    /** Team A or Team B, which is how the arrange screen names them. */
+    side: string;
     players: any[];
     score: number;
     against: number;
@@ -204,8 +254,11 @@ function TeamScore({
                 />
             )}
 
-            <span className="text-label text-secondary relative line-clamp-2 px-1 text-center leading-snug font-medium">
-                {players.map((player: any) => player.name).join(' / ')}
+            <span className="relative flex flex-col items-center gap-0.5">
+                <span className="text-muted text-[0.625rem] font-semibold tracking-[0.14em] uppercase">{side}</span>
+                <span className="text-label text-secondary line-clamp-2 px-1 text-center leading-snug font-medium">
+                    {players.map((player: any) => player.name).join(' / ')}
+                </span>
             </span>
 
             {/*
@@ -257,5 +310,112 @@ function TeamScore({
                 )}
             </span>
         </button>
+    );
+}
+
+/**
+ * Putting people on the side you want them.
+ *
+ * Team A and Team B rather than the pair of names, because the point of this
+ * screen is moving somebody from one to the other, and a name is what you drag,
+ * not where you drop it.
+ */
+function ArrangeTeams({
+    open,
+    onOpenChange,
+    base,
+    match,
+    one,
+    two,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    base: string;
+    match: any;
+    one: any[];
+    two: any[];
+}) {
+    const [teams, setTeams] = useState<Record<number, 'one' | 'two'>>({});
+    const [saving, setSaving] = useState(false);
+
+    /* Reseed each time it opens, so a poll landing underneath does not move
+       somebody while the sides are being decided. */
+    useEffect(() => {
+        if (!open) return;
+
+        const next: Record<number, 'one' | 'two'> = {};
+        one.forEach((player: any) => (next[player.id] = 'one'));
+        two.forEach((player: any) => (next[player.id] = 'two'));
+        setTeams(next);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    const players = [...one, ...two];
+    const perSide = Math.max(1, Math.floor(players.length / 2));
+    const onA = Object.values(teams).filter((side) => side === 'one').length;
+    const even = onA === perSide;
+
+    const save = () => {
+        setSaving(true);
+        router.post(
+            `${base}/matches/${match.id}/teams`,
+            { teams },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => onOpenChange(false),
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Arrange {match.court}</DialogTitle>
+                    <DialogDescription>Tap a side to move a player. Both sides have to end up even.</DialogDescription>
+                </DialogHeader>
+
+                <ul className="space-y-2">
+                    {players.map((player: any) => (
+                        <li key={player.id} className="flex items-center gap-3">
+                            <span className="text-label text-foreground min-w-0 flex-1 truncate font-medium">{player.name}</span>
+                            <div className="border-border bg-surface-muted grid shrink-0 grid-cols-2 gap-1 rounded-lg border p-1">
+                                {(['one', 'two'] as const).map((side) => (
+                                    <button
+                                        key={side}
+                                        type="button"
+                                        aria-pressed={teams[player.id] === side}
+                                        onClick={() => setTeams((current) => ({ ...current, [player.id]: side }))}
+                                        className={cn(
+                                            'text-meta h-9 w-20 rounded-md font-medium transition-colors',
+                                            teams[player.id] === side ? 'bg-primary text-primary-foreground' : 'text-muted hover:text-foreground',
+                                        )}
+                                    >
+                                        {side === 'one' ? 'Team A' : 'Team B'}
+                                    </button>
+                                ))}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+
+                {!even && (
+                    <p role="alert" className="text-meta text-danger">
+                        {onA} on Team A, {players.length - onA} on Team B. They have to be even.
+                    </p>
+                )}
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button type="button" onClick={save} disabled={!even || saving}>
+                        {saving ? <Loader2 className="size-4 animate-spin" /> : 'Save teams'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

@@ -1,38 +1,44 @@
 import { BrandWordmark } from '@/components/marketing-artwork';
 import { PlayerBottomNav } from '@/components/player-bottom-nav';
-import { LiveBadge, StatusBadge } from '@/components/status-badge';
+import { CourtPanel, type ScoreboardCourt } from '@/components/scoreboard/court-panel';
+import { usePortraitTick } from '@/components/scoreboard/player-portrait';
 import { shellForWorkspace } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- payload from LiveCourtController. */
 type DisplaySettings = {
     brand: string;
     logo_url: string | null;
     primary_color: string;
     announcement: string;
     rotation_seconds: number | string;
+    portrait_seconds: number;
 };
 
-type Props = { courts: any[]; displaySettings: DisplaySettings };
+type Props = { courts: ScoreboardCourt[]; displaySettings: DisplaySettings };
+
+/** How often the board pulls fresh scores. */
+const REFRESH_MS = 10000;
 
 /**
  * How many courts fit a page at each width.
  *
- * `null` means "do not paginate": below 640px a single-court page left most of
- * the screen empty and turned ten courts into ten rotations, so phones scroll
- * the full list instead. Rotation stays a kiosk behaviour.
+ * Live courts are the subject, and a live panel carries portraits, so fewer fit
+ * than the old name-and-number card did. `null` means "do not paginate": below
+ * 640px a single-court page left most of the screen empty and turned ten courts
+ * into ten rotations, so phones scroll the full list instead. Rotation stays a
+ * kiosk behaviour.
  */
 const PAGE_SIZES = [
-    { query: '(min-width: 1280px)', size: 8 },
-    { query: '(min-width: 768px)', size: 4 },
+    { query: '(min-width: 1536px)', size: 6 },
+    { query: '(min-width: 1024px)', size: 4 },
     { query: '(min-width: 640px)', size: 2 },
 ];
 
 function usePageSize(): number | null {
-    const [size, setSize] = useState<number | null>(8);
+    const [size, setSize] = useState<number | null>(6);
 
     useEffect(() => {
         const lists = PAGE_SIZES.map((entry) => ({ ...entry, list: window.matchMedia(entry.query) }));
@@ -47,52 +53,99 @@ function usePageSize(): number | null {
     return size;
 }
 
+/** The venue's own clock, which is the one people in the room are looking at. */
+function useClock(): string {
+    const [now, setNow] = useState(() => new Date());
+
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(new Date()), 30000);
+
+        return () => window.clearInterval(timer);
+    }, []);
+
+    return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * The club's wall board.
+ *
+ * This route is two things at once: a screen bolted to a TV in the club, and
+ * the player app's Live tab. Anonymous kiosks keep the bare full-bleed screen; a
+ * signed-in player keeps their shell, because landing on a page with no header
+ * and no tab bar is a dead end they cannot navigate out of. `?tv=1` forces the
+ * bare board for a venue that signed in on the TV.
+ *
+ * Live courts are drawn as the branch scoreboard draws them — the players' own
+ * portraits, or the CourtPrime stand-ins for whoever has uploaded none — so the
+ * two screens a club runs are the same screen at two scopes rather than two
+ * designs. Idle courts recede: somebody glancing up from across the room needs
+ * to find the game, not read an inventory of the building.
+ */
 export default function DisplayLive({ courts, displaySettings }: Props) {
-    /*
-     * This route is two things at once: a wall board bolted to a TV in the club,
-     * and the player app's Live tab. Anonymous kiosks keep the bare full-bleed
-     * screen; a signed-in player keeps their shell, because landing on a page
-     * with no header and no tab bar is a dead end they cannot navigate out of.
-     * `?tv=1` forces the bare board for a venue that signed in on the TV.
-     */
     const { auth, workspace } = usePage<SharedData>().props;
     const { url } = usePage();
     const kiosk = url.includes('tv=1');
     const chrome = Boolean(auth?.user) && shellForWorkspace(workspace) === 'player' && !kiosk;
 
+    const clock = useClock();
+    const tick = usePortraitTick(displaySettings.portrait_seconds);
+
+    const live = useMemo(() => courts.filter((court) => court.match), [courts]);
+    const idle = useMemo(() => courts.filter((court) => !court.match), [courts]);
+
+    /*
+     * Only live courts page. The old board rotated through every court it had,
+     * so a club with two games on twelve courts spent most of the cycle showing
+     * empty ones — and a game could be off screen while somebody was watching
+     * it. Idle courts sit under the games instead, all of them, all the time.
+     */
     const rotationSeconds = Math.max(Number(displaySettings.rotation_seconds ?? 12), 5);
     const pageSize = usePageSize();
-    const courtPages = useMemo(() => (pageSize === null ? [courts] : chunk(courts, pageSize)), [courts, pageSize]);
+    const livePages = useMemo(() => (pageSize === null ? [live] : chunk(live, pageSize)), [live, pageSize]);
     const [page, setPage] = useState(0);
     const [paused, setPaused] = useState(false);
 
     /* A narrower viewport makes more pages, so an old index can fall out of range. */
     useEffect(() => {
-        setPage((current) => (current >= courtPages.length ? 0 : current));
-    }, [courtPages.length]);
+        setPage((current) => (current >= livePages.length ? 0 : current));
+    }, [livePages.length]);
 
     useEffect(() => {
-        if (courtPages.length <= 1 || paused) return;
+        if (livePages.length <= 1 || paused) return;
 
         const timer = window.setInterval(() => {
-            setPage((current) => (current + 1) % courtPages.length);
+            setPage((current) => (current + 1) % livePages.length);
         }, rotationSeconds * 1000);
 
         return () => window.clearInterval(timer);
-    }, [courtPages.length, rotationSeconds, paused]);
+    }, [livePages.length, rotationSeconds, paused]);
 
-    /* This is a live scoreboard, so it refetches court data rather than showing
-       whatever was true when the kiosk was last opened. */
+    /* This is a live scoreboard, so it refetches rather than showing whatever
+       was true when the kiosk was last opened. It polls rather than holding a
+       socket open: a screen that has been on for three days has to recover from
+       the venue's wifi dropping without anybody noticing it did. */
     useEffect(() => {
         const timer = window.setInterval(() => {
             router.reload({ only: ['courts'] });
-        }, 15000);
+        }, REFRESH_MS);
 
         return () => window.clearInterval(timer);
     }, []);
 
-    const visibleCourts = courtPages[page] ?? courtPages[0] ?? [];
+    const visibleLive = livePages[page] ?? livePages[0] ?? [];
     const accent = displaySettings.primary_color || 'var(--primary)';
+
+    /*
+     * Live courts set the scale. One or two get the full treatment; beyond four
+     * the panels tighten so every game still fits without the board hiding one.
+     */
+    const dense = visibleLive.length > 4;
+    const liveColumns =
+        visibleLive.length <= 1
+            ? 'grid-cols-1'
+            : visibleLive.length === 2
+              ? 'grid-cols-1 lg:grid-cols-2'
+              : 'grid-cols-1 md:grid-cols-2 2xl:grid-cols-3';
 
     return (
         <main className={cn('bg-surface-deep flex min-h-svh flex-col text-white', chrome && 'pb-24 md:pb-0')}>
@@ -114,21 +167,37 @@ export default function DisplayLive({ courts, displaySettings }: Props) {
             )}
 
             {/* ---- Header ---------------------------------------------------- */}
-            <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+            <header className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3 sm:px-8 sm:py-5">
                 <div className="min-w-0">
-                    <p className="truncate text-[0.6875rem] font-semibold tracking-wider uppercase sm:text-sm" style={{ color: accent }}>
+                    <p className="truncate text-[0.625rem] font-bold tracking-[0.2em] uppercase sm:text-xs" style={{ color: accent }}>
                         {displaySettings.brand}
                     </p>
-                    <h1 className="text-[1.5rem] leading-none font-black tracking-tight sm:text-[2.25rem] lg:text-[3rem] xl:text-[3.5rem]">
-                        LIVE COURTS
-                    </h1>
+                    <h1 className="text-[clamp(1.25rem,2.6vw,2.75rem)] leading-none font-black tracking-tight uppercase">Live Courts</h1>
                 </div>
 
-                <img
-                    src={displaySettings.logo_url || '/cp.png'}
-                    alt={displaySettings.brand}
-                    className="h-10 w-auto shrink-0 rounded-md bg-white/10 object-contain p-1.5 sm:h-14 sm:p-2 lg:h-16"
-                />
+                <div className="flex shrink-0 items-center gap-4 sm:gap-6">
+                    <div className="text-right">
+                        <p data-numeric className="text-[clamp(1rem,2vw,2rem)] leading-none font-black tabular-nums">
+                            {clock}
+                        </p>
+                        <p className="text-[0.625rem] font-semibold tracking-widest text-white/40 uppercase sm:text-xs">
+                            {live.length} live · {idle.length} open
+                        </p>
+                    </div>
+
+                    {/* The mark steps aside on a phone: it was taking the room
+                        the club's own name needed, and truncating it. */}
+                    {displaySettings.logo_url ? (
+                        <img
+                            src={displaySettings.logo_url}
+                            alt={displaySettings.brand}
+                            className="hidden h-8 w-auto object-contain sm:block sm:h-12"
+                        />
+                    ) : (
+                        /* cp1: white "Court", legal on this navy and nowhere light. */
+                        <BrandWordmark variant="onDark" height={40} className="hidden h-8 w-auto sm:block sm:h-10" />
+                    )}
+                </div>
             </header>
 
             {/* ---- Courts ----------------------------------------------------- */}
@@ -137,71 +206,37 @@ export default function DisplayLive({ courts, displaySettings }: Props) {
                 onMouseLeave={() => setPaused(false)}
                 onFocusCapture={() => setPaused(true)}
                 onBlurCapture={() => setPaused(false)}
-                className="grid content-start gap-3 p-4 sm:flex-1 sm:grid-cols-2 sm:gap-4 sm:p-6 lg:p-8 xl:grid-cols-4"
+                className="flex flex-1 flex-col gap-4 p-4 sm:gap-6 sm:p-6 xl:p-8"
             >
-                {visibleCourts.length === 0 && (
-                    <p className="text-body col-span-full py-16 text-center text-white/50">No courts are configured for this display.</p>
+                {courts.length === 0 && <p className="text-body py-24 text-center text-white/40">No courts are configured for this display.</p>}
+
+                {courts.length > 0 && live.length === 0 && (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
+                        <p className="text-[clamp(1.5rem,4vw,3.5rem)] leading-none font-black tracking-tight uppercase">No games on right now</p>
+                        <p className="text-[clamp(0.875rem,1.2vw,1.25rem)] text-white/45">
+                            {idle.length} {idle.length === 1 ? 'court is' : 'courts are'} open.
+                        </p>
+                    </div>
                 )}
 
-                {visibleCourts.map((court: any) => {
-                    const match = court.matches?.[0];
-                    const status = String(court.status ?? 'available');
+                {/* auto-rows-fr, so two panels on a 1080p wall fill the height
+                    instead of clustering at the top over a dead half-screen. */}
+                {visibleLive.length > 0 && (
+                    <div className={cn('grid flex-1 auto-rows-fr gap-4 sm:gap-6', liveColumns)}>
+                        {visibleLive.map((court) => (
+                            <CourtPanel key={court.id} court={court} tick={tick} dense={dense} />
+                        ))}
+                    </div>
+                )}
 
-                    return (
-                        <article
-                            key={court.id}
-                            className={cn(
-                                'flex flex-col rounded-xl border p-4 sm:p-5',
-                                'sm:min-h-[15rem] xl:min-h-[18rem]',
-                                match ? 'border-white/20 bg-white/[0.07]' : 'border-white/10 bg-white/[0.03]',
-                            )}
-                        >
-                            <div className="flex items-center justify-between gap-2">
-                                <h2 className="truncate text-lg font-black uppercase sm:text-2xl xl:text-3xl">{court.name}</h2>
-                                {match ? <LiveBadge /> : <StatusBadge status={status} />}
-                            </div>
-
-                            {match ? (
-                                /* Scores sit side by side so the card stays legible when it
-                                   is short on a phone and huge on a wall display. */
-                                <div className="mt-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 pt-4 sm:gap-3">
-                                    <p className="truncate text-center text-xs font-bold sm:text-base xl:text-lg">{match.team_one_name}</p>
-                                    <span aria-hidden />
-                                    <p className="truncate text-center text-xs font-bold sm:text-base xl:text-lg">{match.team_two_name}</p>
-
-                                    <p
-                                        data-numeric
-                                        aria-live="polite"
-                                        className="text-center text-[clamp(2.25rem,9vw,5.5rem)] leading-none font-black"
-                                        style={{ color: accent }}
-                                    >
-                                        {match.team_one_score}
-                                    </p>
-                                    <span className="text-meta px-1 text-white/35">VS</span>
-                                    <p
-                                        data-numeric
-                                        aria-live="polite"
-                                        className="text-center text-[clamp(2.25rem,9vw,5.5rem)] leading-none font-black"
-                                    >
-                                        {match.team_two_score}
-                                    </p>
-
-                                    <Link
-                                        href={`/live/matches/${match.id}`}
-                                        className="text-meta col-span-3 mt-3 inline-flex min-h-11 items-center justify-center rounded-md border border-white/15 px-3 font-semibold text-white/80 transition-colors hover:bg-white/10"
-                                    >
-                                        Open player view
-                                    </Link>
-                                </div>
-                            ) : (
-                                <div className="mt-auto pt-6 text-center">
-                                    <p className="text-xl font-black uppercase sm:text-3xl xl:text-4xl">{status.replaceAll('_', ' ')}</p>
-                                    <p className="text-meta mt-2 text-white/45 sm:text-sm">Next booking will appear here</p>
-                                </div>
-                            )}
-                        </article>
-                    );
-                })}
+                {/* Idle courts stay on screen but never compete with a live game. */}
+                {live.length > 0 && idle.length > 0 && (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {idle.map((court) => (
+                            <CourtPanel key={court.id} court={court} tick={tick} dense />
+                        ))}
+                    </div>
+                )}
             </section>
 
             {/* ---- Ticker ----------------------------------------------------- */}
@@ -211,23 +246,23 @@ export default function DisplayLive({ courts, displaySettings }: Props) {
             >
                 <p className="truncate text-sm font-bold sm:text-lg xl:text-2xl">{displaySettings.announcement}</p>
 
-                {courtPages.length > 1 && (
+                {livePages.length > 1 && (
                     <div className="flex shrink-0 items-center gap-2">
                         {/* Dots double as the page indicator and a manual control. */}
                         <div className="hidden items-center gap-1.5 sm:flex">
-                            {courtPages.map((_, index) => (
+                            {livePages.map((_, index) => (
                                 <button
                                     key={index}
                                     type="button"
                                     onClick={() => setPage(index)}
-                                    aria-label={`Show court page ${index + 1}`}
+                                    aria-label={`Show live court page ${index + 1}`}
                                     aria-current={index === page}
                                     className={cn('size-2.5 rounded-full transition-colors', index === page ? 'bg-white' : 'bg-white/40')}
                                 />
                             ))}
                         </div>
                         <span data-numeric className="text-meta font-semibold whitespace-nowrap sm:text-sm">
-                            {page + 1} / {courtPages.length}
+                            {page + 1} / {livePages.length}
                         </span>
                     </div>
                 )}

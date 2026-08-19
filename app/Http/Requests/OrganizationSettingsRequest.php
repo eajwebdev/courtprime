@@ -45,6 +45,10 @@ class OrganizationSettingsRequest extends FormRequest
             'send_push_notifications' => ['required', 'boolean'],
             'live_display_branding' => ['nullable', 'string', 'max:255'],
             'live_display_rotation_seconds' => ['required', 'integer', 'min:5', 'max:120'],
+            /* How long one portrait holds before the next on the courtside
+               boards. Floored at 4 again when it is read, so a stored 1 from an
+               older payload cannot strobe a wall display. */
+            'scoreboard_portrait_seconds' => ['nullable', 'integer', 'min:4', 'max:120'],
             'live_display_announcement' => ['nullable', 'string', 'max:500'],
             'live_display_token_required' => ['required', 'boolean'],
             'live_display_token' => ['nullable', 'string', 'min:12', 'max:100'],

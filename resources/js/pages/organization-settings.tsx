@@ -35,6 +35,7 @@ type OrganizationSettings = {
     send_push_notifications: boolean;
     live_display_branding?: string | null;
     live_display_rotation_seconds: number;
+    scoreboard_portrait_seconds?: number | null;
     live_display_announcement?: string | null;
     live_display_token_required: boolean;
     live_display_token_configured?: boolean;
@@ -115,6 +116,7 @@ export default function OrganizationSettings({
         send_push_notifications: organization.settings.send_push_notifications,
         live_display_branding: organization.settings.live_display_branding ?? 'CourtPrime',
         live_display_rotation_seconds: organization.settings.live_display_rotation_seconds,
+        scoreboard_portrait_seconds: organization.settings.scoreboard_portrait_seconds ?? 10,
         live_display_announcement: organization.settings.live_display_announcement ?? '',
         live_display_token_required: organization.settings.live_display_token_required,
         live_display_token: '',
@@ -133,6 +135,7 @@ export default function OrganizationSettings({
             cancellation_cutoff_hours: Number(data.cancellation_cutoff_hours),
             default_deposit_percent: Number(data.default_deposit_percent),
             live_display_rotation_seconds: Number(data.live_display_rotation_seconds),
+            scoreboard_portrait_seconds: Number(data.scoreboard_portrait_seconds),
         })).post('/organization-settings', { preserveScroll: true });
     };
 
@@ -375,6 +378,15 @@ export default function OrganizationSettings({
                                         value={form.data.live_display_rotation_seconds}
                                         onChange={(value) => form.setData('live_display_rotation_seconds', Number(value))}
                                         error={form.errors.live_display_rotation_seconds}
+                                    />
+                                    {/* How long a player's picture holds on the
+                                        courtside boards before the next one. */}
+                                    <Field
+                                        label="Portrait Hold (seconds)"
+                                        type="number"
+                                        value={form.data.scoreboard_portrait_seconds}
+                                        onChange={(value) => form.setData('scoreboard_portrait_seconds', Number(value))}
+                                        error={form.errors.scoreboard_portrait_seconds}
                                     />
                                     <Field
                                         label="Display Announcement"

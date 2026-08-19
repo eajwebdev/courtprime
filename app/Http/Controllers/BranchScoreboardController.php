@@ -5,16 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\ClubMatch;
 use App\Models\Court;
-use App\Models\OpenPlayMatch;
 use App\Models\OpenPlayQueueEntry;
 use App\Models\OpenPlaySession;
-use App\Models\OrganizationPlayer;
-use App\Models\Player;
-use App\Models\PlayerProfile;
+use App\Services\ScoreboardLineupService;
 use App\Support\NetworkClock;
-use App\Support\PublicPlayerName;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,6 +32,8 @@ use Inertia\Response;
  */
 class BranchScoreboardController extends Controller
 {
+    public function __construct(private readonly ScoreboardLineupService $lineups) {}
+
     public function __invoke(Request $request, Branch $branch): Response
     {
         $branch->loadMissing('organization');
@@ -57,7 +54,7 @@ class BranchScoreboardController extends Controller
             ->get()
             ->groupBy('court_id');
 
-        $lineups = $this->lineups($liveMatches->flatten());
+        $lineups = $this->lineups->forMatches($liveMatches->flatten());
         $settings = $branch->organization?->settings ?? [];
 
         return Inertia::render('branch-scoreboard', [
@@ -113,124 +110,6 @@ class BranchScoreboardController extends Controller
     }
 
     /**
-     * The people on each live match, with the portraits they chose.
-     *
-     * Three queries for the whole board however many courts it has: the
-     * rotation rows for every live match, the club-side player records behind
-     * them, then the network profiles those map to. Doing it per court would be
-     * three queries per court on a screen that reloads every few seconds.
-     *
-     * @param  Collection<int, ClubMatch>  $matches
-     * @return array<int, array{one: array<int, array<string, mixed>>, two: array<int, array<string, mixed>>}>
-     */
-    private function lineups(Collection $matches): array
-    {
-        if ($matches->isEmpty()) {
-            return [];
-        }
-
-        $openPlayMatches = OpenPlayMatch::query()
-            ->withoutGlobalScope('organization')
-            ->with('participants')
-            ->whereIn('club_match_id', $matches->pluck('id'))
-            ->get();
-
-        if ($openPlayMatches->isEmpty()) {
-            return [];
-        }
-
-        $playerIds = $openPlayMatches
-            ->flatMap(fn (OpenPlayMatch $match) => $match->participants->pluck('player_id'))
-            ->filter()
-            ->unique()
-            ->values();
-
-        $players = $this->playersById($playerIds);
-
-        $lineups = [];
-
-        foreach ($openPlayMatches as $openPlayMatch) {
-            $sides = ['one' => [], 'two' => []];
-
-            foreach ($openPlayMatch->participants as $participant) {
-                $player = $players->get($participant->player_id);
-
-                if (! $player) {
-                    continue;
-                }
-
-                $side = $participant->team === 'two' ? 'two' : 'one';
-                $sides[$side][] = $player;
-            }
-
-            $lineups[$openPlayMatch->club_match_id] = $sides;
-        }
-
-        return $lineups;
-    }
-
-    /**
-     * Club-side player records resolved to what a screen may show.
-     *
-     * The portrait and the stated gender live on the network profile, which is
-     * reached through the club's roster row, so the two are looked up together
-     * and handed back keyed by the club-side id the rotation refers to.
-     *
-     * @param  Collection<int, int>  $playerIds
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function playersById(Collection $playerIds): Collection
-    {
-        if ($playerIds->isEmpty()) {
-            return collect();
-        }
-
-        $players = Player::query()
-            ->withoutGlobalScope('organization')
-            ->whereIn('id', $playerIds)
-            ->get(['id', 'name', 'rating', 'skill_level']);
-
-        /* legacy player id → network profile, for photos and stated gender. */
-        $profiles = OrganizationPlayer::query()
-            ->withoutGlobalScope('organization')
-            ->with('playerProfile')
-            ->whereIn('legacy_player_id', $playerIds)
-            ->get()
-            ->keyBy('legacy_player_id');
-
-        return $players->mapWithKeys(function (Player $player) use ($profiles) {
-            $profile = $profiles->get($player->id)?->playerProfile;
-
-            return [$player->id => $this->publicPlayer($player, $profile)];
-        });
-    }
-
-    /** @return array<string, mixed> */
-    private function publicPlayer(Player $player, ?PlayerProfile $profile): array
-    {
-        [$first, $initial] = PublicPlayerName::parts($profile?->display_name ?? $player->name);
-
-        return [
-            'id' => $player->id,
-            /* Split, because the board sets the first name large and the
-               initial small beside it. */
-            'first_name' => $first ?? 'Player',
-            'last_initial' => $initial,
-            'rating' => $player->rating !== null ? (float) $player->rating : null,
-            'skill_level' => $player->skill_level,
-            /*
-             * Stated gender only, never inferred from the name: it selects which
-             * set of CourtPrime portraits stands in for a player who uploaded
-             * none, and a wrong guess misgenders someone on a wall display.
-             */
-            'gender' => $profile?->gender,
-            /* Empty when they have uploaded nothing, and the board falls back to
-               the defaults for their gender. */
-            'photos' => $profile?->portrait_urls ?? [],
-        ];
-    }
-
-    /**
      * Who is next on, from the branch's running session.
      *
      * A board that only shows the courts tells everyone standing beside it
@@ -264,7 +143,7 @@ class BranchScoreboardController extends Controller
             return [];
         }
 
-        $players = $this->playersById($entries->pluck('player_id')->filter()->unique()->values());
+        $players = $this->lineups->playersById($entries->pluck('player_id')->filter()->unique()->values());
 
         return $entries
             ->map(fn (OpenPlayQueueEntry $entry) => $players->get($entry->player_id))

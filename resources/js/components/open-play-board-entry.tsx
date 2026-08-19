@@ -24,9 +24,9 @@ export function OpenPlayBoardEntry({ className }: { className?: string }) {
     return (
         <form onSubmit={submit} className={className}>
             <label htmlFor="board-code" className="text-label text-foreground font-medium">
-                Running the session?
+                Have a session ID and key?
             </label>
-            <p className="text-meta text-muted mt-0.5">Enter the session ID and key to open its board and add players.</p>
+            <p className="text-meta text-muted mt-0.5">Enter both to open the session. No name needed.</p>
 
             <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
                 <div className="relative min-w-0">
@@ -66,7 +66,7 @@ export function OpenPlayBoardEntry({ className }: { className?: string }) {
                     disabled={form.processing || !form.data.code.trim() || !form.data.key.trim()}
                     className="w-full sm:w-auto sm:px-6"
                 >
-                    {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Open board'}
+                    {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Enter'}
                 </Button>
             </div>
 

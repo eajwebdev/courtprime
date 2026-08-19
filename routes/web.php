@@ -35,6 +35,7 @@ use App\Http\Controllers\PlatformAuditController;
 use App\Http\Controllers\PlayerBookingController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlayerIdentityController;
+use App\Http\Controllers\PlayerOpenPlayJoinController;
 use App\Http\Controllers\PlayerPortalController;
 use App\Http\Controllers\PlayerProfileController;
 use App\Http\Controllers\PlayerWalletController;
@@ -151,6 +152,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('me/profile', [PlayerProfileController::class, 'update'])->name('me.profile.update');
     Route::post('me/book', [PlayerBookingController::class, 'store'])->name('me.book.store');
     Route::get('me/wallet', PlayerWalletController::class)->name('me.wallet');
+    /* A player putting themselves in tonight's rotation with the session ID and
+       key. Throttled: it takes a shared secret and creates a club-side record. */
+    Route::post('me/open-play/join', [PlayerOpenPlayJoinController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('me.open-play.join');
     /* Players join an open play session with the code the club shared. */
     Route::get('demo-pipeline', [DemoPipelineController::class, 'index'])->name('demo-pipeline.index');
     Route::post('demo-pipeline/{demoRequest}', [DemoPipelineController::class, 'update'])->name('demo-pipeline.update');

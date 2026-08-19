@@ -9,9 +9,9 @@ import { athleteFor, defaultAvatarFor } from '@/lib/athlete';
 import { currency, friendlyDate, statusLabel, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { Award, BadgeCheck, CalendarClock, ChevronRight, IdCard, MapPin, QrCode, Trophy, Users } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Award, BadgeCheck, CalendarClock, ChevronRight, IdCard, Loader2, MapPin, QrCode, Trophy, Users } from 'lucide-react';
+import { type FormEvent, type ReactNode } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payloads come from PlayerPortalController. */
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Home', href: '/me' }];
@@ -173,6 +173,9 @@ export default function PlayerPortal({
                     </section>
                 )}
 
+                {/* ---- Joining tonight's rotation -------------------------------- */}
+                <JoinOpenPlay />
+
                 {/* ---- Actions. Primary first, full width on phones. ------------- */}
                 <section>
                     {/*
@@ -333,6 +336,74 @@ export default function PlayerPortal({
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+/**
+ * Getting into tonight's rotation from your own phone.
+ *
+ * The club reads out a session ID and key; typing them here puts you in the
+ * queue as yourself, which is what makes the games count on your record. The
+ * alternative — being typed in at the desk — creates a club-side player that
+ * is nobody's account, and the win goes nowhere.
+ *
+ * Deliberately not the board. Running the session is a different job, done on
+ * the tablet at the net post.
+ */
+function JoinOpenPlay() {
+    const form = useForm({ code: '', key: '' });
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.post('/me/open-play/join', {
+            preserveScroll: true,
+            onSuccess: () => form.reset('code', 'key'),
+        });
+    };
+
+    return (
+        <section>
+            <h2 className="text-h3 text-foreground mb-3">Join open play</h2>
+
+            <form onSubmit={submit} className="border-border bg-surface rounded-xl border p-4">
+                <p className="text-meta text-muted mb-3">
+                    Enter the session ID and key the club gave you. You go in the queue as yourself, so your games count.
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                    <input
+                        aria-label="Session ID"
+                        value={form.data.code}
+                        onChange={(event) => form.setData('code', event.target.value.toUpperCase())}
+                        placeholder="OP-000000"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        spellCheck={false}
+                        /* 16px so a phone does not zoom the whole page on focus. */
+                        className="border-border bg-surface text-foreground placeholder:text-muted h-12 min-w-0 flex-1 rounded-xl border px-3.5 text-base tracking-[0.1em] uppercase"
+                    />
+                    <input
+                        aria-label="Session key"
+                        value={form.data.key}
+                        onChange={(event) => form.setData('key', event.target.value.toUpperCase())}
+                        placeholder="XXXXXX"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="border-border bg-surface text-foreground placeholder:text-muted h-12 w-32 rounded-xl border px-3.5 text-center text-base tracking-[0.25em] uppercase"
+                    />
+                    <Button type="submit" size="touch" disabled={form.processing || !form.data.code || !form.data.key} className="w-full sm:w-auto">
+                        {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Join'}
+                    </Button>
+                </div>
+
+                {form.errors.code && (
+                    <p role="alert" className="text-meta text-danger mt-2">
+                        {form.errors.code}
+                    </p>
+                )}
+            </form>
+        </section>
     );
 }
 

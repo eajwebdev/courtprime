@@ -256,7 +256,7 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
                 {clubs.map((venue, index) => (
                     <motion.li key={`${venue.name}-${index}`} {...revealProps(reduce, { delay: Math.min(index, 6) * 0.04, y: 12 })}>
                         <Link
-                            href={`/find-courts?search=${encodeURIComponent(venue.name)}`}
+                            href={`/me/book?search=${encodeURIComponent(venue.name)}`}
                             title={venue.name}
                             className="border-border bg-surface hover:border-primary/50 group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border p-5 text-center transition-colors sm:p-6"
                         >

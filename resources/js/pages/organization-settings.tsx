@@ -20,6 +20,10 @@ type OrganizationSettings = {
     allow_public_booking: boolean;
     player_privacy_mode: string;
     logo_url?: string | null;
+    website?: string | null;
+    facebook?: string | null;
+    instagram?: string | null;
+    tiktok?: string | null;
     primary_color: string;
     secondary_color: string;
     allow_white_label: boolean;
@@ -96,6 +100,10 @@ export default function OrganizationSettings({
         allow_public_booking: organization.settings.allow_public_booking,
         player_privacy_mode: organization.settings.player_privacy_mode,
         logo_url: organization.settings.logo_url ?? '',
+        website: organization.settings.website ?? '',
+        facebook: organization.settings.facebook ?? '',
+        instagram: organization.settings.instagram ?? '',
+        tiktok: organization.settings.tiktok ?? '',
         primary_color: organization.settings.primary_color,
         secondary_color: organization.settings.secondary_color,
         allow_white_label: organization.settings.allow_white_label,
@@ -250,6 +258,36 @@ export default function OrganizationSettings({
                                         </select>
                                         {form.errors.player_privacy_mode && <p className="text-xs text-red-600">{form.errors.player_privacy_mode}</p>}
                                     </div>
+                                </div>
+
+                                <SectionTitle title="Public channels" />
+                                {/* Shown on the club's booking page, which is
+                                    where players reach a club now. */}
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <Field
+                                        label="Website"
+                                        value={form.data.website}
+                                        onChange={(value) => form.setData('website', value)}
+                                        error={form.errors.website}
+                                    />
+                                    <Field
+                                        label="Facebook"
+                                        value={form.data.facebook}
+                                        onChange={(value) => form.setData('facebook', value)}
+                                        error={form.errors.facebook}
+                                    />
+                                    <Field
+                                        label="Instagram"
+                                        value={form.data.instagram}
+                                        onChange={(value) => form.setData('instagram', value)}
+                                        error={form.errors.instagram}
+                                    />
+                                    <Field
+                                        label="TikTok"
+                                        value={form.data.tiktok}
+                                        onChange={(value) => form.setData('tiktok', value)}
+                                        error={form.errors.tiktok}
+                                    />
                                 </div>
 
                                 <SectionTitle title="Branding" />

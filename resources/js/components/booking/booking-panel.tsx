@@ -45,7 +45,16 @@ export type BookableCourt = {
     status: string;
     amenities: string[];
     has_membership_rate: boolean;
-    branch: { id: number | null; name: string | null; address: string | null; organization: string | null };
+    branch: {
+        id: number | null;
+        name: string | null;
+        address: string | null;
+        organization: string | null;
+        /* The club's own details, since booking is where clubs are reached now. */
+        contact_number?: string | null;
+        operating_hours?: { opens?: string; closes?: string } | null;
+        links?: Record<string, string> | null;
+    };
     slots: Slot[];
 };
 

@@ -28,6 +28,11 @@ class OrganizationSettingsRequest extends FormRequest
             'allow_public_booking' => ['required', 'boolean'],
             'player_privacy_mode' => ['required', 'string', 'in:strict,balanced,open'],
             'logo_url' => ['nullable', 'string', 'max:500'],
+            /* Off-site addresses the club controls, shown on its booking page. */
+            'website' => ['nullable', 'url', 'max:255'],
+            'facebook' => ['nullable', 'url', 'max:255'],
+            'instagram' => ['nullable', 'url', 'max:255'],
+            'tiktok' => ['nullable', 'url', 'max:255'],
             'primary_color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'secondary_color' => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'allow_white_label' => ['required', 'boolean'],

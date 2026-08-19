@@ -99,6 +99,10 @@ class OrganizationSettingsController extends Controller
             'allow_public_booking',
             'player_privacy_mode',
             'logo_url',
+            'website',
+            'facebook',
+            'instagram',
+            'tiktok',
             'primary_color',
             'secondary_color',
             'allow_white_label',
@@ -154,6 +158,15 @@ class OrganizationSettingsController extends Controller
             'allow_public_booking' => true,
             'player_privacy_mode' => 'strict',
             'logo_url' => null,
+            /*
+             * The club's public channels. Players reach a club through its
+             * booking page now, and these are what that page shows, so they
+             * have to be settable somewhere: here.
+             */
+            'website' => null,
+            'facebook' => null,
+            'instagram' => null,
+            'tiktok' => null,
             'primary_color' => '#e61b5b',
             'secondary_color' => '#111827',
             'allow_white_label' => false,

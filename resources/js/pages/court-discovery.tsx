@@ -238,9 +238,12 @@ export default function CourtDiscovery({ date, search, branches }: Props) {
                                                     </p>
                                                 </div>
 
-                                                {branch.organization?.slug && (
+                                                {/* The club's own page is the booking page now:
+                                                    its courts, its hours, its channels, and the
+                                                    grid you came to use. */}
+                                                {branch.organization?.name && (
                                                     <Button asChild variant="outline" size="sm" className="shrink-0">
-                                                        <Link href={`/clubs/${branch.organization.slug}`}>Club</Link>
+                                                        <Link href={`/me/book?search=${encodeURIComponent(branch.organization.name)}`}>Book</Link>
                                                     </Button>
                                                 )}
                                             </div>

@@ -94,8 +94,22 @@ class PlayerBookingController extends Controller
                     'id' => $court->branch?->id,
                     'name' => $court->branch?->name,
                     'address' => $court->branch?->address,
+                    'contact_number' => $court->branch?->contact_number,
+                    'operating_hours' => $court->branch?->operating_hours,
                     'organization_id' => $court->branch?->organization?->id,
                     'organization' => $court->branch?->organization?->name,
+                    /*
+                     * Clubs are reached through this page now rather than a
+                     * separate profile, so what that page carried has to be
+                     * here: the club's own channels, kept in the settings JSON
+                     * so adding one needs no migration.
+                     */
+                    'links' => array_filter([
+                        'website' => $court->branch?->organization?->settings['website'] ?? null,
+                        'facebook' => $court->branch?->organization?->settings['facebook'] ?? null,
+                        'instagram' => $court->branch?->organization?->settings['instagram'] ?? null,
+                        'tiktok' => $court->branch?->organization?->settings['tiktok'] ?? null,
+                    ]),
                 ],
                 'has_membership_rate' => $profile ? $this->hasActiveMembership($profile->id, (int) $court->organization_id) : false,
                 /*

@@ -6,13 +6,14 @@ import { EmptyState } from '@/components/empty-state';
 import { AthleteArtwork } from '@/components/marketing-artwork';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { VenueLinks } from '@/components/venue/venue-links';
 import AppLayout from '@/layouts/app-layout';
 import { athleteFor } from '@/lib/athlete';
 import { currency, friendlyDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { LayoutGrid, List, MapPin, Search, X } from 'lucide-react';
+import { Clock, LayoutGrid, List, MapPin, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -159,7 +160,19 @@ export default function PlayerBooking({ profile, date, firstBookableDate, search
 
     /* Courts grouped by venue, for the grid's column set. */
     const branches = useMemo(() => {
-        const map = new Map<string, { key: string; name: string; club: string; courts: BookableCourt[] }>();
+        const map = new Map<
+            string,
+            {
+                key: string;
+                name: string;
+                club: string;
+                address?: string | null;
+                phone?: string | null;
+                hours?: { opens?: string; closes?: string } | null;
+                links?: Record<string, string> | null;
+                courts: BookableCourt[];
+            }
+        >();
 
         for (const court of courts) {
             const key = `${court.branch.organization ?? 'Club'}-${court.branch.name ?? ''}`;
@@ -168,6 +181,12 @@ export default function PlayerBooking({ profile, date, firstBookableDate, search
                     key,
                     name: court.branch.name ?? 'Venue',
                     club: court.branch.organization ?? 'Connected club',
+                    /* Carried through so the club's own details live on the page
+                       that replaced its profile. */
+                    address: court.branch.address,
+                    phone: court.branch.contact_number,
+                    hours: court.branch.operating_hours,
+                    links: court.branch.links,
                     courts: [],
                 });
             }
@@ -435,12 +454,34 @@ export default function PlayerBooking({ profile, date, firstBookableDate, search
                     <div className="min-w-0">
                         {view === 'grid' && branch ? (
                             <div>
-                                <div className="mb-2.5">
-                                    <h2 className="text-h3 text-foreground truncate">{branch.name}</h2>
-                                    <p className="text-meta text-muted flex items-center gap-1.5">
-                                        <MapPin className="size-3.5 shrink-0" aria-hidden />
-                                        <span className="truncate">{branch.club}</span>
-                                    </p>
+                                {/*
+                                 * Clubs used to have a page of their own. This
+                                 * is that page now, so it carries what the club
+                                 * page carried: where it is, when it opens, how
+                                 * to reach it and its own channels, sitting
+                                 * above the grid people came here to use.
+                                 */}
+                                <div className="border-border mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b pb-3">
+                                    <div className="min-w-0">
+                                        <p className="text-meta text-primary truncate font-semibold tracking-wide uppercase">{branch.club}</p>
+                                        <h2 className="text-h3 text-foreground mt-0.5 truncate">{branch.name}</h2>
+                                        <p className="text-meta text-muted mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                            {branch.address && (
+                                                <span className="flex min-w-0 items-center gap-1.5">
+                                                    <MapPin className="size-3.5 shrink-0" aria-hidden />
+                                                    <span className="truncate">{branch.address}</span>
+                                                </span>
+                                            )}
+                                            {branch.hours?.opens && branch.hours?.closes && (
+                                                <span data-numeric className="flex items-center gap-1.5">
+                                                    <Clock className="size-3.5 shrink-0" aria-hidden />
+                                                    {branch.hours.opens} to {branch.hours.closes}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+
+                                    <VenueLinks links={branch.links} phone={branch.phone} name={branch.name} />
                                 </div>
 
                                 {gridTimes.length === 0 ? (

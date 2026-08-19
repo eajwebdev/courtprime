@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\ClubMatch;
 use App\Models\Court;
 use App\Models\OpenPlaySession;
 use App\Models\OpenPlaySessionCourt;
@@ -458,7 +459,65 @@ class OpenPlayBoardControlTest extends TestCase
         $this->assertSame('one', $match->winner_team);
     }
 
-    public function test_teams_cannot_be_rearranged_once_the_game_has_started(): void
+    /**
+     * Changing partners on a game already under way restarts it.
+     *
+     * Refusing outright left the only advice as "tap the points away one at a
+     * time", and partners genuinely do change. Carrying the points over is the
+     * thing that cannot happen: they were won by pairs that no longer exist.
+     * So it is allowed, it is asked about first, and the game starts again.
+     */
+    public function test_changing_partners_mid_game_is_asked_about_and_restarts_the_score(): void
+    {
+        $session = $this->makeSession();
+
+        $this->post('/open-play/board', ['code' => 'OP-TEST01', 'key' => '1234'])->assertRedirect();
+
+        foreach (['A Player', 'B Player', 'C Player', 'D Player'] as $name) {
+            $this->post('/open-play/OP-TEST01/players', ['name' => $name])->assertRedirect();
+        }
+
+        $this->post('/open-play/OP-TEST01/start')->assertRedirect();
+
+        $match = $session->matches()->where('status', 'live')->firstOrFail();
+        $players = $match->participants()->pluck('player_id');
+        $sides = [
+            $players[0] => 'one',
+            $players[1] => 'two',
+            $players[2] => 'one',
+            $players[3] => 'two',
+        ];
+
+        $this->post("/open-play/OP-TEST01/matches/{$match->id}/score", ['team' => 'team_one'])->assertRedirect();
+
+        $clubMatch = ClubMatch::query()->findOrFail($match->club_match_id);
+        $this->assertSame(1, (int) $clubMatch->team_one_score);
+
+        /* Not without saying so: the points are somebody's. */
+        $this->post("/open-play/OP-TEST01/matches/{$match->id}/teams", ['teams' => $sides])
+            ->assertSessionHasErrors('teams');
+
+        $this->assertSame(1, (int) $clubMatch->fresh()->team_one_score);
+
+        /* Acknowledged, and the game starts again from nil all. */
+        $this->post("/open-play/OP-TEST01/matches/{$match->id}/teams", ['teams' => $sides, 'restart' => true])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $clubMatch->refresh();
+
+        $this->assertSame(0, (int) $clubMatch->team_one_score);
+        $this->assertSame(0, (int) $clubMatch->team_two_score);
+        $this->assertSame('live', $clubMatch->status);
+
+        /* The point that was scored is still on the record, alongside the
+           restart, so what happened is answerable. */
+        $this->assertDatabaseHas('score_events', ['club_match_id' => $clubMatch->id, 'event_type' => 'score_reset']);
+        $this->assertDatabaseHas('score_events', ['club_match_id' => $clubMatch->id, 'event_type' => 'score_increment']);
+    }
+
+    /** Before a point is scored, changing partners is free and changes nothing else. */
+    public function test_changing_partners_before_the_first_point_needs_no_restart(): void
     {
         $session = $this->makeSession();
 
@@ -473,10 +532,6 @@ class OpenPlayBoardControlTest extends TestCase
         $match = $session->matches()->where('status', 'live')->firstOrFail();
         $players = $match->participants()->pluck('player_id');
 
-        $this->post("/open-play/OP-TEST01/matches/{$match->id}/score", ['team' => 'team_one'])->assertRedirect();
-
-        /* Moving somebody across the net now would leave that point recorded
-           against a team they were not on. */
         $this->post("/open-play/OP-TEST01/matches/{$match->id}/teams", [
             'teams' => [
                 $players[0] => 'one',
@@ -484,7 +539,10 @@ class OpenPlayBoardControlTest extends TestCase
                 $players[2] => 'one',
                 $players[3] => 'two',
             ],
-        ])->assertSessionHasErrors('teams');
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('one', $match->participants()->where('player_id', $players[0])->value('team'));
+        $this->assertSame('two', $match->participants()->where('player_id', $players[1])->value('team'));
     }
 
     public function test_opening_a_board_does_not_add_the_person_to_the_rotation(): void

@@ -461,6 +461,7 @@ class PublicOpenPlayBoardController extends Controller
         OpenPlayMatch $match,
         OpenPlayService $openPlay,
         OpenPlayRotationService $rotation,
+        MatchScoringService $scoring,
     ): RedirectResponse {
         $session = $this->requireScorer($request, $code, $match, $openPlay);
         $clubMatch = $this->clubMatchFor($session, $match);
@@ -472,10 +473,24 @@ class PublicOpenPlayBoardController extends Controller
                takes their place. */
             'swaps' => ['nullable', 'array'],
             'swaps.*' => ['required', 'integer'],
+            /* Acknowledges that a game already under way starts again. */
+            'restart' => ['nullable', 'boolean'],
         ]);
 
-        if ($clubMatch->team_one_score > 0 || $clubMatch->team_two_score > 0) {
-            return back()->withErrors(['teams' => 'The game has started. Take the points back first.']);
+        $started = $clubMatch->team_one_score > 0 || $clubMatch->team_two_score > 0;
+
+        /*
+         * Partners change between games, not mid rally — but a court that has
+         * already scored used to be refused outright, and the only advice was
+         * to tap the points away one at a time. Changing the teams is allowed
+         * now and the game restarts at nil all, which is what happens on the
+         * court: the points on the board were won by pairs that no longer
+         * exist. The board asks first, and this is the acknowledgement.
+         */
+        if ($started && ! $request->boolean('restart')) {
+            return back()->withErrors([
+                'teams' => 'This game is under way. Changing partners restarts it at 0-0.',
+            ]);
         }
 
         if ($data['swaps'] ?? []) {
@@ -496,9 +511,11 @@ class PublicOpenPlayBoardController extends Controller
            incoming player on the outgoing player's side, which is the sensible
            default, so there is nothing left to place. */
         if ($wanted->keys()->diff($participants->pluck('player_id'))->isNotEmpty() && ($data['swaps'] ?? [])) {
+            $restarted = $this->restartIfStarted($started, $clubMatch, $scoring);
+
             $this->log($request, $session, 'open_play.teams_arranged', 'Swapped a player in', $match->court?->name);
 
-            return back()->with('success', 'Court updated.');
+            return back()->with('success', $restarted ? 'Court updated. The game restarts at 0-0.' : 'Court updated.');
         }
 
         /* Every player on the court has to be placed, and the sides have to
@@ -538,9 +555,34 @@ class PublicOpenPlayBoardController extends Controller
             $match->touch();
         });
 
-        $this->log($request, $session, 'open_play.teams_arranged', 'Rearranged the teams', $match->court?->name);
+        $restarted = $this->restartIfStarted($started, $clubMatch, $scoring);
 
-        return back()->with('success', 'Teams updated.');
+        $this->log(
+            $request,
+            $session,
+            'open_play.teams_arranged',
+            'Changed the partners',
+            trim(($match->court?->name ?? '').($restarted ? ' | game restarted at 0-0' : '')) ?: null,
+        );
+
+        return back()->with('success', $restarted ? 'Partners changed. The game restarts at 0-0.' : 'Partners changed.');
+    }
+
+    /**
+     * Put a game that was already under way back to nil all.
+     *
+     * The points on the board were won by pairs that no longer exist, so they
+     * cannot be carried into a game between different teams.
+     */
+    private function restartIfStarted(bool $started, ClubMatch $clubMatch, MatchScoringService $scoring): bool
+    {
+        if (! $started) {
+            return false;
+        }
+
+        $scoring->reset($clubMatch);
+
+        return true;
     }
 
     /**

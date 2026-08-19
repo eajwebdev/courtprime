@@ -122,16 +122,20 @@ export function CourtCard({
                         /* Only before the first point: moving somebody across
                            the net mid game would leave points against a team
                            they were not on. */
+                        /* "Partners" rather than "Teams": the thing people ask
+                           for at the net post is to change partners, and nobody
+                           looking for that found it behind the other word. It
+                           stays available once a game is under way — the dialog
+                           says the game restarts. */
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            disabled={started}
-                            title={started ? 'Take the points back to rearrange' : 'Rearrange the teams'}
+                            title="Change who is partnering whom"
                             onClick={() => setArranging(true)}
                         >
                             <Shuffle className="size-4" />
-                            <span className="hidden sm:inline">Teams</span>
+                            <span className="hidden sm:inline">Partners</span>
                         </Button>
                     ) : heldBy ? (
                         <span className="text-meta text-muted truncate">{heldBy}</span>
@@ -230,7 +234,17 @@ export function CourtCard({
                 </div>
             )}
 
-            <ArrangeTeams open={arranging} onOpenChange={setArranging} base={base} match={match} one={one} two={two} waiting={waiting} />
+            <ArrangeTeams
+                open={arranging}
+                onOpenChange={setArranging}
+                base={base}
+                match={match}
+                one={one}
+                two={two}
+                waiting={waiting}
+                started={started}
+                score={`${scoreOne}-${scoreTwo}`}
+            />
 
             <ConfirmDialog
                 open={cancelling}
@@ -474,6 +488,8 @@ function ArrangeTeams({
     one,
     two,
     waiting = [],
+    started = false,
+    score,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -482,6 +498,9 @@ function ArrangeTeams({
     one: any[];
     two: any[];
     waiting?: any[];
+    /** Points are already on the board, so changing sides restarts the game. */
+    started?: boolean;
+    score?: string;
 }) {
     const [teams, setTeams] = useState<Record<number, 'one' | 'two'>>({});
     /* Keyed by who is on the court, valued by who takes their place. */
@@ -517,7 +536,9 @@ function ArrangeTeams({
         setSaving(true);
         router.post(
             `${base}/matches/${match.id}/teams`,
-            { teams, swaps },
+            /* The restart is acknowledged here rather than assumed by the
+               server: it throws away points somebody scored. */
+            { teams, swaps, restart: started },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -531,11 +552,20 @@ function ArrangeTeams({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Arrange {match.court}</DialogTitle>
+                    <DialogTitle>Partners on {match.court}</DialogTitle>
                     <DialogDescription>
                         Tap a side to move a player, or swap one out for somebody waiting. Both sides have to end up even.
                     </DialogDescription>
                 </DialogHeader>
+
+                {/* Said before anything is touched, not after saving: the
+                    points belong to pairs that are about to stop existing. */}
+                {started && (
+                    <p className="border-warning/30 bg-warning-soft text-warning text-meta rounded-lg border px-3 py-2">
+                        This game is under way at <span data-numeric>{score}</span>. Changing partners restarts it at 0-0, because those points were
+                        won by the pairs you are about to change.
+                    </p>
+                )}
 
                 <ul className="space-y-2">
                     {players.map((player: any) => {
@@ -647,7 +677,7 @@ function ArrangeTeams({
                         Cancel
                     </Button>
                     <Button type="button" onClick={save} disabled={!even || saving}>
-                        {saving ? <Loader2 className="size-4 animate-spin" /> : 'Save teams'}
+                        {saving ? <Loader2 className="size-4 animate-spin" /> : started ? 'Change partners · restart' : 'Save partners'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

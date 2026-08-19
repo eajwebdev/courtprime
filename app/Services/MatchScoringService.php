@@ -56,6 +56,53 @@ class MatchScoringService
     }
 
     /**
+     * Put the game back to nil all.
+     *
+     * For a court whose teams have just changed: the points on the board were
+     * won by pairs that no longer exist, so carrying them over would credit
+     * them to people who did not win them. The game restarts, which is what
+     * happens on the court when partners swap.
+     *
+     * The points already scored stay in `score_events` — this adds to that
+     * history rather than deleting it, so what happened is still answerable.
+     */
+    public function reset(ClubMatch $match, ?int $userId = null): ClubMatch
+    {
+        return DB::transaction(function () use ($match, $userId) {
+            $match->update([
+                'team_one_score' => 0,
+                'team_two_score' => 0,
+                /* Back to the first serve of a game, which is the column's own
+                   default — it is not nullable, and a restarted game has to
+                   hand the serve to somebody. */
+                'serving_team' => 'team_one',
+                'status' => 'live',
+                'ended_at' => null,
+            ]);
+
+            $this->game($match)->update([
+                'team_one_score' => 0,
+                'team_two_score' => 0,
+                'winner_team' => null,
+                'ended_at' => null,
+            ]);
+
+            ScoreEvent::query()->create([
+                'organization_id' => $match->organization_id,
+                'club_match_id' => $match->id,
+                'recorded_by' => $userId,
+                'event_type' => 'score_reset',
+                'team' => null,
+                'team_one_score' => 0,
+                'team_two_score' => 0,
+                'payload' => ['reason' => 'teams_changed'],
+            ]);
+
+            return $match->refresh();
+        });
+    }
+
+    /**
      * Take back a point.
      *
      * With a team, it takes back that team's last point. Without one, the

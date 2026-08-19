@@ -1,4 +1,4 @@
-import { AthleteArtwork } from '@/components/marketing-artwork';
+import { AthleteArtwork, BrandIcon } from '@/components/marketing-artwork';
 import { MarketingSection } from '@/components/marketing/marketing-section';
 import { Button } from '@/components/ui/button';
 import { EASE, revealProps, usePathDraw, useReveal, VIEWPORT } from '@/lib/motion';
@@ -233,8 +233,8 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
     /*
      * A logo wall, not a directory. Discover already lists venues with rates and
      * availability; repeating that here made two sections do one job. This one
-     * answers a different question — who is actually on the network — so it
-     * shows badges, and every real club links through to its listing.
+     * answers a different question, who is actually on the network, so it shows
+     * marks, and every real club links through to its listing.
      *
      * partner.png was offered for the placeholders but it is a 1-bit threshold
      * copy of the monogram with heavy edge noise; eight of them would read as a
@@ -250,29 +250,36 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
             description="Clubs already running on CourtPrime, and the next wave joining. Open any live club to see today's availability."
             align="center"
         >
-            <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {/* Five across rather than six, so a mark is large enough to be a
+                mark. A logo wall whose logos need squinting at is a list. */}
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
                 {clubs.map((venue, index) => (
                     <motion.li key={`${venue.name}-${index}`} {...revealProps(reduce, { delay: Math.min(index, 6) * 0.04, y: 12 })}>
                         <Link
                             href={`/find-courts?search=${encodeURIComponent(venue.name)}`}
                             title={venue.name}
-                            className="border-border bg-surface hover:border-border-strong group flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-colors sm:p-4"
+                            className="border-border bg-surface hover:border-primary/50 group flex h-full flex-col items-center gap-3 rounded-2xl border p-4 text-center transition-colors sm:p-5"
                         >
-                            {/* No club has uploaded a mark yet, so the monogram
-                                stands in — same pattern as the player avatar. */}
-                            <span className="bg-surface-deep text-primary flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold sm:size-12">
-                                {venue.name
-                                    .split(' ')
-                                    .filter(Boolean)
-                                    .slice(0, 2)
-                                    .map((part) => part[0]?.toUpperCase() ?? '')
-                                    .join('')}
+                            {/*
+                             * The CourtPrime mark stands in until a club uploads
+                             * its own. There is no logo on the organisation yet,
+                             * so this is every club's mark today; when there is
+                             * one, it swaps in here and nothing else moves.
+                             */}
+                            <span className="bg-surface-muted ring-border flex size-20 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-[1.03] sm:size-24">
+                                <BrandIcon size={72} className="size-14 sm:size-16" alt={`${venue.name} on CourtPrime`} />
                             </span>
-                            <span className="text-meta text-foreground line-clamp-2 font-medium">{venue.name}</span>
-                            <span data-numeric className="text-muted text-[0.6875rem]">
-                                {venue.courts} {venue.courts === 1 ? 'court' : 'courts'}
+
+                            <span className="flex min-w-0 flex-col gap-0.5">
+                                <span className="text-label text-foreground line-clamp-2 font-semibold">{venue.name}</span>
+                                <span data-numeric className="text-meta text-muted">
+                                    {venue.courts} {venue.courts === 1 ? 'court' : 'courts'}
+                                    {venue.city ? ` · ${venue.city}` : ''}
+                                </span>
                             </span>
-                            <span className="text-primary flex items-center gap-0.5 text-[0.6875rem] font-medium">
+
+                            <span className="text-primary mt-auto flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide uppercase">
+                                <span className="bg-primary size-1.5 rounded-full" aria-hidden />
                                 Live
                                 <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
                             </span>
@@ -282,9 +289,9 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
 
                 {placeholders.map((index) => (
                     <motion.li key={`joining-${index}`} {...revealProps(reduce, { delay: Math.min(clubs.length + index, 8) * 0.04, y: 12 })}>
-                        <div className="border-border bg-surface-muted/40 flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center sm:p-4">
-                            <span className="border-border-strong text-muted flex size-11 shrink-0 items-center justify-center rounded-full border border-dashed sm:size-12">
-                                <Shield className="size-5" aria-hidden />
+                        <div className="border-border bg-surface-muted/30 flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-4 text-center sm:p-5">
+                            <span className="border-border-strong text-muted flex size-20 shrink-0 items-center justify-center rounded-2xl border border-dashed sm:size-24">
+                                <Shield className="size-8 sm:size-9" aria-hidden />
                             </span>
                             <span className="text-muted text-[0.6875rem] font-medium tracking-wide uppercase">Joining soon</span>
                         </div>
@@ -292,17 +299,15 @@ export function SectionPoweredCourts({ clubs = [] }: { clubs?: NetworkClub[] }) 
                 ))}
 
                 {/* The one action in this section. */}
-                {/* One tile wide so 3 live + 8 joining + this fills two clean rows of six
-                    instead of leaving a hole and wrapping onto a third. */}
                 <motion.li {...revealProps(reduce, { delay: 0.4, y: 12 })}>
                     <Link
                         href="/request-demo"
-                        className="border-primary/40 bg-primary-soft hover:border-primary group flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed p-3 text-center transition-colors sm:p-4"
+                        className="border-primary/40 bg-primary-soft hover:border-primary group flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-4 text-center transition-colors sm:p-5"
                     >
-                        <span className="border-primary/50 text-primary flex size-11 shrink-0 items-center justify-center rounded-full border border-dashed sm:size-12">
-                            <Plus className="size-5" aria-hidden />
+                        <span className="border-primary/50 text-primary flex size-20 shrink-0 items-center justify-center rounded-2xl border border-dashed sm:size-24">
+                            <Plus className="size-8 sm:size-9" aria-hidden />
                         </span>
-                        <span className="text-primary flex items-center gap-0.5 text-[0.6875rem] font-semibold">
+                        <span className="text-primary flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide uppercase">
                             Add your club
                             <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
                         </span>

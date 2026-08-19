@@ -29,7 +29,8 @@ export default function Branches({ branches }: { branches: any[] }) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.transform((data) => ({ ...data, code: data.code.toUpperCase(), currency: data.currency.toUpperCase() })).post('/branches', {
+        form.transform((data) => ({ ...data, code: data.code.toUpperCase(), currency: data.currency.toUpperCase() }));
+        form.post('/branches', {
             preserveScroll: true,
             onSuccess: () => form.reset('name', 'code', 'address', 'contact_number', 'email', 'manager_name'),
         });

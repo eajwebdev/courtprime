@@ -36,7 +36,7 @@ export default function Memberships({
         membership_plan_id: plans[0]?.id ?? '',
         organization_player_id: players[0]?.id ?? '',
         starts_on: new Date().toISOString().slice(0, 10),
-        auto_renew: false,
+        auto_renew: false as boolean,
         notes: '',
     });
 
@@ -44,18 +44,17 @@ export default function Memberships({
         title: '',
         version: 'v1',
         body: '',
-        required_before_booking: false,
+        required_before_booking: false as boolean,
         status: 'active',
     });
 
     const createPlan = (event: FormEvent) => {
         event.preventDefault();
-        planForm
-            .transform((data) => ({ ...data, code: data.code.toUpperCase() }))
-            .post('/membership-plans', {
-                preserveScroll: true,
-                onSuccess: () => planForm.reset('name', 'code', 'benefits'),
-            });
+        planForm.transform((data) => ({ ...data, code: data.code.toUpperCase() }));
+        planForm.post('/membership-plans', {
+            preserveScroll: true,
+            onSuccess: () => planForm.reset('name', 'code', 'benefits'),
+        });
     };
 
     const assignMembership = (event: FormEvent) => {

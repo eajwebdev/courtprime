@@ -21,9 +21,8 @@ export default function CashierSessions({ branches, sessions }: { branches: any[
     };
 
     const close = (id: number) => {
-        closeForm
-            .transform((data) => ({ ...data, closing_cash: Number(data.closing_cash) }))
-            .post(`/cashier-sessions/${id}/close`, { preserveScroll: true });
+        closeForm.transform((data) => ({ ...data, closing_cash: Number(data.closing_cash) }));
+        closeForm.post(`/cashier-sessions/${id}/close`, { preserveScroll: true });
     };
 
     return (

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { currency } from '@/lib/format';
+import { serverError } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Wrench } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function Maintenance({
         end_time: '10:00',
         estimated_cost: 0,
         description: '',
-        block_court: true,
+        block_court: true as boolean,
     });
 
     const submit = (event: FormEvent) => {
@@ -48,7 +49,8 @@ export default function Maintenance({
             court_id: data.court_id ? Number(data.court_id) : null,
             assigned_to: data.assigned_to ? Number(data.assigned_to) : null,
             estimated_cost: Number(data.estimated_cost),
-        })).post('/maintenance', { preserveScroll: true, onSuccess: () => form.reset('title', 'description') });
+        }));
+        form.post('/maintenance', { preserveScroll: true, onSuccess: () => form.reset('title', 'description') });
     };
 
     const branchCourts = courts.filter((court) => Number(court.branch_id) === Number(form.data.branch_id));
@@ -157,7 +159,9 @@ export default function Maintenance({
                                     onChange={(event) => form.setData('description', event.target.value)}
                                 />
                                 {form.errors.description && <p className="text-xs text-red-600">{form.errors.description}</p>}
-                                {form.errors.subscription && <p className="text-xs text-red-600">{form.errors.subscription}</p>}
+                                {serverError(form.errors, 'subscription') && (
+                                    <p className="text-xs text-red-600">{serverError(form.errors, 'subscription')}</p>
+                                )}
                             </div>
                             <Button disabled={form.processing || branches.length === 0}>Create Work Order</Button>
                         </form>
@@ -191,7 +195,8 @@ function WorkOrderCard({ workOrder, canManageMaintenance }: { workOrder: any; ca
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.transform((data) => ({ ...data, actual_cost: Number(data.actual_cost) })).post(`/maintenance/${workOrder.id}`, { preserveScroll: true });
+        form.transform((data) => ({ ...data, actual_cost: Number(data.actual_cost) }));
+        form.post(`/maintenance/${workOrder.id}`, { preserveScroll: true });
     };
 
     return (

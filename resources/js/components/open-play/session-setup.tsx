@@ -194,10 +194,7 @@ export function SessionSetup({
                     </div>
                 </Field>
 
-                <Field
-                    label="Games in a row"
-                    hint="After this many back to back, a player is first off whenever anyone is waiting."
-                >
+                <Field label="Games in a row" hint="After this many back to back, a player is first off whenever anyone is waiting.">
                     <div className="grid grid-cols-4 gap-2">
                         {STREAK_LIMITS.map((limit) => (
                             <SegmentButton

@@ -95,7 +95,10 @@ export function BoardRail({
                             <button
                                 type="button"
                                 onClick={() => setEditing((current) => !current)}
-                                className={cn('text-meta font-medium transition-colors', editing ? 'text-primary' : 'text-muted hover:text-foreground')}
+                                className={cn(
+                                    'text-meta font-medium transition-colors',
+                                    editing ? 'text-primary' : 'text-muted hover:text-foreground',
+                                )}
                             >
                                 {editing ? 'Done' : 'Reorder'}
                             </button>

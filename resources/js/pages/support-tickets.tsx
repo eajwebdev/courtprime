@@ -109,7 +109,7 @@ export default function SupportTickets({
 function TicketRow({ ticket, canUseInternalNotes }: { ticket: any; canUseInternalNotes: boolean }) {
     const replyForm = useForm({
         body: '',
-        internal: false,
+        internal: false as boolean,
         status: ticket.status,
     });
 

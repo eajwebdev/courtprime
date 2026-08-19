@@ -76,13 +76,12 @@ function PipelineRow({ request, assignees, plans }: { request: any; assignees: a
 
     const convert = (event: FormEvent) => {
         event.preventDefault();
-        convertForm
-            .transform((data) => ({
-                ...data,
-                subscription_plan_id: Number(data.subscription_plan_id),
-                trial_ends_at: data.trial_ends_at || null,
-            }))
-            .post(`/demo-pipeline/${request.id}/convert`, { preserveScroll: true });
+        convertForm.transform((data) => ({
+            ...data,
+            subscription_plan_id: Number(data.subscription_plan_id),
+            trial_ends_at: data.trial_ends_at || null,
+        }));
+        convertForm.post(`/demo-pipeline/${request.id}/convert`, { preserveScroll: true });
     };
 
     return (

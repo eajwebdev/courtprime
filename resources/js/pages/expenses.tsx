@@ -48,7 +48,8 @@ export default function Expenses({
             branch_id: data.branch_id ? Number(data.branch_id) : null,
             amount: Number(data.amount),
             approved_by: data.approved_by ? Number(data.approved_by) : null,
-        })).post('/expenses', { preserveScroll: true, onSuccess: () => form.reset('supplier', 'amount', 'receipt_reference', 'notes') });
+        }));
+        form.post('/expenses', { preserveScroll: true, onSuccess: () => form.reset('supplier', 'amount', 'receipt_reference', 'notes') });
     };
 
     return (

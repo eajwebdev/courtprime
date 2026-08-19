@@ -269,9 +269,8 @@ function BracketPanel({ tournament, division }: { tournament: any; division: any
     });
 
     const generate = (overwrite = false) => {
-        bracketForm
-            .transform(() => ({ tournament_division_id: division.id, overwrite }))
-            .post(`/tournaments/${tournament.id}/brackets`, { preserveScroll: true });
+        bracketForm.transform(() => ({ tournament_division_id: division.id, overwrite }));
+        bracketForm.post(`/tournaments/${tournament.id}/brackets`, { preserveScroll: true });
     };
 
     return (

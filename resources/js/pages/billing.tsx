@@ -94,8 +94,8 @@ export default function Billing({ subscription, outstanding, invoices, canTakePa
                                     Your CourtPrime team sets this up
                                 </h1>
                                 <p className="text-meta mt-2 max-w-md text-white/60">
-                                    Trials, plans and billing terms are arranged with EAJ CourtPrime directly. Once your subscription is started,
-                                    this page is where you see what is owed and pay it.
+                                    Trials, plans and billing terms are arranged with EAJ CourtPrime directly. Once your subscription is started, this
+                                    page is where you see what is owed and pay it.
                                 </p>
                                 <Button asChild variant="onDeep" className="mt-4">
                                     <a href="mailto:hello@courtprime.app">

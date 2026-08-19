@@ -136,7 +136,8 @@ export default function OrganizationSettings({
             default_deposit_percent: Number(data.default_deposit_percent),
             live_display_rotation_seconds: Number(data.live_display_rotation_seconds),
             scoreboard_portrait_seconds: Number(data.scoreboard_portrait_seconds),
-        })).post('/organization-settings', { preserveScroll: true });
+        }));
+        form.post('/organization-settings', { preserveScroll: true });
     };
 
     const togglePaymentMethod = (method: string, checked: boolean) => {

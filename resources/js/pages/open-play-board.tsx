@@ -307,7 +307,11 @@ function LiveBoard({
                             {paused ? 'Rotation paused · resume' : 'Pause rotation'}
                         </button>
                     ) : (
-                        paused && <span className="text-meta bg-warning-soft text-warning ml-auto rounded-full px-2.5 py-1 font-medium">Rotation paused</span>
+                        paused && (
+                            <span className="text-meta bg-warning-soft text-warning ml-auto rounded-full px-2.5 py-1 font-medium">
+                                Rotation paused
+                            </span>
+                        )
                     )}
                 </div>
 
@@ -404,9 +408,7 @@ function CourtBar({
                         )}
                     >
                         {court.name}
-                        <span className={cn(mine ? 'text-primary' : 'text-muted')}>
-                            {mine ? '· you' : hold ? `· ${hold.name}` : '· free'}
-                        </span>
+                        <span className={cn(mine ? 'text-primary' : 'text-muted')}>{mine ? '· you' : hold ? `· ${hold.name}` : '· free'}</span>
 
                         {mine && (
                             <button

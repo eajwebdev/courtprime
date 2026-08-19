@@ -92,15 +92,15 @@ export function CourtCard({
     return (
         <article className="border-border bg-surface flex h-full flex-col overflow-hidden rounded-xl border">
             {/*
-              * One header row whoever holds the court.
-              *
-              * Whose court it is used to be a second row that only appeared on
-              * somebody else's card, and the footer of buttons only appeared on
-              * your own — so two cards side by side had different amounts of
-              * chrome and their scores sat at different heights. The row is
-              * always here and always the same height; only what sits at the
-              * end of it changes.
-              */}
+             * One header row whoever holds the court.
+             *
+             * Whose court it is used to be a second row that only appeared on
+             * somebody else's card, and the footer of buttons only appeared on
+             * your own — so two cards side by side had different amounts of
+             * chrome and their scores sat at different heights. The row is
+             * always here and always the same height; only what sits at the
+             * end of it changes.
+             */}
             <div className="border-border bg-surface-muted flex min-h-11 shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
                 <p className="text-label text-foreground font-semibold">{match.court}</p>
                 <p className="text-meta text-muted">
@@ -127,13 +127,7 @@ export function CourtCard({
                            looking for that found it behind the other word. It
                            stays available once a game is under way — the dialog
                            says the game restarts. */
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            title="Change who is partnering whom"
-                            onClick={() => setArranging(true)}
-                        >
+                        <Button type="button" variant="ghost" size="sm" title="Change who is partnering whom" onClick={() => setArranging(true)}>
                             <Shuffle className="size-4" />
                             <span className="hidden sm:inline">Partners</span>
                         </Button>

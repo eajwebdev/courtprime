@@ -8,9 +8,6 @@ import { useForm } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
 import { useEffect, type FormEvent, type ReactNode } from 'react';
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- court payload is shaped
-   by ReservationController and SchedulerController. */
-
 export type BookingCourt = {
     id: number;
     name: string;

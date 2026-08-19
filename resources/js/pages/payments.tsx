@@ -65,7 +65,8 @@ function PaymentRow({ payment }: { payment: any }) {
     });
 
     const submitRefund = () => {
-        form.transform((data) => ({ ...data, amount: Number(data.amount) })).post(`/payments/${payment.id}/refunds`, {
+        form.transform((data) => ({ ...data, amount: Number(data.amount) }));
+        form.post(`/payments/${payment.id}/refunds`, {
             preserveScroll: true,
             onSuccess: () => form.reset('reason'),
         });

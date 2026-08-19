@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { serverError } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { ArrowRightLeft, PackageCheck } from 'lucide-react';
@@ -30,7 +31,8 @@ export default function StockTransfers({ branches, products, transfers }: { bran
             to_branch_id: data.to_branch_id,
             notes: data.notes,
             items: [{ product_id: data.product_id, quantity: data.quantity }],
-        })).post('/stock-transfers', { preserveScroll: true, onSuccess: () => form.reset('quantity', 'notes') });
+        }));
+        form.post('/stock-transfers', { preserveScroll: true, onSuccess: () => form.reset('quantity', 'notes') });
     };
 
     return (
@@ -68,7 +70,7 @@ export default function StockTransfers({ branches, products, transfers }: { bran
                                 options={products.map((product) => String(product.id))}
                                 labels={productLabels(products)}
                                 onChange={(value) => form.setData('product_id', Number(value))}
-                                error={form.errors.items}
+                                error={serverError(form.errors, 'items')}
                             />
                             <Field
                                 label="Quantity"

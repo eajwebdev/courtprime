@@ -56,7 +56,7 @@ export default function TeamRoles({
         organization_id: String(organizations[0]?.id ?? ''),
         branch_id: 'none',
         role_key: roles[0]?.value ?? 'front_desk',
-        is_primary: true,
+        is_primary: true as boolean,
     });
 
     const selectedOrganizationId = Number(form.data.organization_id);
@@ -71,7 +71,8 @@ export default function TeamRoles({
             user_id: data.user_id === 'new' ? null : Number(data.user_id),
             organization_id: data.organization_id ? Number(data.organization_id) : null,
             branch_id: data.branch_id === 'none' ? null : Number(data.branch_id),
-        })).post('/team-roles', {
+        }));
+        form.post('/team-roles', {
             preserveScroll: true,
             onSuccess: () => form.reset('name', 'email'),
         });

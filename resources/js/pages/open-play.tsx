@@ -242,7 +242,9 @@ export default function OpenPlay({
                                         <article key={court.id} className="border-border rounded-xl border border-dashed px-4 py-8 text-center">
                                             <p className="text-label text-foreground font-semibold">{court.name}</p>
                                             <p className="text-meta text-muted mt-1">
-                                                {shortBy === 0 ? 'Assigning next match…' : `Idle · ${shortBy} more ${shortBy === 1 ? 'player' : 'players'} needed`}
+                                                {shortBy === 0
+                                                    ? 'Assigning next match…'
+                                                    : `Idle · ${shortBy} more ${shortBy === 1 ? 'player' : 'players'} needed`}
                                             </p>
                                         </article>
                                     ))}

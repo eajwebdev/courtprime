@@ -14,6 +14,10 @@ interface ResetPasswordProps {
 }
 
 interface ResetPasswordForm {
+    /* useForm requires a string index: Inertia has to be able to walk
+       the object to build the request body. The named fields below are
+       still checked. */
+    [key: string]: string | boolean;
     token: string;
     email: string;
     password: string;

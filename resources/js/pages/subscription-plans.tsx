@@ -23,7 +23,7 @@ export default function SubscriptionPlans({ plans }: { plans: any[] }) {
         branch_limit: '',
         court_limit: '',
         staff_limit: '',
-        is_active: true,
+        is_active: true as boolean,
     });
 
     const submit = (event: FormEvent) => {
@@ -37,7 +37,8 @@ export default function SubscriptionPlans({ plans }: { plans: any[] }) {
             branch_limit: data.branch_limit === '' ? null : Number(data.branch_limit),
             court_limit: data.court_limit === '' ? null : Number(data.court_limit),
             staff_limit: data.staff_limit === '' ? null : Number(data.staff_limit),
-        })).post('/subscription-plans', { preserveScroll: true, onSuccess: () => form.reset() });
+        }));
+        form.post('/subscription-plans', { preserveScroll: true, onSuccess: () => form.reset() });
     };
 
     return (
@@ -181,7 +182,7 @@ function FeatureForm({ plan }: { plan: any }) {
     const form = useForm({
         feature_key: '',
         label: '',
-        enabled: true,
+        enabled: true as boolean,
         limit_value: '',
     });
 
@@ -190,7 +191,8 @@ function FeatureForm({ plan }: { plan: any }) {
         form.transform((data) => ({
             ...data,
             limit_value: data.limit_value === '' ? null : Number(data.limit_value),
-        })).post(`/subscription-plans/${plan.id}/features`, {
+        }));
+        form.post(`/subscription-plans/${plan.id}/features`, {
             preserveScroll: true,
             onSuccess: () => form.reset('feature_key', 'label', 'limit_value'),
         });

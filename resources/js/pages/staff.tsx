@@ -58,33 +58,30 @@ export default function Staff({
 
     const submitProfile = (event: FormEvent) => {
         event.preventDefault();
-        profileForm
-            .transform((data) => ({
-                ...data,
-                branch_id: data.branch_id ? Number(data.branch_id) : null,
-                user_id: data.user_id ? Number(data.user_id) : null,
-            }))
-            .post('/staff', {
-                preserveScroll: true,
-                onSuccess: () =>
-                    profileForm.reset('employee_id', 'name', 'position', 'contact_email', 'contact_mobile', 'emergency_contact', 'notes'),
-            });
+        profileForm.transform((data) => ({
+            ...data,
+            branch_id: data.branch_id ? Number(data.branch_id) : null,
+            user_id: data.user_id ? Number(data.user_id) : null,
+        }));
+        profileForm.post('/staff', {
+            preserveScroll: true,
+            onSuccess: () => profileForm.reset('employee_id', 'name', 'position', 'contact_email', 'contact_mobile', 'emergency_contact', 'notes'),
+        });
     };
 
     const submitAttendance = (event: FormEvent) => {
         event.preventDefault();
-        attendanceForm
-            .transform((data) => ({
-                ...data,
-                staff_profile_id: Number(data.staff_profile_id),
-                branch_id: data.branch_id ? Number(data.branch_id) : null,
-                gps_latitude: data.gps_latitude === '' ? null : Number(data.gps_latitude),
-                gps_longitude: data.gps_longitude === '' ? null : Number(data.gps_longitude),
-            }))
-            .post('/staff/attendance', {
-                preserveScroll: true,
-                onSuccess: () => attendanceForm.reset('time_out', 'qr_code', 'gps_latitude', 'gps_longitude', 'notes'),
-            });
+        attendanceForm.transform((data) => ({
+            ...data,
+            staff_profile_id: Number(data.staff_profile_id),
+            branch_id: data.branch_id ? Number(data.branch_id) : null,
+            gps_latitude: data.gps_latitude === '' ? null : Number(data.gps_latitude),
+            gps_longitude: data.gps_longitude === '' ? null : Number(data.gps_longitude),
+        }));
+        attendanceForm.post('/staff/attendance', {
+            preserveScroll: true,
+            onSuccess: () => attendanceForm.reset('time_out', 'qr_code', 'gps_latitude', 'gps_longitude', 'notes'),
+        });
     };
 
     return (

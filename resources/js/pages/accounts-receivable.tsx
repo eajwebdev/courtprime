@@ -49,7 +49,8 @@ export default function AccountsReceivable({
             organization_player_id: data.organization_player_id ? Number(data.organization_player_id) : null,
             reservation_id: data.reservation_id ? Number(data.reservation_id) : null,
             amount_due: Number(data.amount_due),
-        })).post('/accounts-receivable', { preserveScroll: true, onSuccess: () => form.reset('customer_name', 'amount_due', 'notes') });
+        }));
+        form.post('/accounts-receivable', { preserveScroll: true, onSuccess: () => form.reset('customer_name', 'amount_due', 'notes') });
     };
 
     return (
@@ -183,7 +184,8 @@ function ReceivableCard({ receivable }: { receivable: any }) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.transform((data) => ({ amount: Number(data.amount) })).post(`/accounts-receivable/${receivable.id}/payments`, { preserveScroll: true });
+        form.transform((data) => ({ amount: Number(data.amount) }));
+        form.post(`/accounts-receivable/${receivable.id}/payments`, { preserveScroll: true });
     };
 
     return (

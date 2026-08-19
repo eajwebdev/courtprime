@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- payload from SchedulerController. */
-
 export type SchedulerCourt = {
     id: number;
     name: string;

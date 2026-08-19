@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { currency } from '@/lib/format';
+import { serverError } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Minus, Plus, ReceiptText } from 'lucide-react';
@@ -53,7 +54,8 @@ export default function POS({
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        form.transform((data) => ({ ...data, amount_tendered: Number(data.amount_tendered) || total })).post('/pos', { preserveScroll: true });
+        form.transform((data) => ({ ...data, amount_tendered: Number(data.amount_tendered) || total }));
+        form.post('/pos', { preserveScroll: true });
     };
 
     return (
@@ -175,7 +177,9 @@ export default function POS({
                                     error={form.errors.amount_tendered}
                                 />
                                 {form.errors.items && <p className="text-xs text-red-600">{form.errors.items}</p>}
-                                {form.errors.cashier_session && <p className="text-xs text-red-600">{form.errors.cashier_session}</p>}
+                                {serverError(form.errors, 'cashier_session') && (
+                                    <p className="text-xs text-red-600">{serverError(form.errors, 'cashier_session')}</p>
+                                )}
                                 <div className="dark:bg-surface-muted rounded-lg bg-slate-50 p-4 text-sm">
                                     <Row label="Subtotal" value={currency(subtotal)} />
                                     <Row label="Tax" value={currency(tax)} />

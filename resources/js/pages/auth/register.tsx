@@ -11,6 +11,10 @@ import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 
 interface RegisterForm {
+    /* useForm requires a string index: Inertia has to be able to walk
+       the object to build the request body. The named fields below are
+       still checked. */
+    [key: string]: string | boolean;
     name: string;
     email: string;
     password: string;

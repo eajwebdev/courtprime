@@ -32,8 +32,8 @@ export default function TenantSubscriptions({ organizations, plans, trialDays, c
                     <p className="text-sm font-semibold text-pink-600">EAJ Superadmin</p>
                     <h1 className="mt-2 text-2xl font-semibold">Tenant Subscriptions</h1>
                     <p className="text-muted-foreground mt-2 text-sm">
-                        Start a club's trial, put it on a plan and term, and settle payments taken outside QRPh. A club sees what it owes and pays
-                        by QRPh from its own billing page, it does not choose its own plan.
+                        Start a club's trial, put it on a plan and term, and settle payments taken outside QRPh. A club sees what it owes and pays by
+                        QRPh from its own billing page, it does not choose its own plan.
                     </p>
                 </div>
 
@@ -95,13 +95,13 @@ function TenantSubscriptionCard({
      * current when the button was pressed.
      */
     const startTrial = () => {
-        trialForm.transform(() => ({ plan_id: newPlanId })).post(`/tenant-subscriptions/${organization.id}/trial`, { preserveScroll: true });
+        trialForm.transform(() => ({ plan_id: newPlanId }));
+        trialForm.post(`/tenant-subscriptions/${organization.id}/trial`, { preserveScroll: true });
     };
 
     const subscribeTenant = () => {
-        subscribeForm
-            .transform(() => ({ plan_id: newPlanId, term_months: newMonths }))
-            .post(`/tenant-subscriptions/${organization.id}/subscribe`, { preserveScroll: true });
+        subscribeForm.transform(() => ({ plan_id: newPlanId, term_months: newMonths }));
+        subscribeForm.post(`/tenant-subscriptions/${organization.id}/subscribe`, { preserveScroll: true });
     };
 
     const outstanding = (subscription?.invoices ?? []).find((invoice: any) => ['issued', 'overdue', 'partial'].includes(invoice.status));
@@ -154,37 +154,36 @@ function TenantSubscriptionCard({
             subscription_plan_id: Number(data.subscription_plan_id),
             trial_ends_at: data.trial_ends_at || null,
             current_period_ends_at: data.current_period_ends_at || null,
-        })).post(`/tenant-subscriptions/${organization.id}`, { preserveScroll: true });
+        }));
+        form.post(`/tenant-subscriptions/${organization.id}`, { preserveScroll: true });
     };
 
     const issueInvoice = (event: FormEvent) => {
         event.preventDefault();
-        invoiceForm
-            .transform((data) => ({
-                ...data,
-                period_starts_on: data.period_starts_on || null,
-                period_ends_on: data.period_ends_on || null,
-                due_on: data.due_on || null,
-                subtotal: data.subtotal === '' ? null : Number(data.subtotal),
-                tax_amount: Number(data.tax_amount),
-                discount_amount: Number(data.discount_amount),
-            }))
-            .post(`/tenant-subscriptions/${organization.id}/invoices`, { preserveScroll: true, onSuccess: () => invoiceForm.reset('notes') });
+        invoiceForm.transform((data) => ({
+            ...data,
+            period_starts_on: data.period_starts_on || null,
+            period_ends_on: data.period_ends_on || null,
+            due_on: data.due_on || null,
+            subtotal: data.subtotal === '' ? null : Number(data.subtotal),
+            tax_amount: Number(data.tax_amount),
+            discount_amount: Number(data.discount_amount),
+        }));
+        invoiceForm.post(`/tenant-subscriptions/${organization.id}/invoices`, { preserveScroll: true, onSuccess: () => invoiceForm.reset('notes') });
     };
 
     const recordPayment = (event: FormEvent) => {
         event.preventDefault();
-        paymentForm
-            .transform((data) => ({
-                ...data,
-                subscription_invoice_id: data.subscription_invoice_id ? Number(data.subscription_invoice_id) : null,
-                amount: Number(data.amount),
-                paid_at: data.paid_at || null,
-            }))
-            .post(`/tenant-subscriptions/${organization.id}/payments`, {
-                preserveScroll: true,
-                onSuccess: () => paymentForm.reset('external_reference', 'notes'),
-            });
+        paymentForm.transform((data) => ({
+            ...data,
+            subscription_invoice_id: data.subscription_invoice_id ? Number(data.subscription_invoice_id) : null,
+            amount: Number(data.amount),
+            paid_at: data.paid_at || null,
+        }));
+        paymentForm.post(`/tenant-subscriptions/${organization.id}/payments`, {
+            preserveScroll: true,
+            onSuccess: () => paymentForm.reset('external_reference', 'notes'),
+        });
     };
 
     return (
@@ -293,7 +292,9 @@ function TenantSubscriptionCard({
                                                 {currency(term.per_month)}
                                                 <span className="text-muted font-normal">/mo</span>
                                             </span>
-                                            <span data-numeric className="text-meta text-muted mt-1 block">{currency(term.total)} billed now</span>
+                                            <span data-numeric className="text-meta text-muted mt-1 block">
+                                                {currency(term.total)} billed now
+                                            </span>
                                         </button>
                                     );
                                 })}
@@ -370,9 +371,7 @@ function TenantSubscriptionCard({
                             <p className="text-label text-foreground font-semibold">
                                 Outstanding: {outstanding.invoice_number} · <span data-numeric>{currency(outstanding.total_amount)}</span>
                             </p>
-                            <p className="text-meta text-muted mt-0.5">
-                                Only for money taken outside QRPh — cash at the desk, or a bank transfer.
-                            </p>
+                            <p className="text-meta text-muted mt-0.5">Only for money taken outside QRPh — cash at the desk, or a bank transfer.</p>
                             <div className="mt-2 flex flex-wrap items-end gap-2">
                                 <Select
                                     label="Paid by"

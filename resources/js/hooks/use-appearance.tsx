@@ -3,15 +3,15 @@ import { useEffect, useState } from 'react';
 /**
  * Light or dark. There is no "system".
  *
- * A third state meant the toggle could not simply flip, and a visitor whose OS
- * preferred dark landed on dark without choosing it. The first visit now seeds
- * from the OS once, and after that the stored choice is the only authority.
+ * A third state meant the toggle could not simply flip. Light is the default
+ * for everyone: the OS preference is not consulted at all, so every first
+ * visit renders the same way and the product is designed against one known
+ * ground. Dark is opt-in, and once chosen the stored value is the only
+ * authority.
  */
 export type Appearance = 'light' | 'dark';
 
 const STORAGE_KEY = 'appearance';
-
-const prefersDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
 
 const applyTheme = (appearance: Appearance) => {
     document.documentElement.classList.toggle('dark', appearance === 'dark');
@@ -25,7 +25,7 @@ const readStored = (): Appearance => {
         return stored;
     }
 
-    return prefersDark() ? 'dark' : 'light';
+    return 'light';
 };
 
 export function initializeTheme() {

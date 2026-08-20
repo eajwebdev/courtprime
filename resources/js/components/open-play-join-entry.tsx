@@ -39,11 +39,16 @@ export function OpenPlayJoinEntry({ className, autoFocus = false }: { className?
                 Scan the club's QR, or enter the session ID and key they gave you. You go in the queue as yourself, so your games count.
             </p>
 
-            <ScanToJoin className="mt-3 w-full sm:w-auto" />
-
-            <p className="text-meta text-muted mt-3">Or type the pair:</p>
-
-            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
+            {/*
+             * Scan sits beside Join, not on a row of its own above it.
+             *
+             * They are two ways to do the same thing, so they belong in the
+             * same cluster: the fields read first because the label just named
+             * them, and scanning is offered at the end as the shortcut for
+             * anyone standing in front of the club's code. Stacked above with
+             * an "or type the pair" divider underneath, it read as a step.
+             */}
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_8rem_auto_auto]">
                 <div className="relative min-w-0">
                     <Ticket className="text-muted pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" aria-hidden />
                     <input
@@ -79,6 +84,8 @@ export function OpenPlayJoinEntry({ className, autoFocus = false }: { className?
                 <Button type="submit" size="touch" disabled={going || !code.trim() || !key.trim()} className="w-full sm:w-auto sm:px-6">
                     Join
                 </Button>
+
+                <ScanToJoin className="w-full sm:w-auto" />
             </div>
         </form>
     );

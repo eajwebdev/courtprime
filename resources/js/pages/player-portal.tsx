@@ -367,10 +367,6 @@ function JoinOpenPlay() {
                     your games count.
                 </p>
 
-                {/* The fast path first: scanning needs no typing and no reading
-                    two strings across a hall. */}
-                <ScanToJoin className="mb-3 w-full" />
-
                 <div className="flex flex-wrap gap-2">
                     <input
                         aria-label="Session ID"
@@ -393,9 +389,18 @@ function JoinOpenPlay() {
                         spellCheck={false}
                         className="border-border bg-surface text-foreground placeholder:text-muted h-12 w-32 rounded-xl border px-3.5 text-center text-base tracking-[0.25em] uppercase"
                     />
-                    <Button type="submit" size="touch" disabled={form.processing || !form.data.code || !form.data.key} className="w-full sm:w-auto">
+                    <Button
+                        type="submit"
+                        size="touch"
+                        disabled={form.processing || !form.data.code || !form.data.key}
+                        className="flex-1 sm:flex-none"
+                    >
                         {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Join'}
                     </Button>
+
+                    {/* Beside Join, for the same reason as on the discovery
+                        page: one cluster, two ways in. */}
+                    <ScanToJoin className="flex-1 sm:flex-none" />
                 </div>
 
                 {form.errors.code && (

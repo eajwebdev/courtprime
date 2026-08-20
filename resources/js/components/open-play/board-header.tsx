@@ -1,6 +1,6 @@
 import { BrandIcon } from '@/components/marketing-artwork';
 import { Button } from '@/components/ui/button';
-import { Check, CircleStop, Copy, History, LogOut } from 'lucide-react';
+import { Check, CircleStop, Copy, History, LogOut, QrCode } from 'lucide-react';
 import { useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from PublicOpenPlayBoardController. */
@@ -20,6 +20,7 @@ export function BoardHeader({
     session,
     inControl,
     onShowActivity,
+    onShowJoinQr,
     onRelease,
     onEnd,
     activityCount,
@@ -28,6 +29,8 @@ export function BoardHeader({
     /** Whether this device is the one holding the board. */
     inControl: boolean;
     onShowActivity: () => void;
+    /** Turning the tablet around so players can scan themselves in. */
+    onShowJoinQr: () => void;
     onRelease: () => void;
     /** Only the host closing a session that has started. */
     onEnd?: () => void;
@@ -85,6 +88,14 @@ export function BoardHeader({
                 </button>
 
                 <div className="flex shrink-0 items-center gap-2">
+                    {/* The players' way in, on the screen the players are stood
+                        in front of. Everything else in this bar runs the
+                        session; this one is for them. */}
+                    <Button type="button" variant="onDeep" size="sm" onClick={onShowJoinQr} className="shrink-0">
+                        <QrCode className="size-4" />
+                        <span className="hidden sm:inline">Scan to join</span>
+                    </Button>
+
                     <Button type="button" variant="onDeep" size="sm" onClick={onShowActivity} className="shrink-0">
                         <History className="size-4" />
                         <span className="hidden sm:inline">History</span>

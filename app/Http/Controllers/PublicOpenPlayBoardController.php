@@ -22,6 +22,7 @@ use App\Support\NetworkClock;
 use App\Support\OpenPlayBoardAccess;
 use App\Support\OpenPlayCourtAccess;
 use App\Support\OpenPlaySessionLog;
+use App\Support\Qr;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -316,6 +317,14 @@ class PublicOpenPlayBoardController extends Controller
                 'starts_at' => substr((string) $session->start_time, 0, 5),
                 'ends_at' => substr((string) $session->end_time, 0, 5),
             ],
+            /*
+             * The join code, for players standing at the court.
+             *
+             * It points at the join page, never at this board: the two are
+             * different jobs and the QR is the one everybody sees. Rendered
+             * server-side so it is on screen the instant the board loads.
+             */
+            'joinQr' => $this->joinQr($session),
             /* Whether this device is the host: the one that opened the session
                and owns how it is run. Scoring is a separate question now. */
             'inControl' => OpenPlayBoardAccess::isHolder($request, $session),
@@ -987,6 +996,18 @@ class PublicOpenPlayBoardController extends Controller
         }
 
         return back()->with('success', 'Session updated.');
+    }
+
+    /**
+     * The scannable join code for a session.
+     *
+     * @return array{path: string, modules: int, url: string}
+     */
+    private function joinQr(OpenPlaySession $session): array
+    {
+        $url = Qr::openPlayJoinUrl($session->session_code, $session->session_key);
+
+        return array_merge(Qr::path($url), ['url' => $url]);
     }
 
     /**

@@ -11,7 +11,7 @@ import { CalendarDays, Clock, MapPin, Phone, Trophy } from 'lucide-react';
 /* eslint-disable @typescript-eslint/no-explicit-any -- club payload is shaped by
    the existing PublicClubController. */
 
-export default function PublicClub({ club }: { club: any }) {
+export default function PublicClub({ club, seo }: { club: any; seo?: { title: string } }) {
     const branches: any[] = club.branches ?? [];
     const courts = branches.flatMap((branch: any) => branch.courts ?? []);
 
@@ -22,12 +22,9 @@ export default function PublicClub({ club }: { club: any }) {
 
     return (
         <>
-            <Head title={`${club.name} | CourtPrime`}>
-                <meta
-                    name="description"
-                    content={`${club.name} on CourtPrime — branches, courts, hourly rates and public tournaments, bookable with one player identity.`}
-                />
-            </Head>
+            {/* The server already resolved this title, city included; reusing
+                it keeps the rendered page identical to the fetched one. */}
+            <Head title={seo?.title ?? `${club.name} | Pickleball Courts on CourtPrime`} />
 
             {/*
              * Wrapped in the discovery chrome rather than a bare <main>. This is a

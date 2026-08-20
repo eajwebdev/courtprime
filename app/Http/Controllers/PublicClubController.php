@@ -23,6 +23,7 @@ class PublicClubController extends Controller
             ->firstOrFail();
 
         return Inertia::render('public-club', [
+            'seo' => $this->seo($organization),
             'club' => [
                 'name' => $organization->name,
                 'slug' => $organization->slug,
@@ -63,5 +64,49 @@ class PublicClubController extends Controller
                     ]),
             ],
         ]);
+    }
+
+    /**
+     * Per-club search metadata.
+     *
+     * A club page is the one page on the network that answers a local search —
+     * somebody looking for courts in their own city — so it says the city in
+     * its title and describes itself as a place, not as a screen in an app.
+     * Each branch is published as a SportsActivityLocation with its address and
+     * phone, which is what puts a real venue into local results.
+     *
+     * @return array<string, mixed>
+     */
+    private function seo(Organization $organization): array
+    {
+        $branches = $organization->branches;
+        $address = (string) ($branches->first()->address ?? '');
+        $parts = array_values(array_filter(array_map('trim', explode(',', $address))));
+        $city = $parts ? (string) end($parts) : null;
+        $courts = $branches->sum(fn ($branch) => $branch->courts->count());
+
+        $where = $city ? " in {$city}" : '';
+        $countText = $courts > 0
+            ? $courts.' '.($courts === 1 ? 'court' : 'courts')
+            : 'Courts';
+
+        return [
+            'title' => "{$organization->name}{$where} | Pickleball Courts on CourtPrime",
+            'description' => "{$countText} at {$organization->name}{$where}. See hourly rates, open play sessions and upcoming tournaments, and book with one CourtPrime player identity.",
+            'schema' => [[
+                '@context' => 'https://schema.org',
+                '@type' => 'SportsOrganization',
+                'name' => $organization->name,
+                'url' => route('clubs.public.show', $organization->slug),
+                'sport' => 'Pickleball',
+                'location' => $branches->map(fn ($branch) => array_filter([
+                    '@type' => 'SportsActivityLocation',
+                    'name' => $branch->name,
+                    'address' => $branch->address,
+                    'telephone' => $branch->phone,
+                    'email' => $branch->email,
+                ]))->values()->all(),
+            ]],
+        ];
     }
 }

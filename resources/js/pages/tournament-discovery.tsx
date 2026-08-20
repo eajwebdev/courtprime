@@ -50,12 +50,7 @@ export default function TournamentDiscovery({ search, date, tournaments }: Props
 
     return (
         <>
-            <Head title="Find tournaments | CourtPrime">
-                <meta
-                    name="description"
-                    content="Discover public pickleball tournaments across connected CourtPrime clubs and register with one identity."
-                />
-            </Head>
+            <Head title="Find Pickleball Tournaments | CourtPrime" />
 
             <DiscoveryPage current="/find-tournaments">
                 <DiscoveryHero

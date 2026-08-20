@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>{{ config('app.name', 'EAJ CourtPrime') }}</title>
+        @include('partials.seo')
 
         <meta name="theme-color" content="#e61b5b">
         <meta name="application-name" content="EAJ CourtPrime">

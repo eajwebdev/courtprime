@@ -43,6 +43,7 @@ use App\Http\Controllers\POSController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PublicClubController;
 use App\Http\Controllers\PublicLiveMatchController;
+use App\Http\Controllers\PublicOpenPlayBoardClaimController;
 use App\Http\Controllers\PublicOpenPlayBoardController;
 use App\Http\Controllers\PublicOpenPlayController;
 use App\Http\Controllers\PublicOpenPlayJoinController;
@@ -51,8 +52,10 @@ use App\Http\Controllers\PublicTournamentController;
 use App\Http\Controllers\RankingController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\ScoreController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\SubscriptionPlanController;
@@ -64,6 +67,10 @@ use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', LandingController::class)->name('home');
+/* Served by the app, not from public/, so both carry this deployment's real
+   domain instead of one hardcoded at build time. */
+Route::get('sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('robots.txt', RobotsController::class)->name('robots');
 Route::get('privacy-policy', [LandingController::class, 'privacy'])->name('privacy');
 Route::get('terms-of-service', [LandingController::class, 'terms'])->name('terms');
 Route::get('request-demo', [DemoRequestController::class, 'create'])->name('demo.create');
@@ -87,9 +94,18 @@ Route::get('player-identities/{courtprimePlayerId}', [PlayerIdentityController::
 Route::get('player-qr/{courtprimePlayerId}', [PlayerIdentityController::class, 'qrProfile'])->middleware('signed')->name('player-identities.qr');
 Route::get('find-courts', CourtDiscoveryController::class)->name('courts.discovery');
 Route::get('find-open-play', PublicOpenPlayController::class)->name('open-play.discovery');
-/* Walk-ins join with the club's code and a name, no account. Throttled because
-   it creates player records from unauthenticated input. */
-Route::post('open-play/open', [PublicOpenPlayJoinController::class, 'store'])
+
+/*
+ * The player's door, and what the session QR points at. Public and a GET so a
+ * phone camera can open it; joining from it still needs an account, because a
+ * game only counts for somebody it can be credited to.
+ */
+Route::get('open-play/join', [PublicOpenPlayJoinController::class, 'show'])->name('open-play.join.public');
+
+/* The other door: taking the board to run the session. A different job from
+   playing in it, so a different route, a different screen and a different
+   verb. Throttled because it is unauthenticated. */
+Route::post('open-play/open', [PublicOpenPlayBoardClaimController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('open-play.board.open');
 

@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\DB;
  *   1. fewest games played goes on first
  *   2. then whoever has waited longest (lowest last round played)
  *   3. then whoever sat out the previous round
- *   4. partners are varied
+ *   4. partners are varied — among players coming off the queue. A pair that
+ *      holds the court keeps playing together; see bestPairing().
  *   5. opponents are varied
  *   6. nobody plays many consecutive rounds while others wait
  *   7. teams are balanced by rating when ratings exist
@@ -189,7 +190,18 @@ class OpenPlayRotationService
             $history = $this->history($session);
             $group = $this->entriesFor($next);
 
-            $created = collect([$this->createMatch($session, $locked->court, $group, $history, $round)]);
+            /*
+             * Partners who are both staying on stay partners.
+             *
+             * The pairing score treats a repeated partner as the worst thing it
+             * can do, so a pair that won and held the court was being split up
+             * for the very next game — the club sets a team, the team wins, and
+             * the board hands them each somebody else. The court keeps its
+             * teams; the queue is where fresh partners come from.
+             */
+            $keepTogether = $this->pairsStayingOn($locked, $plan['stay']);
+
+            $created = collect([$this->createMatch($session, $locked->court, $group, $history, $round, $keepTogether)]);
 
             $session->update(['current_round' => $round, 'status' => 'live']);
 
@@ -478,11 +490,18 @@ class OpenPlayRotationService
     /**
      * Cheapest of the three ways to split four players into two teams.
      *
+     * `$keepTogether` names pairs that are already a team and are staying on
+     * the court. Those splits are the only ones considered, so a pairing that
+     * has been set — by winning and staying on, or by hand at the board — is
+     * not undone by the variety scoring, which otherwise penalises a repeated
+     * partner harder than anything else and so actively split them up.
+     *
      * @param  Collection<int, array{player_id:int, rating:float}>  $quartet
      * @param  array{partners: array<string,int>, opponents: array<string,int>}  $history
+     * @param  array<int, array{0:int, 1:int}>  $keepTogether
      * @return array{score: float, one: array<int, array>, two: array<int, array>}
      */
-    private function bestPairing(Collection $quartet, array $history): array
+    private function bestPairing(Collection $quartet, array $history, array $keepTogether = []): array
     {
         $players = $quartet->values()->all();
 
@@ -501,6 +520,37 @@ class OpenPlayRotationService
             [[$a, $c], [$b, $d]],
             [[$a, $d], [$b, $c]],
         ];
+
+        /*
+         * A pair that must stay together rules out the splits that break them
+         * up. With one such pair among four players exactly one split survives,
+         * which is the whole point: they keep playing together.
+         *
+         * If nothing survives the filter the constraint was self-contradictory,
+         * so it is dropped rather than leaving the court without a match.
+         */
+        if ($keepTogether !== []) {
+            $required = array_map(fn (array $pair) => $this->pairKey($pair[0], $pair[1]), $keepTogether);
+
+            $viable = array_values(array_filter($splits, function (array $split) use ($required): bool {
+                $made = array_map(
+                    fn (array $team) => $this->pairKey($team[0]['player_id'], $team[1]['player_id']),
+                    $split,
+                );
+
+                foreach ($required as $key) {
+                    if (! in_array($key, $made, true)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }));
+
+            if ($viable !== []) {
+                $splits = $viable;
+            }
+        }
 
         $best = null;
         $bestScore = null;
@@ -559,10 +609,17 @@ class OpenPlayRotationService
     /**
      * @param  Collection<int, array{player_id:int, rating:float}>  $four
      * @param  array{partners: array<string,int>, opponents: array<string,int>}  $history
+     * @param  array<int, array{0:int, 1:int}>  $keepTogether  pairs already on this court together
      */
-    private function createMatch(OpenPlaySession $session, Court $court, Collection $four, array &$history, int $round): OpenPlayMatch
-    {
-        $pairing = $this->bestPairing($four, $history);
+    private function createMatch(
+        OpenPlaySession $session,
+        Court $court,
+        Collection $four,
+        array &$history,
+        int $round,
+        array $keepTogether = [],
+    ): OpenPlayMatch {
+        $pairing = $this->bestPairing($four, $history, $keepTogether);
 
         $names = Player::query()
             ->whereIn('id', $four->pluck('player_id'))
@@ -621,6 +678,36 @@ class OpenPlayRotationService
         $this->recordHistory($history, $pairing);
 
         return $openPlayMatch->load(['court', 'participants.player', 'clubMatch']);
+    }
+
+    /**
+     * Teams from the finished match whose members are all staying on.
+     *
+     * A team only survives if both of its players held the court. One of a pair
+     * rotating off leaves the other free to be paired with whoever comes on,
+     * which is what should happen — there is no team left to keep.
+     *
+     * @param  array<int, int>  $staying
+     * @return array<int, array{0:int, 1:int}>
+     */
+    private function pairsStayingOn(OpenPlayMatch $match, array $staying): array
+    {
+        if (count($staying) < 2) {
+            return [];
+        }
+
+        return $match->participants()
+            ->get(['player_id', 'team'])
+            ->groupBy('team')
+            ->map(fn (Collection $members) => $members
+                ->pluck('player_id')
+                ->map(fn ($id) => (int) $id)
+                ->intersect($staying)
+                ->values()
+                ->all())
+            ->filter(fn (array $members) => count($members) === 2)
+            ->values()
+            ->all();
     }
 
     /**

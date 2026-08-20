@@ -5,7 +5,8 @@ import { BoardHeader } from '@/components/open-play/board-header';
 import { BoardRail } from '@/components/open-play/board-rail';
 import { CourtCard } from '@/components/open-play/court-card';
 import { RosterPanel, type RosterEntry } from '@/components/open-play/roster-panel';
-import { SessionSetup, type BoardCourt } from '@/components/open-play/session-setup';
+import { JoinQrOverlay, type SessionQr } from '@/components/open-play/session-qr';
+import { SessionSaveAction, SessionSetup, useSessionSettingsForm, type BoardCourt, type SessionSettings } from '@/components/open-play/session-setup';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -28,6 +29,8 @@ type Props = {
     upNext: { ready: boolean; needed: number; teams: { one: any[]; two: any[] } | null; players: any[] } | null;
     results: any[];
     activity: ActivityEntry[];
+    /** Server-rendered join code, so players can add themselves. */
+    joinQr: SessionQr;
 };
 
 /**
@@ -59,13 +62,23 @@ export default function OpenPlayBoard({
     upNext = null,
     results,
     activity,
+    joinQr,
 }: Props) {
     const [showActivity, setShowActivity] = useState(false);
+    const [showJoinQr, setShowJoinQr] = useState(false);
     const [confirmRelease, setConfirmRelease] = useState(false);
     const [confirmEnd, setConfirmEnd] = useState(false);
     const { errors } = usePage().props as any;
     const base = `/open-play/${session.session_code}`;
     const started = Boolean(session.started);
+
+    /* Owned here so the fields and the Save button, which sits in the bottom
+       bar beside Start session, are driving the same form. */
+    const settings = useSessionSettingsForm({
+        base,
+        session,
+        selectedCourtIds: courts.map((court) => court.id),
+    });
 
     /*
      * Several phones and a tablet can all be looking at this at once, so the
@@ -113,6 +126,7 @@ export default function OpenPlayBoard({
                 inControl={inControl}
                 activityCount={activity.length}
                 onShowActivity={() => setShowActivity(true)}
+                onShowJoinQr={() => setShowJoinQr(true)}
                 onRelease={() => setConfirmRelease(true)}
                 onEnd={started ? () => setConfirmEnd(true) : undefined}
             />
@@ -141,10 +155,8 @@ export default function OpenPlayBoard({
                     />
                 ) : (
                     <SessionSetup
-                        base={base}
-                        session={session}
+                        settings={settings}
                         branchCourts={branchCourts}
-                        selectedCourtIds={courts.map((court) => court.id)}
                         history={
                             <div className="border-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
                                 <ActivityFeed entries={activity} />
@@ -164,10 +176,13 @@ export default function OpenPlayBoard({
                     /* Singles needs two on a court, doubles four. */
                     needed={session.format === 'singles' ? 2 : 4}
                     error={errors?.start}
+                    settings={settings}
                 />
             )}
 
             <ActivityPanel open={showActivity} onClose={() => setShowActivity(false)} entries={activity} />
+
+            <JoinQrOverlay qr={joinQr} session={session} open={showJoinQr} onClose={() => setShowJoinQr(false)} />
 
             {/* The board's own dialog rather than the browser's, which showed
                 the host name and looked like a phishing prompt on a tablet. */}
@@ -444,13 +459,30 @@ function CourtBar({
 }
 
 /**
- * What is still missing before the first match can be drawn.
+ * The setup screen's one bottom bar: what is still missing, and the two things
+ * that can be committed.
  *
  * Fixed to the bottom because on a tablet the person setting up is looking at
  * the list of names, not at the top of the page, and the answer to "why can't I
- * start" has to be where their eyes already are.
+ * start" has to be where their eyes already are. Saving the settings lands here
+ * too, for the same reason and so that the corner holds one bar instead of two
+ * stacked on each other.
  */
-function StartBar({ base, courts, players, needed, error }: { base: string; courts: number; players: number; needed: number; error?: string }) {
+function StartBar({
+    base,
+    courts,
+    players,
+    needed,
+    error,
+    settings,
+}: {
+    base: string;
+    courts: number;
+    players: number;
+    needed: number;
+    error?: string;
+    settings: SessionSettings;
+}) {
     const [starting, setStarting] = useState(false);
     const ready = courts >= 1 && players >= needed;
 
@@ -461,18 +493,23 @@ function StartBar({ base, courts, players, needed, error }: { base: string; cour
 
     return (
         <div className="border-border bg-surface/95 z-sticky sticky bottom-0 border-t backdrop-blur-md">
-            <div className="mx-auto flex w-full max-w-[120rem] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <div className="mx-auto flex w-full max-w-[120rem] flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:px-6 lg:px-8">
                 <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     <Requirement met={courts >= 1} label={courts === 1 ? '1 court' : `${courts} courts`} />
                     <Requirement met={players >= needed} label={`${players}/${needed} players`} />
                 </ul>
 
-                <div className="flex items-center gap-3">
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-3">
                     {error && (
                         <p role="alert" className="text-meta text-danger">
                             {error}
                         </p>
                     )}
+
+                    {/* Settings first, then the button that ends this screen:
+                        left to right in the order they happen. */}
+                    <SessionSaveAction settings={settings} />
+
                     <Button type="button" size="touch" onClick={start} disabled={!ready || starting} className="min-w-40">
                         {starting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
                         Start session

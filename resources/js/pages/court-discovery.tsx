@@ -76,12 +76,10 @@ export default function CourtDiscovery({ date, search, branches }: Props) {
 
     return (
         <>
-            <Head title="Find courts | CourtPrime">
-                <meta
-                    name="description"
-                    content="Search connected CourtPrime clubs, compare available courts and rates, and book with one player identity."
-                />
-            </Head>
+            {/* Matches the title App\Support\Seo prints server-side, so the
+                page a crawler renders says the same thing as the page it
+                fetched. The description lives there, not here. */}
+            <Head title="Find Pickleball Courts Near You | CourtPrime" />
 
             <DiscoveryPage current="/find-courts">
                 <DiscoveryHero

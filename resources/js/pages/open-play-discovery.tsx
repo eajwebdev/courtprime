@@ -3,13 +3,14 @@ import { DiscoveryHero, FilterChip, FilterRow, Pagination } from '@/components/d
 import { DiscoveryPage } from '@/components/discovery/discovery-page';
 import { EmptyState } from '@/components/empty-state';
 import { OpenPlayBoardEntry } from '@/components/open-play-board-entry';
+import { OpenPlayJoinEntry } from '@/components/open-play-join-entry';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { currency, time12h } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ExternalLink, MapPin, Search, Users, X } from 'lucide-react';
+import { ClipboardList, ExternalLink, MapPin, Search, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- paginator payload is
@@ -138,12 +139,7 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
 
     return (
         <>
-            <Head title="Find open play | CourtPrime">
-                <meta
-                    name="description"
-                    content="Drop-in pickleball sessions across every connected CourtPrime club. Join with the session ID and key and the rotation assigns your court, partner and opponents."
-                />
-            </Head>
+            <Head title="Find Pickleball Open Play Sessions | CourtPrime" />
 
             <DiscoveryPage current="/find-open-play">
                 <DiscoveryHero
@@ -213,11 +209,28 @@ export default function OpenPlayDiscovery({ date, search, sessions }: Props) {
                     )}
 
                     {/*
-                     * The pair opens the board, it does not join a game. The
-                     * person holding it runs the session and adds the players,
-                     * so nothing here asks who they are.
+                     * Two doors, and which is which has to be obvious from the
+                     * page rather than from the error you get.
+                     *
+                     * Almost everyone here is a player looking for a game, so
+                     * joining is the one on the page. Taking the board is the
+                     * job of one person per session, on the tablet at the net
+                     * post, so it is a line of text underneath rather than a
+                     * second form that looks exactly like the first.
                      */}
-                    <OpenPlayBoardEntry className="border-border bg-surface mb-8 rounded-xl border p-4 sm:p-5" />
+                    <OpenPlayJoinEntry className="border-border bg-surface rounded-xl border p-4 sm:p-5" />
+
+                    <details className="group border-border bg-surface-muted mt-3 mb-8 rounded-xl border px-4 py-3">
+                        <summary className="text-meta text-muted flex cursor-pointer items-center gap-2 select-none marker:content-none">
+                            <ClipboardList className="size-3.5 shrink-0" aria-hidden />
+                            Running the session? Take the board
+                        </summary>
+                        <p className="text-meta text-muted mt-2">
+                            One device runs a session. Taking the board puts this one in charge of the courts, the queue and the scores — it does not
+                            put you in the rotation.
+                        </p>
+                        <OpenPlayBoardEntry className="mt-3" />
+                    </details>
 
                     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
                         <h2 className="text-h2 text-foreground">

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useForm } from '@inertiajs/react';
+import { useForm, type InertiaFormProps } from '@inertiajs/react';
 import { Check, Loader2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
@@ -25,6 +25,71 @@ const STREAK_LIMITS: Array<{ value: number | null; label: string }> = [
     { value: 3, label: '3' },
 ];
 
+type SettingsForm = {
+    name: string;
+    format: string;
+    target_score: number;
+    win_by_two: boolean;
+    max_consecutive_games: number | null;
+    max_players: number | null;
+    court_ids: number[];
+};
+
+export type SessionSettings = {
+    form: InertiaFormProps<SettingsForm>;
+    save: () => void;
+};
+
+/**
+ * The session settings form, owned above the setup screen.
+ *
+ * It lives here rather than inside SessionSetup because the save action belongs
+ * in the board's one bottom bar, next to Start session — the same bar, not a
+ * second one floating above it. The fields and the button are in different
+ * parts of the tree, so the form they share has to be above both.
+ */
+export function useSessionSettingsForm({
+    base,
+    session,
+    selectedCourtIds,
+}: {
+    base: string;
+    session: SessionShape;
+    selectedCourtIds: number[];
+}): SessionSettings {
+    const form = useForm<SettingsForm>({
+        name: session.name ?? '',
+        format: session.format ?? 'doubles',
+        target_score: Number(session.target_score ?? 11),
+        win_by_two: Boolean(session.win_by_two),
+        max_consecutive_games: session.max_consecutive_games ?? null,
+        max_players: session.max_players,
+        court_ids: selectedCourtIds,
+    });
+
+    const save = () =>
+        form.post(`${base}/settings`, {
+            preserveScroll: true,
+            preserveState: true,
+            /*
+             * What was just saved is the new baseline.
+             *
+             * isDirty compares the data to the form's defaults, and a visit
+             * that preserves state never touches those, so without this the
+             * board sat on "Unsaved changes" forever — after a save that had
+             * in fact gone through, which taught whoever was setting up that
+             * the button does nothing.
+             *
+             * Called with no arguments it takes the values as they were when
+             * the request went out, so an edit made while it was in flight is
+             * still correctly dirty afterwards.
+             */
+            onSuccess: () => form.setDefaults(),
+        });
+
+    return { form, save };
+}
+
 /**
  * Everything about the session that the people at the court can change.
  *
@@ -35,33 +100,20 @@ const STREAK_LIMITS: Array<{ value: number | null; label: string }> = [
  * has to undo.
  */
 export function SessionSetup({
-    base,
-    session,
+    settings,
     branchCourts,
-    selectedCourtIds,
     children,
     history,
 }: {
-    base: string;
-    session: SessionShape;
+    settings: SessionSettings;
     branchCourts: BoardCourt[];
-    selectedCourtIds: number[];
     /** The roster panel, rendered as the third column. */
     children: ReactNode;
     /** Session history, wide screens only, where there is a column spare. */
     history?: ReactNode;
 }) {
-    const form = useForm({
-        name: session.name ?? '',
-        format: session.format ?? 'doubles',
-        target_score: Number(session.target_score ?? 11),
-        win_by_two: Boolean(session.win_by_two),
-        max_consecutive_games: session.max_consecutive_games ?? null,
-        max_players: session.max_players,
-        court_ids: selectedCourtIds,
-    });
-
-    const [custom, setCustom] = useState(!TARGETS.includes(Number(session.target_score ?? 11)));
+    const { form } = settings;
+    const [custom, setCustom] = useState(!TARGETS.includes(Number(form.data.target_score ?? 11)));
 
     /*
      * Not a <form>. The roster panel below is one, and it has to be, because
@@ -69,7 +121,6 @@ export function SessionSetup({
      * is invalid, and enter in the name field would have submitted the settings
      * instead of adding the player.
      */
-    const save = () => form.post(`${base}/settings`, { preserveScroll: true, preserveState: true });
 
     /* The session runs on every court picked here, and the rotation spreads
        whoever is waiting across all of them. */
@@ -88,6 +139,11 @@ export function SessionSetup({
                         /* 16px so a tablet or phone does not zoom on focus. */
                         className="border-border bg-surface text-foreground h-12 w-full rounded-xl border px-3.5 text-base"
                     />
+                    {form.errors.name && (
+                        <p role="alert" className="text-meta text-danger mt-1.5">
+                            {form.errors.name}
+                        </p>
+                    )}
                 </Field>
 
                 <Field
@@ -220,18 +276,43 @@ export function SessionSetup({
             {/* A fourth column only exists on a genuinely wide screen. Below
                 that the history stays behind the header button. */}
             {history && <div className="border-border hidden min-h-0 2xl:flex 2xl:flex-col 2xl:border-l 2xl:pl-6">{history}</div>}
+        </div>
+    );
+}
 
-            {/* Saving is explicit. Several devices can be on this board at once,
-                and a field that saved as you typed would fight whoever else is
-                editing. */}
-            {form.isDirty && (
-                <div className="border-border z-sticky bg-surface/95 sticky bottom-20 -mx-4 flex items-center justify-between gap-3 border-t px-4 py-3 backdrop-blur-md md:col-span-2 lg:col-span-3 2xl:col-span-4">
-                    <p className="text-meta text-muted">Unsaved changes</p>
-                    <Button type="button" size="touch" onClick={save} disabled={form.processing}>
-                        {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Save changes'}
-                    </Button>
-                </div>
-            )}
+/**
+ * Save, in the board's bottom bar rather than in a bar of its own.
+ *
+ * This used to be a second sticky strip floating five rem above the start bar.
+ * As a grid item it also added a row to the setup layout, so the three columns
+ * were resized by the act of editing a field and the strip landed on top of the
+ * roster; two stacked bars competing for the same corner of a tablet is not a
+ * place to put the one control that commits the session.
+ *
+ * Saving stays explicit. Several devices can be on this board at once, and a
+ * field that saved as you typed would fight whoever else is editing.
+ */
+export function SessionSaveAction({ settings }: { settings: SessionSettings }) {
+    const { form, save } = settings;
+
+    /* An explicit confirmation, held for a couple of seconds by Inertia, rather
+       than only a toast that has already gone by the time anyone looks up from
+       the roster. */
+    if (!form.isDirty) {
+        return form.recentlySuccessful ? (
+            <p className="text-meta text-success flex items-center gap-1.5" role="status">
+                <Check className="size-3.5 shrink-0" aria-hidden />
+                Settings saved
+            </p>
+        ) : null;
+    }
+
+    return (
+        <div className="flex items-center gap-3">
+            <p className="text-meta text-warning">Unsaved changes</p>
+            <Button type="button" size="touch" variant="outline" onClick={save} disabled={form.processing}>
+                {form.processing ? <Loader2 className="size-4 animate-spin" /> : 'Save changes'}
+            </Button>
         </div>
     );
 }

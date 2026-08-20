@@ -24,12 +24,7 @@ export default function PublicRankings({ rankings }: { rankings: any[] }) {
 
     return (
         <>
-            <Head title="Leaderboards | CourtPrime">
-                <meta
-                    name="description"
-                    content="Global CourtPrime rankings built from verified player identity records across every connected club."
-                />
-            </Head>
+            <Head title="Pickleball Leaderboards & Player Rankings | CourtPrime" />
 
             <DiscoveryPage current="/leaderboards">
                 <DiscoveryHero

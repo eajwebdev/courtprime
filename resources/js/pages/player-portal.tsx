@@ -1,7 +1,6 @@
 import { EmptyState } from '@/components/empty-state';
 import { Section } from '@/components/layout-primitives';
 import { AthleteArtwork } from '@/components/marketing-artwork';
-import { OpenPlayBoardEntry } from '@/components/open-play-board-entry';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -212,10 +211,6 @@ export default function PlayerPortal({
                         <ActionButton href="/find-open-play" icon={Users} label="Open play" />
                         <ActionButton href="/find-tournaments" icon={Trophy} label="Tournaments" />
                     </div>
-
-                    {/* Open play is now code-first: the club shares one, the
-                        player types it, the rotation does the rest. */}
-                    <OpenPlayBoardEntry className="border-border bg-surface mt-2.5 rounded-xl border p-4" />
                 </section>
 
                 {/* ---- Upcoming ------------------------------------------------- */}

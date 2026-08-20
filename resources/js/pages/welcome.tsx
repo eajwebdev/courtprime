@@ -38,11 +38,10 @@ export default function Welcome({
 
     return (
         <>
-            <Head title="EAJ CourtPrime | One player identity. Every connected court.">
-                <meta
-                    name="description"
-                    content="CourtPrime connects pickleball players through one verified identity across every participating club, and gives club owners a private operating system for reservations, courts, POS, memberships, tournaments and live scoring."
-                />
+            {/* Title and description are printed server-side by
+                App\Support\Seo so a crawler that runs no JavaScript still gets
+                them; this keeps the tab title identical after hydration. */}
+            <Head title="CourtPrime — Pickleball Club Software & Player Network">
                 <link rel="preload" as="image" href="/cp-model5.png" fetchPriority="high" />
             </Head>
 

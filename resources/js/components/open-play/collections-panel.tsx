@@ -83,16 +83,18 @@ export function CollectionsPanel({ sessionId, sheet }: { sessionId: number; shee
                                     {row.left && <span className="text-meta text-muted ml-1.5 font-normal">· gone</span>}
                                 </p>
                                 <p className="text-meta text-muted">
+                                    {/* The fee is for being here, so it is shown
+                                        from the moment they are. Games are
+                                        reported beside it as what has happened
+                                        so far, not as what decides the bill. */}
                                     {row.games === 0 ? (
-                                        /* Said plainly, so nobody wonders why this
-                                           person is not being charged. */
-                                        <span>no games yet · nothing owed</span>
+                                        <span>checked in</span>
                                     ) : (
                                         <>
-                                            <span data-numeric>{row.games}</span> {row.games === 1 ? 'game' : 'games'} ·{' '}
-                                            <span data-numeric>{currency(row.due)}</span>
+                                            <span data-numeric>{row.games}</span> {row.games === 1 ? 'game' : 'games'}
                                         </>
-                                    )}
+                                    )}{' '}
+                                    · <span data-numeric>{currency(row.due)}</span>
                                 </p>
                             </div>
 

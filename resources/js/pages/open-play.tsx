@@ -104,61 +104,137 @@ export default function OpenPlay({
                              * hall while players type them in.
                              */}
                             <section className="bg-surface-deep text-surface-deep-foreground rounded-2xl px-4 py-5 sm:px-6">
-                                <div className="flex flex-wrap items-start justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <p className="text-eyebrow text-primary uppercase">Share both with players</p>
-                                        <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1">
-                                            <p
-                                                data-numeric
-                                                className="text-[2rem] leading-none font-semibold tracking-tight text-white sm:text-[2.5rem]"
-                                            >
-                                                {activeSession.session_code ?? '—'}
+                                {/*
+                                 * Two columns: everything about the session on the
+                                 * left, the two ways to hand it over on the right.
+                                 *
+                                 * All three used to sit in one justify-between row,
+                                 * which left the QR floating in whatever gap was
+                                 * spare and stranded it on a wide screen. The rail
+                                 * gives it and the buttons a column of their own,
+                                 * and the left side is then free to use the full
+                                 * width instead of stopping halfway across.
+                                 */}
+                                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+                                    <div className="flex min-w-0 flex-1 flex-col gap-4 lg:self-stretch">
+                                        <div className="min-w-0">
+                                            {/* An ended session's pair opens nothing, so it stops
+                                                telling the desk to read it out. */}
+                                            <p className={cn('text-eyebrow uppercase', ended ? 'text-white/45' : 'text-primary')}>
+                                                {ended ? 'Session record' : 'Share both with players'}
                                             </p>
-                                            <p className="text-eyebrow text-white/45 uppercase">
-                                                key{' '}
-                                                <span
+                                            <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+                                                <p
                                                     data-numeric
-                                                    className="text-primary text-[1.5rem] leading-none font-semibold tracking-[0.15em]"
+                                                    className="text-[2rem] leading-none font-semibold tracking-tight text-white sm:text-[2.5rem]"
                                                 >
-                                                    {activeSession.session_key ?? '—'}
-                                                </span>
+                                                    {activeSession.session_code ?? '—'}
+                                                </p>
+                                                <p className="text-eyebrow text-white/45 uppercase">
+                                                    key{' '}
+                                                    <span
+                                                        data-numeric
+                                                        className="text-primary text-[1.5rem] leading-none font-semibold tracking-[0.15em]"
+                                                    >
+                                                        {activeSession.session_key ?? '—'}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <p className="text-meta mt-2 truncate text-white/55">
+                                                {activeSession.name} · {activeSession.branch?.name} · {activeSession.format ?? 'doubles'} · round{' '}
+                                                <span data-numeric>{activeSession.current_round ?? 0}</span>
                                             </p>
                                         </div>
-                                        <p className="text-meta mt-2 truncate text-white/55">
-                                            {activeSession.name} · {activeSession.branch?.name} · {activeSession.format ?? 'doubles'} · round{' '}
-                                            <span data-numeric>{activeSession.current_round ?? 0}</span>
-                                        </p>
+
+                                        {/* Full width of the column now. Capped at
+                                            max-w-2xl it stopped short and left the band
+                                            looking half-finished. */}
+                                        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 sm:grid-cols-4">
+                                            <Metric label="Courts" value={sessionCourts.length} />
+                                            <Metric label="On court" value={liveMatches.length * (activeSession.format === 'singles' ? 2 : 4)} />
+                                            <Metric label="Waiting" value={waiting.length} />
+                                            <Metric label="To collect" value={currency(collections?.outstanding ?? 0)} />
+                                        </dl>
+
+                                        {/* The board is held by one device. When that
+                                            device goes home in somebody's bag, this is
+                                            how the desk gets it back.
+
+                                            Pushed to the bottom of the column so it
+                                            sits on the same baseline as the QR beside
+                                            it, rather than leaving a slab of navy
+                                            under one column and not the other. */}
+                                        <div className="flex flex-wrap items-center gap-3 lg:mt-auto">
+                                            <p className="text-meta text-white/55">
+                                                {board?.held
+                                                    ? board.quiet
+                                                        ? 'A device holds the board but has gone quiet.'
+                                                        : 'A device is running the board now.'
+                                                    : 'Nobody is holding the board.'}
+                                            </p>
+                                            {/* Closing the night: the pair stops opening a
+                                                board for anybody still holding it. */}
+                                            {!ended && (
+                                                <ConfirmDialog
+                                                    open={ending}
+                                                    onOpenChange={setEnding}
+                                                    trigger={
+                                                        <Button type="button" variant="onDeep" size="sm">
+                                                            <CircleStop className="size-4" />
+                                                            End session
+                                                        </Button>
+                                                    }
+                                                    title={`End ${activeSession.name}?`}
+                                                    description={
+                                                        liveMatches.length > 0
+                                                            ? `${liveMatches.length} ${liveMatches.length === 1 ? 'game is' : 'games are'} still on and will be cancelled, counting for nobody. The ID and key stop working for everyone holding them.`
+                                                            : 'The ID and key stop working, for everyone holding them. Nothing already played is lost.'
+                                                    }
+                                                    confirmLabel="End session"
+                                                    variant="destructive"
+                                                    onConfirm={() =>
+                                                        router.post(`/open-play/${activeSession.id}/end-session`, {}, { preserveScroll: true })
+                                                    }
+                                                />
+                                            )}
+
+                                            {board?.held && (
+                                                <ConfirmDialog
+                                                    trigger={
+                                                        <Button type="button" variant="onDeep" size="sm">
+                                                            <LogOut className="size-4" />
+                                                            Sign out that device
+                                                        </Button>
+                                                    }
+                                                    title="Sign the board out?"
+                                                    description="Whoever is holding it loses control immediately. Anyone with the session ID and key can then open it."
+                                                    confirmLabel="Sign out"
+                                                    variant="destructive"
+                                                    onConfirm={() =>
+                                                        router.post(`/open-play/${activeSession.id}/release-board`, {}, { preserveScroll: true })
+                                                    }
+                                                />
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {/*
-                                     * The other way in, beside the one being
-                                     * read out. A player at the counter scans
-                                     * this and is in the queue as themselves;
-                                     * the ID and key stay for whoever is on a
-                                     * phone that will not.
-                                     */}
-                                    {joinQr && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowQr(true)}
-                                            title="Show this bigger"
-                                            className="hover:ring-primary shrink-0 rounded-lg transition hover:ring-2"
-                                        >
-                                            <SessionQr qr={joinQr} size={104} />
-                                            <span className="text-meta mt-1.5 block text-center text-white/55">Scan to join</span>
-                                        </button>
-                                    )}
-
-                                    <div className="flex shrink-0 flex-wrap gap-2">
-                                        {/* An ended session's pair opens nothing, so neither
-                                            control is offered for one. */}
-                                        {!ended && (
+                                    {/* The rail. Fixed width, so the buttons and the QR
+                                        line up on one edge rather than drifting with
+                                        whatever is beside them. */}
+                                    <div className="flex shrink-0 flex-col gap-3 lg:w-44">
+                                        {/* An ended session's pair opens nothing, so
+                                            neither control is offered for one. */}
+                                        {ended ? (
+                                            <span className="text-meta rounded-full bg-white/10 px-3 py-1.5 text-center text-white/70">
+                                                Session ended
+                                            </span>
+                                        ) : (
                                             <>
-                                                <Button type="button" variant="onDeep" onClick={copyCode}>
+                                                <Button type="button" variant="onDeep" onClick={copyCode} className="w-full">
                                                     {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                                                     {copied ? 'Copied' : 'Copy ID + key'}
                                                 </Button>
-                                                <Button asChild>
+                                                <Button asChild className="w-full">
                                                     <Link href={`/open-play/${activeSession.session_code}/board`}>
                                                         <MonitorPlay className="size-4" />
                                                         Open board
@@ -166,69 +242,23 @@ export default function OpenPlay({
                                                 </Button>
                                             </>
                                         )}
-                                        {ended && <span className="text-meta rounded-full bg-white/10 px-3 py-1.5 text-white/70">Session ended</span>}
+
+                                        {/* The other way in. A player at the counter
+                                            scans this and is in the queue as themselves;
+                                            the ID and key stay for whoever is on a phone
+                                            that will not. */}
+                                        {joinQr && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowQr(true)}
+                                                title="Show this bigger"
+                                                className="hover:ring-primary mt-1 rounded-lg transition hover:ring-2"
+                                            >
+                                                <SessionQr qr={joinQr} size={176} className="mx-auto h-auto w-36" />
+                                                <span className="text-meta mt-1.5 block text-center text-white/55">Scan to join</span>
+                                            </button>
+                                        )}
                                     </div>
-                                </div>
-
-                                <dl className="mt-4 grid max-w-2xl grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 sm:grid-cols-4">
-                                    <Metric label="Courts" value={sessionCourts.length} />
-                                    <Metric label="On court" value={liveMatches.length * (activeSession.format === 'singles' ? 2 : 4)} />
-                                    <Metric label="Waiting" value={waiting.length} />
-                                    <Metric label="To collect" value={currency(collections?.outstanding ?? 0)} />
-                                </dl>
-
-                                {/* The board is held by one device. When that device
-                                    goes home in somebody's bag, this is how the desk
-                                    gets it back. */}
-                                <div className="mt-3 flex flex-wrap items-center gap-3">
-                                    <p className="text-meta text-white/55">
-                                        {board?.held
-                                            ? board.quiet
-                                                ? 'A device holds the board but has gone quiet.'
-                                                : 'A device is running the board now.'
-                                            : 'Nobody is holding the board.'}
-                                    </p>
-                                    {/* Closing the night: the pair stops opening a board
-                                        for anybody still holding it. */}
-                                    {!ended && (
-                                        <ConfirmDialog
-                                            open={ending}
-                                            onOpenChange={setEnding}
-                                            trigger={
-                                                <Button type="button" variant="onDeep" size="sm">
-                                                    <CircleStop className="size-4" />
-                                                    End session
-                                                </Button>
-                                            }
-                                            title={`End ${activeSession.name}?`}
-                                            description={
-                                                liveMatches.length > 0
-                                                    ? `${liveMatches.length} ${liveMatches.length === 1 ? 'game is' : 'games are'} still on and will be cancelled, counting for nobody. The ID and key stop working for everyone holding them.`
-                                                    : 'The ID and key stop working, for everyone holding them. Nothing already played is lost.'
-                                            }
-                                            confirmLabel="End session"
-                                            variant="destructive"
-                                            onConfirm={() => router.post(`/open-play/${activeSession.id}/end-session`, {}, { preserveScroll: true })}
-                                        />
-                                    )}
-
-                                    {board?.held && (
-                                        <ConfirmDialog
-                                            trigger={
-                                                <Button type="button" variant="onDeep" size="sm">
-                                                    <LogOut className="size-4" />
-                                                    Sign out that device
-                                                </Button>
-                                            }
-                                            title="Sign the board out?"
-                                            description="Whoever is holding it loses control immediately. Anyone with the session ID and key can then open it."
-                                            confirmLabel="Sign out"
-                                            variant="destructive"
-                                            onConfirm={() =>
-                                                router.post(`/open-play/${activeSession.id}/release-board`, {}, { preserveScroll: true })
-                                            }
-                                        />
-                                    )}
                                 </div>
                             </section>
 

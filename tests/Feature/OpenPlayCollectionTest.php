@@ -132,16 +132,24 @@ class OpenPlayCollectionTest extends TestCase
         }
     }
 
-    public function test_a_player_who_never_played_owes_nothing(): void
+    /**
+     * Checking in is what is charged for.
+     *
+     * The sheet used to wait for a completed game before it would bill anyone,
+     * so a hall full of people waiting on two courts read as nothing owed and
+     * the desk had to chase them afterwards.
+     */
+    public function test_a_player_who_has_not_played_yet_still_owes_the_entry(): void
     {
         $waited = $this->addPlayer('Never Played');
 
         $sheet = app(OpenPlayCollectionService::class)->sheet($this->session);
         $row = collect($sheet['players'])->firstWhere('player_id', $waited->id);
 
-        $this->assertSame(0, $row['games']);
-        $this->assertEqualsWithDelta(0, $row['due'], 0.01);
-        $this->assertEqualsWithDelta(0, $sheet['due'], 0.01, 'Nobody has played, so nothing is owed.');
+        $this->assertSame(0, $row['games'], 'They have not played.');
+        $this->assertEqualsWithDelta(200, $row['due'], 0.01, 'Being in the session is what the fee is for.');
+        $this->assertEqualsWithDelta(200, $sheet['due'], 0.01);
+        $this->assertSame(1, $sheet['billable']);
     }
 
     public function test_one_game_owes_the_full_entry(): void
@@ -174,7 +182,11 @@ class OpenPlayCollectionTest extends TestCase
         $this->assertEqualsWithDelta(800, $sheet['due'], 0.01, 'Leaving does not reduce what the club is owed.');
     }
 
-    public function test_a_player_who_never_played_is_deleted_on_removal(): void
+    /**
+     * Removing somebody who never played and never paid is the desk fixing a
+     * mistyped name, not a debt being written off.
+     */
+    public function test_a_player_with_no_games_and_no_money_is_deleted_on_removal(): void
     {
         $waited = $this->addPlayer('Never Played');
 
@@ -183,6 +195,29 @@ class OpenPlayCollectionTest extends TestCase
 
         $this->assertSame('removed', $outcome);
         $this->assertSame(0, $this->session->players()->count(), 'Nothing happened, so nothing is remembered.');
+    }
+
+    /**
+     * Paying on arrival and leaving before a court frees up is now an ordinary
+     * night. Deleting that row would delete the money with it.
+     */
+    public function test_a_player_who_paid_survives_removal_even_with_no_games(): void
+    {
+        $paid = $this->addPlayer('Paid Then Left');
+
+        $collections = app(OpenPlayCollectionService::class);
+        $collections->settle($this->session, $paid->id);
+
+        $outcome = $collections->removePlayer($this->session, $paid->id);
+
+        $this->assertSame('left', $outcome);
+
+        $sheet = $collections->sheet($this->session);
+        $row = collect($sheet['players'])->firstWhere('player_id', $paid->id);
+
+        $this->assertNotNull($row, 'The money they handed over is still on the sheet.');
+        $this->assertTrue($row['settled']);
+        $this->assertEqualsWithDelta(200, $sheet['collected'], 0.01);
     }
 
     public function test_the_session_board_cannot_take_payment(): void

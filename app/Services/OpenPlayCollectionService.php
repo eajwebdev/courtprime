@@ -9,15 +9,21 @@ use Illuminate\Support\Facades\DB;
 /**
  * What a session is owed, and by whom.
  *
- * Entry is charged per player, once, and only once they have played. Someone
- * who checked in, waited for a court and went home before one came free owes
- * nothing: they were never on it. Someone who played a single game owes the
- * full entry, because that is what entry buys.
+ * Entry is charged per player, once, for being in the session. Checking in is
+ * what buys the entry — the court time, the balls, the organising — not the
+ * games that happen to come up before somebody goes home. A player who waited
+ * an hour for a court still took a place in the session, and a club that has to
+ * wait for a match to finish before it can ask for the fee is chasing money
+ * around a hall.
  *
- * That rule is why taking a player off the board does not delete them once they
- * have a game. The row is kept and marked as gone, so the money they owe is
- * still on the sheet at the end of the night. Removing somebody who never
- * played does delete them, because there is nothing to remember.
+ * This used to charge only once a player had a completed game, so a full room
+ * could show nothing owed. Whoever is on the sheet owes the entry.
+ *
+ * Which is why taking a player off the board only deletes them when there is
+ * genuinely nothing to remember: no games and no money taken. That is the
+ * front desk correcting a mistyped name. Anyone who played, or who has already
+ * handed over cash, is kept and marked as gone so the night's takings still add
+ * up at the end of it.
  */
 class OpenPlayCollectionService
 {
@@ -69,8 +75,8 @@ class OpenPlayCollectionService
             ->get()
             ->map(function (OpenPlayPlayer $entry) use ($fee, $games) {
                 $played = $games[$entry->player_id] ?? 0;
-                /* No games, no charge. This is the whole rule. */
-                $due = $played > 0 ? $fee : 0.0;
+                /* On the sheet is on the hook. This is the whole rule. */
+                $due = $fee;
                 $paid = (float) $entry->amount_paid;
 
                 return [
@@ -114,7 +120,7 @@ class OpenPlayCollectionService
             ->where('player_id', $playerId)
             ->firstOrFail();
 
-        $due = $this->hasPlayed($session, $playerId) ? (float) ($session->entry_fee ?? 0) : 0.0;
+        $due = (float) ($session->entry_fee ?? 0);
         $paid = $amount ?? $due;
 
         $entry->update([
@@ -126,9 +132,14 @@ class OpenPlayCollectionService
     /**
      * Take a player off the board.
      *
-     * Played at least once: kept, marked as gone, still on the collection
-     * sheet. Never played: deleted outright, because nothing is owed and
-     * nothing happened.
+     * Kept and marked as gone if anything happened worth remembering: a game
+     * played, or money already taken. Otherwise deleted outright — nobody
+     * played, nobody paid, and the row is a typo at the desk rather than a
+     * person who owes the club anything.
+     *
+     * The paid check matters now that checking in is what is charged for. A
+     * player can hand over the fee on arrival and be taken off the board a
+     * minute later, and deleting that row would delete the money with it.
      */
     public function removePlayer(OpenPlaySession $session, int $playerId): string
     {
@@ -148,7 +159,7 @@ class OpenPlayCollectionService
             return 'missing';
         }
 
-        if ($played) {
+        if ($played || (float) $entry->amount_paid > 0) {
             $entry->update(['status' => 'left', 'withdrawn_at' => now()]);
 
             return 'left';

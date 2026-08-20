@@ -18,6 +18,7 @@ use App\Services\SubscriptionFeatureGate;
 use App\Services\TenantContext;
 use App\Support\NetworkClock;
 use App\Support\OpenPlayBoardAccess;
+use App\Support\Qr;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,6 +103,17 @@ class OpenPlayController extends Controller
                 ->map(fn ($row) => ['date' => (string) $row->day, 'sessions' => (int) $row->sessions])
                 ->all(),
             'activeSession' => $session,
+            /*
+             * The same join code the board shows, on the screen the club is
+             * already looking at. A player at the counter scans it instead of
+             * being read two strings across a hall; the strings stay on the
+             * page for whoever's camera refuses.
+             *
+             * Absent for a finished session, whose pair opens nothing.
+             */
+            'joinQr' => $session && ! in_array($session->status, ['completed', 'cancelled'], true)
+                ? Qr::forOpenPlaySession($session)
+                : null,
             'sessionCourts' => $session ? $session->courts()->orderBy('court_number')->get(['courts.id', 'name', 'court_number']) : [],
             'liveMatches' => $session ? $this->liveMatches($session) : [],
             'waiting' => $session ? $this->waiting($session) : [],

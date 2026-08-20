@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OpenPlayPlayer;
 use App\Models\OpenPlaySession;
 use App\Services\OpenPlayService;
 use Illuminate\Http\Request;
@@ -37,10 +38,13 @@ class PublicOpenPlayJoinController extends Controller
 
         $session = null;
         $error = null;
+        $alreadyJoined = false;
 
         if ($code !== '' && $key !== '') {
             try {
-                $session = $this->summarise($openPlay->sessionForCode($code, $key));
+                $model = $openPlay->sessionForCode($code, $key);
+                $session = $this->summarise($model);
+                $alreadyJoined = $this->alreadyJoined($request, $model);
             } catch (ValidationException $exception) {
                 /* The service throws one deliberately vague message for a bad
                    pair, a missing session and a finished one. Kept as it is:
@@ -67,7 +71,35 @@ class PublicOpenPlayJoinController extends Controller
             'sessionKey' => strtoupper($key),
             'session' => $session,
             'error' => $error,
+            /* So the page can join on arrival without posting again for
+               somebody who is already in the queue. */
+            'alreadyJoined' => $alreadyJoined,
         ]);
+    }
+
+    /**
+     * Whether the signed-in player is already in this session.
+     *
+     * Read-only, and it never creates the club-side record that joining would:
+     * simply looking at the page must not put anyone in a club's player list.
+     */
+    private function alreadyJoined(Request $request, OpenPlaySession $session): bool
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return OpenPlayPlayer::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->whereNull('withdrawn_at')
+            ->whereHas('player', fn ($query) => $query
+                ->withoutGlobalScope('organization')
+                ->where('organization_id', $session->organization_id)
+                ->where('email', $user->email))
+            ->exists();
     }
 
     /**

@@ -324,7 +324,7 @@ class PublicOpenPlayBoardController extends Controller
              * different jobs and the QR is the one everybody sees. Rendered
              * server-side so it is on screen the instant the board loads.
              */
-            'joinQr' => $this->joinQr($session),
+            'joinQr' => Qr::forOpenPlaySession($session),
             /* Whether this device is the host: the one that opened the session
                and owns how it is run. Scoring is a separate question now. */
             'inControl' => OpenPlayBoardAccess::isHolder($request, $session),
@@ -996,18 +996,6 @@ class PublicOpenPlayBoardController extends Controller
         }
 
         return back()->with('success', 'Session updated.');
-    }
-
-    /**
-     * The scannable join code for a session.
-     *
-     * @return array{path: string, modules: int, url: string}
-     */
-    private function joinQr(OpenPlaySession $session): array
-    {
-        $url = Qr::openPlayJoinUrl($session->session_code, $session->session_key);
-
-        return array_merge(Qr::path($url), ['url' => $url]);
     }
 
     /**

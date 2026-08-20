@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OpenPlayPlayer;
 use App\Services\OpenPlayRotationService;
 use App\Services\OpenPlayService;
 use App\Services\PlayerIdentityService;
@@ -69,8 +70,22 @@ class PlayerOpenPlayJoinController extends Controller
 
         $player = $organizationPlayer->legacyPlayer;
 
-        /* Idempotent: tapping join twice, or while already on a court, leaves
-           them exactly where they are rather than sending them to the back. */
+        /*
+         * Whether this is news, worked out before anything changes.
+         *
+         * The join itself is idempotent — tapping twice, or arriving while
+         * already on a court, leaves them where they are — but the history is
+         * not. Scanning the QR joins on arrival, and a player who reloads that
+         * page or scans again at the next break would otherwise post "joined"
+         * into the session history every time.
+         */
+        $isNew = ! OpenPlayPlayer::query()
+            ->withoutGlobalScope('organization')
+            ->where('open_play_session_id', $session->id)
+            ->where('player_id', $player->id)
+            ->whereNull('withdrawn_at')
+            ->exists();
+
         $openPlay->join($session, $player);
         $openPlay->checkIn($session, $player);
 
@@ -78,8 +93,15 @@ class PlayerOpenPlayJoinController extends Controller
             $rotation->generate($session);
         }
 
-        OpenPlaySessionLog::record($request, $session, 'open_play.player_joined', $player->name.' joined');
+        if ($isNew) {
+            OpenPlaySessionLog::record($request, $session, 'open_play.player_joined', $player->name.' joined');
+        }
 
-        return back()->with('success', "You are in the rotation for {$session->name}.");
+        return back()->with(
+            'success',
+            $isNew
+                ? "You are in the rotation for {$session->name}."
+                : "You are already in the rotation for {$session->name}.",
+        );
     }
 }

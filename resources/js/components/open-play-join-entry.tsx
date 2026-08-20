@@ -1,6 +1,7 @@
+import { ScanToJoin } from '@/components/scan-to-join';
 import { Button } from '@/components/ui/button';
 import { router } from '@inertiajs/react';
-import { QrCode, Ticket } from 'lucide-react';
+import { Ticket } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 /**
@@ -38,7 +39,11 @@ export function OpenPlayJoinEntry({ className, autoFocus = false }: { className?
                 Scan the club's QR, or enter the session ID and key they gave you. You go in the queue as yourself, so your games count.
             </p>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
+            <ScanToJoin className="mt-3 w-full sm:w-auto" />
+
+            <p className="text-meta text-muted mt-3">Or type the pair:</p>
+
+            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
                 <div className="relative min-w-0">
                     <Ticket className="text-muted pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" aria-hidden />
                     <input
@@ -72,7 +77,6 @@ export function OpenPlayJoinEntry({ className, autoFocus = false }: { className?
                 </div>
 
                 <Button type="submit" size="touch" disabled={going || !code.trim() || !key.trim()} className="w-full sm:w-auto sm:px-6">
-                    <QrCode className="size-4" aria-hidden />
                     Join
                 </Button>
             </div>

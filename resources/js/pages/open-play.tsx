@@ -1,6 +1,7 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CollectionsPanel, type CollectionSheet } from '@/components/open-play/collections-panel';
 import { SessionCreateDialog } from '@/components/open-play/session-create-dialog';
+import { JoinQrOverlay, SessionQr, type SessionQr as SessionQrData } from '@/components/open-play/session-qr';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -23,6 +24,8 @@ type Props = {
     today: string;
     sessionDates: { date: string; sessions: number }[];
     board: { held: boolean; since: string | null; last_seen: string | null; quiet: boolean } | null;
+    /** Scannable join code for the session on screen. Absent once it has ended. */
+    joinQr: SessionQrData | null;
     collections: CollectionSheet | null;
     sessionCourts: any[];
     liveMatches: any[];
@@ -46,6 +49,7 @@ export default function OpenPlay({
     today,
     sessionDates = [],
     board,
+    joinQr,
     collections,
     sessionCourts = [],
     liveMatches = [],
@@ -53,6 +57,7 @@ export default function OpenPlay({
     branches,
 }: Props) {
     const [copied, setCopied] = useState(false);
+    const [showQr, setShowQr] = useState(false);
     const [creating, setCreating] = useState(false);
     const [ending, setEnding] = useState(false);
 
@@ -124,6 +129,25 @@ export default function OpenPlay({
                                             <span data-numeric>{activeSession.current_round ?? 0}</span>
                                         </p>
                                     </div>
+
+                                    {/*
+                                     * The other way in, beside the one being
+                                     * read out. A player at the counter scans
+                                     * this and is in the queue as themselves;
+                                     * the ID and key stay for whoever is on a
+                                     * phone that will not.
+                                     */}
+                                    {joinQr && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowQr(true)}
+                                            title="Show this bigger"
+                                            className="hover:ring-primary shrink-0 rounded-lg transition hover:ring-2"
+                                        >
+                                            <SessionQr qr={joinQr} size={104} />
+                                            <span className="text-meta mt-1.5 block text-center text-white/55">Scan to join</span>
+                                        </button>
+                                    )}
 
                                     <div className="flex shrink-0 flex-wrap gap-2">
                                         {/* An ended session's pair opens nothing, so neither
@@ -424,6 +448,8 @@ export default function OpenPlay({
                     </ul>
                 </aside>
             </div>
+
+            {joinQr && <JoinQrOverlay qr={joinQr} session={activeSession} open={showQr} onClose={() => setShowQr(false)} />}
 
             <SessionCreateDialog open={creating} onOpenChange={setCreating} branches={branches} />
         </AppLayout>

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\OpenPlaySession;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 
@@ -67,5 +68,20 @@ class Qr
             'code' => $code,
             'key' => $key,
         ]));
+    }
+
+    /**
+     * A session's scannable join code, ready for the SessionQr component.
+     *
+     * Both the board and the club's open play screen show this, and they have
+     * to show the same thing, so neither builds it itself.
+     *
+     * @return array{path: string, modules: int, url: string}
+     */
+    public static function forOpenPlaySession(OpenPlaySession $session): array
+    {
+        $url = self::openPlayJoinUrl($session->session_code, $session->session_key);
+
+        return array_merge(self::path($url), ['url' => $url]);
     }
 }

@@ -1,6 +1,7 @@
 import { EmptyState } from '@/components/empty-state';
 import { Section } from '@/components/layout-primitives';
 import { AthleteArtwork } from '@/components/marketing-artwork';
+import { ScanToJoin } from '@/components/scan-to-join';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -362,8 +363,13 @@ function JoinOpenPlay() {
 
             <form onSubmit={submit} className="border-border bg-surface rounded-xl border p-4">
                 <p className="text-meta text-muted mb-3">
-                    Enter the session ID and key the club gave you. You go in the queue as yourself, so your games count.
+                    Scan the club's QR and you are in. Or enter the session ID and key they gave you — either way you go in the queue as yourself, so
+                    your games count.
                 </p>
+
+                {/* The fast path first: scanning needs no typing and no reading
+                    two strings across a hall. */}
+                <ScanToJoin className="mb-3 w-full" />
 
                 <div className="flex flex-wrap gap-2">
                     <input

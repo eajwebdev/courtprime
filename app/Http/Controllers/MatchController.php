@@ -35,6 +35,8 @@ class MatchController extends Controller
             'branch_id' => $court->branch_id,
             'team_one_score' => 0,
             'team_two_score' => 0,
+            'serving_team' => 'team_one',
+            'serving_number' => $request->string('match_type')->toString() === 'singles' ? null : 2,
             'game_number' => 1,
             'status' => 'live',
             'started_at' => now(),

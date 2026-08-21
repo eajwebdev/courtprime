@@ -23,6 +23,12 @@ export default function Scorekeeper({ match }: { match: any }) {
         event.preventDefault();
         disputeForm.post(`/matches/${match.id}/disputes`, { preserveScroll: true, onSuccess: () => disputeForm.reset('description') });
     };
+    const servingTeam = match.serving_team === 'team_two' ? 'team_two' : 'team_one';
+    const servingNumber = match.match_type === 'singles' ? null : match.serving_number || 2;
+    const serveCall =
+        servingTeam === 'team_one'
+            ? `${match.team_one_score}-${match.team_two_score}${servingNumber ? `-${servingNumber}` : ''}`
+            : `${match.team_two_score}-${match.team_one_score}${servingNumber ? `-${servingNumber}` : ''}`;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -50,21 +56,36 @@ export default function Scorekeeper({ match }: { match: any }) {
                             onClick={() => score('team_one')}
                             className="rounded-lg bg-white/10 p-8 transition hover:bg-white/15 disabled:opacity-50"
                         >
+                            {servingTeam === 'team_one' && (
+                                <span className="mb-3 inline-flex rounded-full bg-[#FF1F64]/15 px-3 py-1 text-xs font-black tracking-widest text-[#FF1F64] uppercase">
+                                    Server
+                                </span>
+                            )}
                             <span className="block text-7xl font-black text-[#FF1F64]">{match.team_one_score}</span>
-                            <span className="mt-3 block text-sm text-slate-300 uppercase">Add Point</span>
+                            <span className="mt-3 block text-sm text-slate-300 uppercase">
+                                {servingTeam === 'team_one' ? 'Won rally + point' : 'Won rally - rotate serve'}
+                            </span>
                         </button>
                         <div className="text-sm text-slate-400">
                             <p>Game {match.game_number}</p>
                             <p>First to {match.target_score}</p>
                             <p>{match.win_by_two ? 'Win by 2' : 'No win by 2'}</p>
+                            <p className="mt-3 rounded-full border border-white/15 bg-white/5 px-3 py-1 font-black tracking-widest text-white uppercase">Serve {serveCall}</p>
                         </div>
                         <button
                             disabled={match.status === 'completed'}
                             onClick={() => score('team_two')}
                             className="rounded-lg bg-white/10 p-8 transition hover:bg-white/15 disabled:opacity-50"
                         >
+                            {servingTeam === 'team_two' && (
+                                <span className="mb-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-black tracking-widest text-white uppercase">
+                                    Server
+                                </span>
+                            )}
                             <span className="block text-7xl font-black">{match.team_two_score}</span>
-                            <span className="mt-3 block text-sm text-slate-300 uppercase">Add Point</span>
+                            <span className="mt-3 block text-sm text-slate-300 uppercase">
+                                {servingTeam === 'team_two' ? 'Won rally + point' : 'Won rally - rotate serve'}
+                            </span>
                         </button>
                     </div>
                     <div className="mt-6 flex justify-center">

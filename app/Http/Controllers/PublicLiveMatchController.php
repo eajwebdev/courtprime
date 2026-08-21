@@ -27,6 +27,8 @@ class PublicLiveMatchController extends Controller
                 'team_one_score' => $match->team_one_score,
                 'team_two_score' => $match->team_two_score,
                 'serving_team' => $match->serving_team,
+                'serving_number' => $this->servingNumber($match),
+                'serve_call' => $this->serveCall($match),
                 'game_number' => $match->game_number,
                 'status' => $match->status,
                 'verification_status' => $match->verification_status,
@@ -50,5 +52,35 @@ class PublicLiveMatchController extends Controller
                 ->limit(20)
                 ->get(['id', 'event_type', 'team', 'team_one_score', 'team_two_score', 'created_at']),
         ]);
+    }
+
+    private function servingTeam(ClubMatch $match): string
+    {
+        return in_array($match->serving_team, ['team_one', 'team_two'], true) ? $match->serving_team : 'team_one';
+    }
+
+    private function servingNumber(ClubMatch $match): ?int
+    {
+        if ($match->match_type === 'singles') {
+            return null;
+        }
+
+        $number = (int) ($match->serving_number ?? 0);
+
+        if (in_array($number, [1, 2], true)) {
+            return $number;
+        }
+
+        return (int) $match->team_one_score === 0 && (int) $match->team_two_score === 0 && $this->servingTeam($match) === 'team_one' ? 2 : 1;
+    }
+
+    private function serveCall(ClubMatch $match): string
+    {
+        $servingTeam = $this->servingTeam($match);
+        $serverScore = $servingTeam === 'team_one' ? (int) $match->team_one_score : (int) $match->team_two_score;
+        $receiverScore = $servingTeam === 'team_one' ? (int) $match->team_two_score : (int) $match->team_one_score;
+        $servingNumber = $this->servingNumber($match);
+
+        return $servingNumber ? "{$serverScore}-{$receiverScore}-{$servingNumber}" : "{$serverScore}-{$receiverScore}";
     }
 }

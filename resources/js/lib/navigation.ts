@@ -150,15 +150,66 @@ const frontDeskGroups: NavGroup[] = [
 
 const superadminGroups: NavGroup[] = [
     {
-        title: 'Network',
-        defaultOpen: true,
-        items: [navItems.dashboard, navItems.tenantSubscriptions, navItems.subscriptionPlans, navItems.demoPipeline, navItems.onboarding],
-    },
-    { title: 'Identity', defaultOpen: true, items: [navItems.players, navItems.duplicateIdentities, navItems.rankings] },
-    {
         title: 'Platform',
         defaultOpen: true,
-        items: [navItems.platformAudit, navItems.supportTickets, navItems.announcements, navItems.apiCredentials],
+        items: [
+            navItems.dashboard,
+            navItems.tenantSubscriptions,
+            navItems.demoPipeline,
+            navItems.subscriptionPlans,
+            navItems.onboarding,
+            navItems.supportTickets,
+            navItems.platformAudit,
+        ],
+    },
+    {
+        title: 'Club operations',
+        defaultOpen: true,
+        items: [
+            navItems.operations,
+            navItems.liveCourts,
+            navItems.reservations,
+            navItems.scheduler,
+            navItems.courts,
+            navItems.branches,
+            navItems.maintenance,
+        ],
+    },
+    {
+        title: 'People & play',
+        defaultOpen: true,
+        items: [
+            navItems.players,
+            navItems.duplicateIdentities,
+            navItems.memberships,
+            navItems.staff,
+            navItems.coaches,
+            navItems.openPlay,
+            navItems.teamRoles,
+        ],
+    },
+    {
+        title: 'Competition',
+        defaultOpen: false,
+        items: [navItems.tournaments, navItems.matches, navItems.rankings, navItems.reports],
+    },
+    {
+        title: 'Money & stock',
+        defaultOpen: false,
+        items: [
+            navItems.pos,
+            navItems.payments,
+            navItems.receivables,
+            navItems.expenses,
+            navItems.cashierSessions,
+            navItems.inventory,
+            navItems.products,
+        ],
+    },
+    {
+        title: 'Setup',
+        defaultOpen: false,
+        items: [navItems.organizationSettings, navItems.announcements, navItems.apiCredentials],
     },
 ];
 

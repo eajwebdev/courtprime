@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import AppLayout from '@/layouts/app-layout';
 import { currency } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Building2, Check, CreditCard, Sparkles } from 'lucide-react';
+import { Building2, Check, CreditCard, FileText, History, Sparkles } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload from TenantSubscriptionController. */
@@ -23,7 +24,22 @@ type Props = {
     canTakePayment: boolean;
 };
 
+type TenantSubscriptionTab = 'subscription' | 'billing' | 'history';
+
 export default function TenantSubscriptions({ organizations, plans, trialDays, canTakePayment }: Props) {
+    const activeTenants = organizations.filter(
+        (organization) => organization.subscription?.status === 'active' || organization.status === 'active',
+    ).length;
+    const trialTenants = organizations.filter(
+        (organization) => organization.subscription?.status === 'trial' || organization.status === 'trial',
+    ).length;
+    const outstandingInvoices = organizations.reduce(
+        (total, organization) =>
+            total +
+            (organization.subscription?.invoices ?? []).filter((invoice: any) => ['issued', 'overdue', 'partial'].includes(invoice.status)).length,
+        0,
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Tenant Subscriptions" />
@@ -35,6 +51,13 @@ export default function TenantSubscriptions({ organizations, plans, trialDays, c
                         Start a club's trial, put it on a plan and term, and settle payments taken outside QRPh. A club sees what it owes and pays by
                         QRPh from its own billing page, it does not choose its own plan.
                     </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                    <Metric icon={Building2} label="Tenants" value={organizations.length} />
+                    <Metric icon={CreditCard} label="Active" value={activeTenants} />
+                    <Metric icon={Sparkles} label="Trials" value={trialTenants} />
+                    <Metric icon={FileText} label="Open invoices" value={outstandingInvoices} />
                 </div>
 
                 <div className="grid gap-4">
@@ -70,6 +93,7 @@ function TenantSubscriptionCard({
     canTakePayment: boolean;
 }) {
     const subscription = organization.subscription;
+    const [activeTab, setActiveTab] = useState<TenantSubscriptionTab>('subscription');
 
     /* The new path: start a trial, or put the club on a plan and term. Kept
        separate from the manual override form below rather than merged into
@@ -211,376 +235,435 @@ function TenantSubscriptionCard({
                     <Info label="Monthly" value={selectedPlan ? currency(selectedPlan.monthly_price) : '-'} />
                 </div>
 
+                <TenantTabs value={activeTab} onChange={setActiveTab} />
+
                 {/* ---- Start a trial or subscribe: the path that keeps
                     term_months, grace_days and QRPh in sync -------------- */}
-                <div className="bg-primary-soft/30 border-primary/20 space-y-4 rounded-lg border p-4">
-                    <div>
-                        <p className="text-sm font-semibold">Start or change subscription</p>
-                        <p className="text-muted-foreground text-xs">
-                            The trial is {trialDays} days, free. Subscribing raises an invoice the club pays by QRPh from its own billing page.
-                        </p>
-                    </div>
+                {activeTab === 'subscription' && (
+                    <div className="bg-primary-soft/30 border-primary/20 space-y-4 rounded-lg border p-4">
+                        <div>
+                            <p className="text-sm font-semibold">Start or change subscription</p>
+                            <p className="text-muted-foreground text-xs">
+                                The trial is {trialDays} days, free. Subscribing raises an invoice the club pays by QRPh from its own billing page.
+                            </p>
+                        </div>
 
-                    {/* Step 1. The whole plan, not just its name: choosing
+                        {/* Step 1. The whole plan, not just its name: choosing
                         between three names told you nothing about what the club
                         is being moved onto or what it costs them. */}
-                    <div>
-                        <p className="text-muted-foreground mb-1.5 text-[0.6875rem] font-semibold tracking-wide uppercase">1 · Plan</p>
-                        <div className="grid gap-2 sm:grid-cols-3">
-                            {plans.map((plan) => {
-                                const active = Number(plan.id) === newPlanId;
-                                const current = Number(plan.id) === Number(subscription?.subscription_plan_id);
-
-                                return (
-                                    <button
-                                        key={plan.id}
-                                        type="button"
-                                        aria-pressed={active}
-                                        onClick={() => setNewPlanId(Number(plan.id))}
-                                        className={cn(
-                                            'rounded-lg border px-3 py-2.5 text-left transition-colors',
-                                            active ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:border-border-strong',
-                                        )}
-                                    >
-                                        <span className="flex items-baseline justify-between gap-2">
-                                            <span className="text-label text-foreground font-semibold">{plan.name}</span>
-                                            {current && <span className="text-meta text-primary font-semibold">current</span>}
-                                        </span>
-                                        <span data-numeric className="text-foreground mt-0.5 block text-sm font-semibold">
-                                            {currency(plan.monthly_price)}
-                                            <span className="text-muted font-normal">/mo</span>
-                                        </span>
-                                        {/* What they are actually buying. */}
-                                        <span className="text-meta text-muted mt-1 block">
-                                            <span data-numeric>{plan.branch_limit ?? '∞'}</span> branches ·{' '}
-                                            <span data-numeric>{plan.court_limit ?? '∞'}</span> courts ·{' '}
-                                            <span data-numeric>{plan.staff_limit ?? '∞'}</span> staff
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Step 2. Committing longer is the club's discount, so the
-                        saving is on the control that decides it. */}
-                    {newPlan?.terms && (
                         <div>
-                            <p className="text-muted-foreground mb-1.5 text-[0.6875rem] font-semibold tracking-wide uppercase">2 · Term</p>
+                            <p className="text-muted-foreground mb-1.5 text-[0.6875rem] font-semibold tracking-wide uppercase">1 · Plan</p>
                             <div className="grid gap-2 sm:grid-cols-3">
-                                {newPlan.terms.map((term: any) => {
-                                    const active = term.months === newMonths;
+                                {plans.map((plan) => {
+                                    const active = Number(plan.id) === newPlanId;
+                                    const current = Number(plan.id) === Number(subscription?.subscription_plan_id);
 
                                     return (
                                         <button
-                                            key={term.months}
+                                            key={plan.id}
                                             type="button"
                                             aria-pressed={active}
-                                            onClick={() => setNewMonths(term.months)}
+                                            onClick={() => setNewPlanId(Number(plan.id))}
                                             className={cn(
                                                 'rounded-lg border px-3 py-2.5 text-left transition-colors',
                                                 active ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:border-border-strong',
                                             )}
                                         >
                                             <span className="flex items-baseline justify-between gap-2">
-                                                <span className="text-label text-foreground font-semibold">{term.label}</span>
-                                                {term.saving_percent > 0 && (
-                                                    <span className="text-meta text-success font-semibold">save {term.saving_percent}%</span>
-                                                )}
+                                                <span className="text-label text-foreground font-semibold">{plan.name}</span>
+                                                {current && <span className="text-meta text-primary font-semibold">current</span>}
                                             </span>
                                             <span data-numeric className="text-foreground mt-0.5 block text-sm font-semibold">
-                                                {currency(term.per_month)}
+                                                {currency(plan.monthly_price)}
                                                 <span className="text-muted font-normal">/mo</span>
                                             </span>
-                                            <span data-numeric className="text-meta text-muted mt-1 block">
-                                                {currency(term.total)} billed now
+                                            {/* What they are actually buying. */}
+                                            <span className="text-meta text-muted mt-1 block">
+                                                <span data-numeric>{plan.branch_limit ?? '∞'}</span> branches ·{' '}
+                                                <span data-numeric>{plan.court_limit ?? '∞'}</span> courts ·{' '}
+                                                <span data-numeric>{plan.staff_limit ?? '∞'}</span> staff
                                             </span>
                                         </button>
                                     );
                                 })}
                             </div>
                         </div>
-                    )}
 
-                    {/* Step 3. What is about to happen, in one line, before it
+                        {/* Step 2. Committing longer is the club's discount, so the
+                        saving is on the control that decides it. */}
+                        {newPlan?.terms && (
+                            <div>
+                                <p className="text-muted-foreground mb-1.5 text-[0.6875rem] font-semibold tracking-wide uppercase">2 · Term</p>
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    {newPlan.terms.map((term: any) => {
+                                        const active = term.months === newMonths;
+
+                                        return (
+                                            <button
+                                                key={term.months}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() => setNewMonths(term.months)}
+                                                className={cn(
+                                                    'rounded-lg border px-3 py-2.5 text-left transition-colors',
+                                                    active ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:border-border-strong',
+                                                )}
+                                            >
+                                                <span className="flex items-baseline justify-between gap-2">
+                                                    <span className="text-label text-foreground font-semibold">{term.label}</span>
+                                                    {term.saving_percent > 0 && (
+                                                        <span className="text-meta text-success font-semibold">save {term.saving_percent}%</span>
+                                                    )}
+                                                </span>
+                                                <span data-numeric className="text-foreground mt-0.5 block text-sm font-semibold">
+                                                    {currency(term.per_month)}
+                                                    <span className="text-muted font-normal">/mo</span>
+                                                </span>
+                                                <span data-numeric className="text-meta text-muted mt-1 block">
+                                                    {currency(term.total)} billed now
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 3. What is about to happen, in one line, before it
                         happens — this raises a real bill against a real club. */}
-                    <div className="border-primary/20 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                        <div className="min-w-0">
-                            <p className="text-label text-foreground font-semibold">
-                                {newPlan?.name ?? 'No plan'}
-                                {newTerm ? ` · ${newTerm.label}` : ''}
-                            </p>
-                            <p className="text-meta text-muted">
-                                {changingPlan && subscription?.plan?.name ? `Moving from ${subscription.plan.name}. ` : ''}
-                                {newTerm ? (
-                                    <>
-                                        Invoice for <span data-numeric>{currency(newTerm.total)}</span> raised now, covering{' '}
-                                        <span data-numeric>{newTerm.months}</span> {newTerm.months === 1 ? 'month' : 'months'}.
-                                    </>
-                                ) : (
-                                    'Pick a plan and a term.'
-                                )}
-                            </p>
-                        </div>
+                        <div className="border-primary/20 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+                            <div className="min-w-0">
+                                <p className="text-label text-foreground font-semibold">
+                                    {newPlan?.name ?? 'No plan'}
+                                    {newTerm ? ` · ${newTerm.label}` : ''}
+                                </p>
+                                <p className="text-meta text-muted">
+                                    {changingPlan && subscription?.plan?.name ? `Moving from ${subscription.plan.name}. ` : ''}
+                                    {newTerm ? (
+                                        <>
+                                            Invoice for <span data-numeric>{currency(newTerm.total)}</span> raised now, covering{' '}
+                                            <span data-numeric>{newTerm.months}</span> {newTerm.months === 1 ? 'month' : 'months'}.
+                                        </>
+                                    ) : (
+                                        'Pick a plan and a term.'
+                                    )}
+                                </p>
+                            </div>
 
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={trialForm.processing || !newPlanId || Boolean(subscription?.trial_ends_at)}
-                                title={subscription?.trial_ends_at ? 'This club has already had its trial' : undefined}
-                                onClick={startTrial}
-                            >
-                                <Sparkles className="mr-1.5 size-4" />
-                                {subscription?.trial_ends_at ? 'Trial already used' : `Start ${trialDays}-day trial`}
-                            </Button>
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={trialForm.processing || !newPlanId || Boolean(subscription?.trial_ends_at)}
+                                    title={subscription?.trial_ends_at ? 'This club has already had its trial' : undefined}
+                                    onClick={startTrial}
+                                >
+                                    <Sparkles className="mr-1.5 size-4" />
+                                    {subscription?.trial_ends_at ? 'Trial already used' : `Start ${trialDays}-day trial`}
+                                </Button>
 
-                            {/* Asked first: this bills a club, and the button
+                                {/* Asked first: this bills a club, and the button
                                 used to do it on one click from a card that
                                 looks like every other card on the page. */}
-                            <ConfirmDialog
-                                trigger={
-                                    <Button type="button" size="sm" disabled={subscribeForm.processing || !newPlanId || !newTerm}>
-                                        <CreditCard className="mr-1.5 size-4" />
-                                        Subscribe{newTerm ? ` · ${currency(newTerm.total)}` : ''}
-                                    </Button>
-                                }
-                                title={`Put ${organization.name} on ${newPlan?.name ?? 'this plan'}?`}
-                                description={
-                                    newTerm
-                                        ? `This raises an invoice for ${currency(newTerm.total)} covering ${newTerm.months} ${
-                                              newTerm.months === 1 ? 'month' : 'months'
-                                          }. The club pays it by QRPh from its own billing page.`
-                                        : 'Pick a term first.'
-                                }
-                                confirmLabel="Subscribe"
-                                onConfirm={subscribeTenant}
-                            />
+                                <ConfirmDialog
+                                    trigger={
+                                        <Button type="button" size="sm" disabled={subscribeForm.processing || !newPlanId || !newTerm}>
+                                            <CreditCard className="mr-1.5 size-4" />
+                                            Subscribe{newTerm ? ` · ${currency(newTerm.total)}` : ''}
+                                        </Button>
+                                    }
+                                    title={`Put ${organization.name} on ${newPlan?.name ?? 'this plan'}?`}
+                                    description={
+                                        newTerm
+                                            ? `This raises an invoice for ${currency(newTerm.total)} covering ${newTerm.months} ${
+                                                  newTerm.months === 1 ? 'month' : 'months'
+                                              }. The club pays it by QRPh from its own billing page.`
+                                            : 'Pick a term first.'
+                                    }
+                                    confirmLabel="Subscribe"
+                                    onConfirm={subscribeTenant}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    {(trialForm.errors as any).plan_id && (
-                        <p role="alert" className="text-meta text-danger">
-                            {(trialForm.errors as any).plan_id}
-                        </p>
-                    )}
-
-                    {outstanding && (
-                        <form onSubmit={settleOutstanding} className="border-primary/20 border-t pt-3">
-                            <p className="text-label text-foreground font-semibold">
-                                Outstanding: {outstanding.invoice_number} · <span data-numeric>{currency(outstanding.total_amount)}</span>
+                        {(trialForm.errors as any).plan_id && (
+                            <p role="alert" className="text-meta text-danger">
+                                {(trialForm.errors as any).plan_id}
                             </p>
-                            <p className="text-meta text-muted mt-0.5">Only for money taken outside QRPh — cash at the desk, or a bank transfer.</p>
-                            <div className="mt-2 flex flex-wrap items-end gap-2">
-                                <Select
-                                    label="Paid by"
-                                    value={settleForm.data.method}
-                                    options={['cash', 'bank_transfer', 'other']}
-                                    onChange={(value) => settleForm.setData('method', value)}
-                                />
-                                <Field
-                                    label="Reference"
-                                    value={settleForm.data.reference}
-                                    onChange={(value) => settleForm.setData('reference', value)}
-                                    error={(settleForm.errors as any).method}
-                                />
-                                <Button size="sm" disabled={settleForm.processing}>
-                                    <Check className="mr-1.5 size-4" />
-                                    Mark this invoice paid
-                                </Button>
-                            </div>
-                            {!canTakePayment && (
-                                <p className="text-meta text-muted mt-1">
-                                    QRPh is not connected, so the club cannot pay this online yet; this records an offline payment instead.
+                        )}
+
+                        {outstanding && (
+                            <form onSubmit={settleOutstanding} className="border-primary/20 border-t pt-3">
+                                <p className="text-label text-foreground font-semibold">
+                                    Outstanding: {outstanding.invoice_number} · <span data-numeric>{currency(outstanding.total_amount)}</span>
                                 </p>
-                            )}
-                        </form>
-                    )}
-                </div>
-
-                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Manual override</p>
-
-                <form onSubmit={submit} className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end">
-                    <div className="space-y-2">
-                        <Label>Plan</Label>
-                        <select
-                            className="bg-background h-10 w-full rounded-md border px-3 text-sm"
-                            value={form.data.subscription_plan_id}
-                            onChange={(event) => form.setData('subscription_plan_id', Number(event.target.value))}
-                        >
-                            {plans.map((plan) => (
-                                <option key={plan.id} value={plan.id}>
-                                    {plan.name} - {currency(plan.monthly_price)}
-                                </option>
-                            ))}
-                        </select>
-                        {form.errors.subscription_plan_id && <p className="text-xs text-red-600">{form.errors.subscription_plan_id}</p>}
-                    </div>
-                    <Select
-                        label="Status"
-                        value={form.data.status}
-                        options={['trial', 'active', 'grace_period', 'expired', 'suspended', 'cancelled']}
-                        onChange={(value) => form.setData('status', value)}
-                    />
-                    <Select
-                        label="Cycle"
-                        value={form.data.billing_cycle}
-                        options={['monthly', 'quarterly', 'annual', 'manual']}
-                        onChange={(value) => form.setData('billing_cycle', value)}
-                    />
-                    <Field
-                        label="Trial Ends"
-                        type="date"
-                        value={form.data.trial_ends_at}
-                        onChange={(value) => form.setData('trial_ends_at', value)}
-                        error={form.errors.trial_ends_at}
-                    />
-                    <Field
-                        label="Period Ends"
-                        type="date"
-                        value={form.data.current_period_ends_at}
-                        onChange={(value) => form.setData('current_period_ends_at', value)}
-                        error={form.errors.current_period_ends_at}
-                    />
-                    <Button disabled={form.processing || plans.length === 0}>
-                        <CreditCard className="mr-2 size-4" />
-                        Save
-                    </Button>
-                </form>
-
-                {subscription && (
-                    <div className="grid gap-4 xl:grid-cols-2">
-                        <form onSubmit={issueInvoice} className="space-y-3 rounded-lg border p-3">
-                            <p className="text-sm font-semibold">Issue Platform Invoice</p>
-                            <div className="grid gap-3 md:grid-cols-2">
-                                <Field
-                                    label="Period Starts"
-                                    type="date"
-                                    value={invoiceForm.data.period_starts_on}
-                                    onChange={(value) => invoiceForm.setData('period_starts_on', value)}
-                                    error={invoiceForm.errors.period_starts_on}
-                                />
-                                <Field
-                                    label="Period Ends"
-                                    type="date"
-                                    value={invoiceForm.data.period_ends_on}
-                                    onChange={(value) => invoiceForm.setData('period_ends_on', value)}
-                                    error={invoiceForm.errors.period_ends_on}
-                                />
-                                <Field
-                                    label="Issued"
-                                    type="date"
-                                    value={invoiceForm.data.issued_on}
-                                    onChange={(value) => invoiceForm.setData('issued_on', value)}
-                                    error={invoiceForm.errors.issued_on}
-                                />
-                                <Field
-                                    label="Due"
-                                    type="date"
-                                    value={invoiceForm.data.due_on}
-                                    onChange={(value) => invoiceForm.setData('due_on', value)}
-                                    error={invoiceForm.errors.due_on}
-                                />
-                                <Field
-                                    label="Subtotal Override"
-                                    type="number"
-                                    value={invoiceForm.data.subtotal}
-                                    onChange={(value) => invoiceForm.setData('subtotal', value)}
-                                    error={invoiceForm.errors.subtotal}
-                                />
-                                <Field
-                                    label="Tax"
-                                    type="number"
-                                    value={invoiceForm.data.tax_amount}
-                                    onChange={(value) => invoiceForm.setData('tax_amount', Number(value))}
-                                    error={invoiceForm.errors.tax_amount}
-                                />
-                                <Field
-                                    label="Discount"
-                                    type="number"
-                                    value={invoiceForm.data.discount_amount}
-                                    onChange={(value) => invoiceForm.setData('discount_amount', Number(value))}
-                                    error={invoiceForm.errors.discount_amount}
-                                />
-                            </div>
-                            <Field
-                                label="Notes"
-                                value={invoiceForm.data.notes}
-                                onChange={(value) => invoiceForm.setData('notes', value)}
-                                error={invoiceForm.errors.notes}
-                            />
-                            <Button disabled={invoiceForm.processing}>Issue Invoice</Button>
-                        </form>
-
-                        <form onSubmit={recordPayment} className="space-y-3 rounded-lg border p-3">
-                            <p className="text-sm font-semibold">Record Platform Payment</p>
-                            <div className="grid gap-3 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label>Invoice</Label>
-                                    <select
-                                        className="bg-background h-10 w-full rounded-md border px-3 text-sm"
-                                        value={paymentForm.data.subscription_invoice_id}
-                                        onChange={(event) =>
-                                            paymentForm.setData('subscription_invoice_id', event.target.value ? Number(event.target.value) : '')
-                                        }
-                                    >
-                                        <option value="">Unapplied payment</option>
-                                        {invoices.map((invoice: any) => (
-                                            <option key={invoice.id} value={invoice.id}>
-                                                {invoice.invoice_number} - {currency(Number(invoice.total_amount) - Number(invoice.amount_paid))}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {paymentForm.errors.subscription_invoice_id && (
-                                        <p className="text-xs text-red-600">{paymentForm.errors.subscription_invoice_id}</p>
-                                    )}
+                                <p className="text-meta text-muted mt-0.5">
+                                    Only for money taken outside QRPh — cash at the desk, or a bank transfer.
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-end gap-2">
+                                    <Select
+                                        label="Paid by"
+                                        value={settleForm.data.method}
+                                        options={['cash', 'bank_transfer', 'other']}
+                                        onChange={(value) => settleForm.setData('method', value)}
+                                    />
+                                    <Field
+                                        label="Reference"
+                                        value={settleForm.data.reference}
+                                        onChange={(value) => settleForm.setData('reference', value)}
+                                        error={(settleForm.errors as any).method}
+                                    />
+                                    <Button size="sm" disabled={settleForm.processing}>
+                                        <Check className="mr-1.5 size-4" />
+                                        Mark this invoice paid
+                                    </Button>
                                 </div>
-                                <Field
-                                    label="Amount"
-                                    type="number"
-                                    value={paymentForm.data.amount}
-                                    onChange={(value) => paymentForm.setData('amount', Number(value))}
-                                    error={paymentForm.errors.amount}
-                                />
-                                <Select
-                                    label="Method"
-                                    value={paymentForm.data.method}
-                                    options={['manual', 'cash', 'bank_transfer', 'gcash', 'maya', 'card', 'check', 'other']}
-                                    onChange={(value) => paymentForm.setData('method', value)}
-                                />
-                                <Field
-                                    label="Paid At"
-                                    type="datetime-local"
-                                    value={paymentForm.data.paid_at}
-                                    onChange={(value) => paymentForm.setData('paid_at', value)}
-                                    error={paymentForm.errors.paid_at}
-                                />
-                                <Field
-                                    label="External Ref"
-                                    value={paymentForm.data.external_reference}
-                                    onChange={(value) => paymentForm.setData('external_reference', value)}
-                                    error={paymentForm.errors.external_reference}
-                                />
-                            </div>
-                            <Field
-                                label="Notes"
-                                value={paymentForm.data.notes}
-                                onChange={(value) => paymentForm.setData('notes', value)}
-                                error={paymentForm.errors.notes}
-                            />
-                            <Button disabled={paymentForm.processing}>Record Payment</Button>
-                        </form>
+                                {!canTakePayment && (
+                                    <p className="text-meta text-muted mt-1">
+                                        QRPh is not connected, so the club cannot pay this online yet; this records an offline payment instead.
+                                    </p>
+                                )}
+                            </form>
+                        )}
                     </div>
                 )}
 
-                <div className="grid gap-4 xl:grid-cols-3">
-                    <Ledger title="Invoices" rows={invoices} empty="No platform invoices yet." />
-                    <Ledger title="Payments" rows={payments} empty="No subscription payments yet." />
-                    <Ledger title="Events" rows={events} empty="No subscription events yet." />
-                </div>
+                {activeTab === 'billing' && (
+                    <div className="space-y-4">
+                        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Manual override</p>
+
+                        <form
+                            onSubmit={submit}
+                            className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-end"
+                        >
+                            <div className="space-y-2">
+                                <Label>Plan</Label>
+                                <select
+                                    className="bg-background h-10 w-full rounded-md border px-3 text-sm"
+                                    value={form.data.subscription_plan_id}
+                                    onChange={(event) => form.setData('subscription_plan_id', Number(event.target.value))}
+                                >
+                                    {plans.map((plan) => (
+                                        <option key={plan.id} value={plan.id}>
+                                            {plan.name} - {currency(plan.monthly_price)}
+                                        </option>
+                                    ))}
+                                </select>
+                                {form.errors.subscription_plan_id && <p className="text-xs text-red-600">{form.errors.subscription_plan_id}</p>}
+                            </div>
+                            <Select
+                                label="Status"
+                                value={form.data.status}
+                                options={['trial', 'active', 'grace_period', 'expired', 'suspended', 'cancelled']}
+                                onChange={(value) => form.setData('status', value)}
+                            />
+                            <Select
+                                label="Cycle"
+                                value={form.data.billing_cycle}
+                                options={['monthly', 'quarterly', 'annual', 'manual']}
+                                onChange={(value) => form.setData('billing_cycle', value)}
+                            />
+                            <Field
+                                label="Trial Ends"
+                                type="date"
+                                value={form.data.trial_ends_at}
+                                onChange={(value) => form.setData('trial_ends_at', value)}
+                                error={form.errors.trial_ends_at}
+                            />
+                            <Field
+                                label="Period Ends"
+                                type="date"
+                                value={form.data.current_period_ends_at}
+                                onChange={(value) => form.setData('current_period_ends_at', value)}
+                                error={form.errors.current_period_ends_at}
+                            />
+                            <Button disabled={form.processing || plans.length === 0}>
+                                <CreditCard className="mr-2 size-4" />
+                                Save
+                            </Button>
+                        </form>
+
+                        {subscription && (
+                            <div className="grid gap-4 xl:grid-cols-2">
+                                <form onSubmit={issueInvoice} className="space-y-3 rounded-lg border p-3">
+                                    <p className="text-sm font-semibold">Issue Platform Invoice</p>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <Field
+                                            label="Period Starts"
+                                            type="date"
+                                            value={invoiceForm.data.period_starts_on}
+                                            onChange={(value) => invoiceForm.setData('period_starts_on', value)}
+                                            error={invoiceForm.errors.period_starts_on}
+                                        />
+                                        <Field
+                                            label="Period Ends"
+                                            type="date"
+                                            value={invoiceForm.data.period_ends_on}
+                                            onChange={(value) => invoiceForm.setData('period_ends_on', value)}
+                                            error={invoiceForm.errors.period_ends_on}
+                                        />
+                                        <Field
+                                            label="Issued"
+                                            type="date"
+                                            value={invoiceForm.data.issued_on}
+                                            onChange={(value) => invoiceForm.setData('issued_on', value)}
+                                            error={invoiceForm.errors.issued_on}
+                                        />
+                                        <Field
+                                            label="Due"
+                                            type="date"
+                                            value={invoiceForm.data.due_on}
+                                            onChange={(value) => invoiceForm.setData('due_on', value)}
+                                            error={invoiceForm.errors.due_on}
+                                        />
+                                        <Field
+                                            label="Subtotal Override"
+                                            type="number"
+                                            value={invoiceForm.data.subtotal}
+                                            onChange={(value) => invoiceForm.setData('subtotal', value)}
+                                            error={invoiceForm.errors.subtotal}
+                                        />
+                                        <Field
+                                            label="Tax"
+                                            type="number"
+                                            value={invoiceForm.data.tax_amount}
+                                            onChange={(value) => invoiceForm.setData('tax_amount', Number(value))}
+                                            error={invoiceForm.errors.tax_amount}
+                                        />
+                                        <Field
+                                            label="Discount"
+                                            type="number"
+                                            value={invoiceForm.data.discount_amount}
+                                            onChange={(value) => invoiceForm.setData('discount_amount', Number(value))}
+                                            error={invoiceForm.errors.discount_amount}
+                                        />
+                                    </div>
+                                    <Field
+                                        label="Notes"
+                                        value={invoiceForm.data.notes}
+                                        onChange={(value) => invoiceForm.setData('notes', value)}
+                                        error={invoiceForm.errors.notes}
+                                    />
+                                    <Button disabled={invoiceForm.processing}>Issue Invoice</Button>
+                                </form>
+
+                                <form onSubmit={recordPayment} className="space-y-3 rounded-lg border p-3">
+                                    <p className="text-sm font-semibold">Record Platform Payment</p>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>Invoice</Label>
+                                            <select
+                                                className="bg-background h-10 w-full rounded-md border px-3 text-sm"
+                                                value={paymentForm.data.subscription_invoice_id}
+                                                onChange={(event) =>
+                                                    paymentForm.setData(
+                                                        'subscription_invoice_id',
+                                                        event.target.value ? Number(event.target.value) : '',
+                                                    )
+                                                }
+                                            >
+                                                <option value="">Unapplied payment</option>
+                                                {invoices.map((invoice: any) => (
+                                                    <option key={invoice.id} value={invoice.id}>
+                                                        {invoice.invoice_number} -{' '}
+                                                        {currency(Number(invoice.total_amount) - Number(invoice.amount_paid))}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {paymentForm.errors.subscription_invoice_id && (
+                                                <p className="text-xs text-red-600">{paymentForm.errors.subscription_invoice_id}</p>
+                                            )}
+                                        </div>
+                                        <Field
+                                            label="Amount"
+                                            type="number"
+                                            value={paymentForm.data.amount}
+                                            onChange={(value) => paymentForm.setData('amount', Number(value))}
+                                            error={paymentForm.errors.amount}
+                                        />
+                                        <Select
+                                            label="Method"
+                                            value={paymentForm.data.method}
+                                            options={['manual', 'cash', 'bank_transfer', 'gcash', 'maya', 'card', 'check', 'other']}
+                                            onChange={(value) => paymentForm.setData('method', value)}
+                                        />
+                                        <Field
+                                            label="Paid At"
+                                            type="datetime-local"
+                                            value={paymentForm.data.paid_at}
+                                            onChange={(value) => paymentForm.setData('paid_at', value)}
+                                            error={paymentForm.errors.paid_at}
+                                        />
+                                        <Field
+                                            label="External Ref"
+                                            value={paymentForm.data.external_reference}
+                                            onChange={(value) => paymentForm.setData('external_reference', value)}
+                                            error={paymentForm.errors.external_reference}
+                                        />
+                                    </div>
+                                    <Field
+                                        label="Notes"
+                                        value={paymentForm.data.notes}
+                                        onChange={(value) => paymentForm.setData('notes', value)}
+                                        error={paymentForm.errors.notes}
+                                    />
+                                    <Button disabled={paymentForm.processing}>Record Payment</Button>
+                                </form>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'history' && (
+                    <div className="grid gap-4 xl:grid-cols-3">
+                        <Ledger title="Invoices" rows={invoices} empty="No platform invoices yet." />
+                        <Ledger title="Payments" rows={payments} empty="No subscription payments yet." />
+                        <Ledger title="Events" rows={events} empty="No subscription events yet." />
+                    </div>
+                )}
             </CardContent>
         </Card>
+    );
+}
+
+function Metric({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
+    return (
+        <Card>
+            <CardContent className="p-4">
+                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Icon className="size-4 text-pink-600" />
+                    {label}
+                </p>
+                <p data-numeric className="mt-1 text-2xl font-semibold">
+                    {value}
+                </p>
+            </CardContent>
+        </Card>
+    );
+}
+
+function TenantTabs({ value, onChange }: { value: TenantSubscriptionTab; onChange: (value: TenantSubscriptionTab) => void }) {
+    const tabs = [
+        ['subscription', Sparkles, 'Subscription'],
+        ['billing', CreditCard, 'Billing'],
+        ['history', History, 'History'],
+    ] as const;
+
+    return (
+        <ToggleGroup
+            type="single"
+            value={value}
+            onValueChange={(next) => next && onChange(next as TenantSubscriptionTab)}
+            className="border-border bg-surface-muted/50 inline-flex w-full justify-start rounded-lg border p-1 sm:w-auto"
+        >
+            {tabs.map(([tabValue, Icon, label]) => (
+                <ToggleGroupItem key={tabValue} value={tabValue} className="flex-1 rounded-md px-3 sm:flex-none">
+                    <Icon className="size-4" />
+                    {label}
+                </ToggleGroupItem>
+            ))}
+        </ToggleGroup>
     );
 }
 

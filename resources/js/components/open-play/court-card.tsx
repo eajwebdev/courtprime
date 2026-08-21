@@ -72,6 +72,8 @@ export function CourtCard({
 
     const scoreOne = match.team_one_score ?? 0;
     const scoreTwo = match.team_two_score ?? 0;
+    const servingTeam = match.serving_team ?? 'team_one';
+    const serveCall = match.serve_call ?? '0-0-2';
     const started = scoreOne > 0 || scoreTwo > 0;
     const level = scoreOne === scoreTwo;
 
@@ -104,6 +106,8 @@ export function CourtCard({
             <div className="border-border bg-surface-muted flex min-h-11 shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5">
                 <p className="text-label text-foreground font-semibold">{match.court}</p>
                 <p className="text-meta text-muted">
+                    <span className="text-primary font-semibold">Serve {serveCall}</span>
+                    <span className="mx-1.5">|</span>
                     {target ? (
                         <>
                             to{' '}
@@ -147,6 +151,7 @@ export function CourtCard({
                     players={one}
                     score={match.team_one_score}
                     against={match.team_two_score}
+                    serving={servingTeam === 'team_one' || servingTeam === 'one'}
                     target={target}
                     winByTwo={winByTwo}
                     readOnly={!mine}
@@ -158,6 +163,7 @@ export function CourtCard({
                     players={two}
                     score={match.team_two_score}
                     against={match.team_one_score}
+                    serving={servingTeam === 'team_two' || servingTeam === 'two'}
                     target={target}
                     winByTwo={winByTwo}
                     readOnly={!mine}
@@ -258,6 +264,7 @@ function TeamScore({
     players,
     score,
     against,
+    serving,
     target,
     winByTwo,
     readOnly = false,
@@ -269,6 +276,7 @@ function TeamScore({
     players: any[];
     score: number;
     against: number;
+    serving: boolean;
     target?: number;
     winByTwo?: boolean;
     /** Somebody else is scoring this court; the number is here to read only. */
@@ -326,7 +334,7 @@ function TeamScore({
             return;
         }
 
-        setPending(1);
+        setPending(serving ? 1 : 0);
         onScore(done);
     };
 
@@ -341,7 +349,7 @@ function TeamScore({
 
     /* One more point wins it. Worth saying out loud on a court where nobody is
        watching the number closely. */
-    const matchPoint = Boolean(target) && shown >= (target ?? 0) - 1 && shown + 1 - against >= (winByTwo ? 2 : 1);
+    const matchPoint = serving && Boolean(target) && shown >= (target ?? 0) - 1 && shown + 1 - against >= (winByTwo ? 2 : 1);
 
     /* Progress to the target, so the game reads at a glance from the far side
        of the net rather than by comparing two numbers. */
@@ -366,14 +374,14 @@ function TeamScore({
                    been handled by the pointer sequence above. */
                 if (readOnly || event.detail !== 0) return;
 
-                setPending(1);
+                setPending(serving ? 1 : 0);
                 onScore(() => setPending(0));
             }}
             disabled={readOnly}
             aria-label={
                 readOnly
                     ? `${players.map((player: any) => player.name).join(' and ')}, scored by somebody else`
-                    : `Score for ${players.map((player: any) => player.name).join(' and ')}. Tap to add a point, drag left to take one back.`
+                    : `${players.map((player: any) => player.name).join(' and ')} won the rally. Drag left to take one back.`
             }
             /* The whole half scores: a small "+1" is a miss on a tablet at
                arm's length across a court. `touch-action` keeps the browser
@@ -402,7 +410,14 @@ function TeamScore({
             )}
 
             <span className="relative flex flex-col items-center gap-0.5">
-                <span className="text-muted text-[0.625rem] font-semibold tracking-[0.14em] uppercase">{side}</span>
+                <span className="flex items-center gap-1.5">
+                    <span className="text-muted text-[0.625rem] font-semibold tracking-[0.14em] uppercase">{side}</span>
+                    {serving && (
+                        <span className="bg-primary-soft text-primary rounded-full px-1.5 py-0.5 text-[0.5625rem] font-black tracking-[0.12em] uppercase">
+                            Server
+                        </span>
+                    )}
+                </span>
                 <span className="text-label text-secondary line-clamp-2 px-1 text-center leading-snug font-medium">
                     {players.map((player: any) => player.name).join(' / ')}
                 </span>
@@ -459,7 +474,7 @@ function TeamScore({
                     /* Only while it is still nil all: once there are points on
                        the board the instruction is noise. */
                     <span className={cn('text-meta text-muted transition-opacity', (score > 0 || against > 0) && 'opacity-0')}>
-                        tap to score · drag left to undo
+                        {serving ? 'tap to score' : 'tap for serve'} - drag left to undo
                     </span>
                 )}
             </span>

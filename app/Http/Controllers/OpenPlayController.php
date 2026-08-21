@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\OpenPlayGroupStoreRequest;
 use App\Http\Requests\OpenPlaySessionStoreRequest;
 use App\Models\Branch;
+use App\Models\ClubMatch;
 use App\Models\Court;
 use App\Models\OpenPlayCourtHold;
 use App\Models\OpenPlayMatch;
@@ -389,7 +390,7 @@ class OpenPlayController extends Controller
         return OpenPlayMatch::query()
             ->where('open_play_session_id', $session->id)
             ->where('status', 'live')
-            ->with(['court:id,name', 'participants.player:id,name,rating', 'clubMatch:id,team_one_score,team_two_score,status'])
+            ->with(['court:id,name', 'participants.player:id,name,rating', 'clubMatch:id,team_one_score,team_two_score,serving_team,serving_number,match_type,status'])
             ->orderBy('court_id')
             ->get()
             ->map(fn (OpenPlayMatch $match) => [
@@ -399,6 +400,9 @@ class OpenPlayController extends Controller
                 'club_match_id' => $match->club_match_id,
                 'team_one_score' => $match->clubMatch?->team_one_score ?? 0,
                 'team_two_score' => $match->clubMatch?->team_two_score ?? 0,
+                'serving_team' => $match->clubMatch?->serving_team ?? 'team_one',
+                'serving_number' => $match->clubMatch ? $this->servingNumber($match->clubMatch) : 2,
+                'serve_call' => $match->clubMatch ? $this->serveCall($match->clubMatch) : '0-0-2',
                 'teams' => $match->participants
                     ->groupBy('team')
                     ->map(fn ($group) => $group->map(fn ($entry) => [
@@ -409,6 +413,36 @@ class OpenPlayController extends Controller
                     ->all(),
             ])
             ->all();
+    }
+
+    private function servingTeam(ClubMatch $match): string
+    {
+        return in_array($match->serving_team, ['team_one', 'team_two'], true) ? $match->serving_team : 'team_one';
+    }
+
+    private function servingNumber(ClubMatch $match): ?int
+    {
+        if ($match->match_type === 'singles') {
+            return null;
+        }
+
+        $number = (int) ($match->serving_number ?? 0);
+
+        if (in_array($number, [1, 2], true)) {
+            return $number;
+        }
+
+        return (int) $match->team_one_score === 0 && (int) $match->team_two_score === 0 && $this->servingTeam($match) === 'team_one' ? 2 : 1;
+    }
+
+    private function serveCall(ClubMatch $match): string
+    {
+        $servingTeam = $this->servingTeam($match);
+        $serverScore = $servingTeam === 'team_one' ? (int) $match->team_one_score : (int) $match->team_two_score;
+        $receiverScore = $servingTeam === 'team_one' ? (int) $match->team_two_score : (int) $match->team_one_score;
+        $servingNumber = $this->servingNumber($match);
+
+        return $servingNumber ? "{$serverScore}-{$receiverScore}-{$servingNumber}" : "{$serverScore}-{$receiverScore}";
     }
 
     /**

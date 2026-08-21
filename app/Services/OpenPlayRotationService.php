@@ -639,6 +639,8 @@ class OpenPlayRotationService
             'win_by_two' => $session->win_by_two,
             'team_one_name' => $label($pairing['one']),
             'team_two_name' => $label($pairing['two']),
+            'serving_team' => 'team_one',
+            'serving_number' => $session->format === 'singles' ? null : 2,
             'status' => 'live',
             'started_at' => now(),
             'notes' => "Open play {$session->session_code} · round {$round}",

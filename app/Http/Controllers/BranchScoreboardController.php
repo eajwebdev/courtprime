@@ -99,6 +99,8 @@ class BranchScoreboardController extends Controller
                 'team_one_score' => (int) $match->team_one_score,
                 'team_two_score' => (int) $match->team_two_score,
                 'serving_team' => $match->serving_team,
+                'serving_number' => $this->servingNumber($match),
+                'serve_call' => $this->serveCall($match),
                 'game_number' => (int) $match->game_number,
                 'target_score' => (int) ($match->target_score ?: 11),
                 'match_type' => (string) $match->match_type,
@@ -168,5 +170,35 @@ class BranchScoreboardController extends Controller
             hash_equals((string) $settings['live_display_token_hash'], hash('sha256', (string) $request->query('token', ''))),
             403,
         );
+    }
+
+    private function servingTeam(ClubMatch $match): string
+    {
+        return in_array($match->serving_team, ['team_one', 'team_two'], true) ? $match->serving_team : 'team_one';
+    }
+
+    private function servingNumber(ClubMatch $match): ?int
+    {
+        if ($match->match_type === 'singles') {
+            return null;
+        }
+
+        $number = (int) ($match->serving_number ?? 0);
+
+        if (in_array($number, [1, 2], true)) {
+            return $number;
+        }
+
+        return (int) $match->team_one_score === 0 && (int) $match->team_two_score === 0 && $this->servingTeam($match) === 'team_one' ? 2 : 1;
+    }
+
+    private function serveCall(ClubMatch $match): string
+    {
+        $servingTeam = $this->servingTeam($match);
+        $serverScore = $servingTeam === 'team_one' ? (int) $match->team_one_score : (int) $match->team_two_score;
+        $receiverScore = $servingTeam === 'team_one' ? (int) $match->team_two_score : (int) $match->team_one_score;
+        $servingNumber = $this->servingNumber($match);
+
+        return $servingNumber ? "{$serverScore}-{$receiverScore}-{$servingNumber}" : "{$serverScore}-{$receiverScore}";
     }
 }

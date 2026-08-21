@@ -11,10 +11,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Taking a point back takes it off the right team.
+ * Pickleball side-out scoring.
  *
- * The open play board undoes with a double tap on the half you tapped by
- * mistake, so which team the undo belongs to is the whole question.
+ * A tap means a side won the rally. The serving side scores a point; the
+ * receiving side only moves the serve. Undo has to restore both.
  */
 class MatchScoringUndoTest extends TestCase
 {
@@ -67,7 +67,8 @@ class MatchScoringUndoTest extends TestCase
         $scoring = app(MatchScoringService::class);
 
         $scoring->increment($match->fresh(), 'team_one');
-        /* The other team scores last, which is the case that used to break it. */
+        /* Team two first earns the side-out, then scores on serve. */
+        $scoring->increment($match->fresh(), 'team_two');
         $scoring->increment($match->fresh(), 'team_two');
 
         $scoring->undo($match->fresh(), null, 'team_one');
@@ -76,6 +77,8 @@ class MatchScoringUndoTest extends TestCase
 
         $this->assertSame(0, (int) $match->team_one_score);
         $this->assertSame(1, (int) $match->team_two_score, 'Undoing one team must not take a point off the other.');
+        $this->assertSame('team_two', $match->serving_team);
+        $this->assertSame(1, (int) $match->serving_number);
     }
 
     public function test_undo_without_a_team_still_takes_the_last_point(): void
@@ -85,6 +88,7 @@ class MatchScoringUndoTest extends TestCase
 
         $scoring->increment($match->fresh(), 'team_one');
         $scoring->increment($match->fresh(), 'team_two');
+        $scoring->increment($match->fresh(), 'team_two');
 
         $scoring->undo($match->fresh());
 
@@ -92,5 +96,62 @@ class MatchScoringUndoTest extends TestCase
 
         $this->assertSame(1, (int) $match->team_one_score);
         $this->assertSame(0, (int) $match->team_two_score);
+        $this->assertSame('team_two', $match->serving_team);
+        $this->assertSame(1, (int) $match->serving_number);
+    }
+
+    public function test_opening_doubles_rally_starts_at_zero_zero_two(): void
+    {
+        $match = $this->makeMatch();
+        $scoring = app(MatchScoringService::class);
+
+        $scoring->increment($match->fresh(), 'team_one');
+
+        $match = $match->fresh();
+
+        $this->assertSame(1, (int) $match->team_one_score);
+        $this->assertSame(0, (int) $match->team_two_score);
+        $this->assertSame('team_one', $match->serving_team);
+        $this->assertSame(2, (int) $match->serving_number);
+    }
+
+    public function test_receiving_team_winning_opening_rally_gets_side_out_without_a_point(): void
+    {
+        $match = $this->makeMatch();
+        $scoring = app(MatchScoringService::class);
+
+        $scoring->increment($match->fresh(), 'team_two');
+
+        $match = $match->fresh();
+
+        $this->assertSame(0, (int) $match->team_one_score);
+        $this->assertSame(0, (int) $match->team_two_score);
+        $this->assertSame('team_two', $match->serving_team);
+        $this->assertSame(1, (int) $match->serving_number);
+        $this->assertDatabaseHas('score_events', [
+            'club_match_id' => $match->id,
+            'event_type' => 'serve_rotation',
+            'team' => 'team_two',
+        ]);
+    }
+
+    public function test_first_server_loss_moves_to_second_server_without_a_point(): void
+    {
+        $match = $this->makeMatch();
+        $match->update([
+            'team_one_score' => 3,
+            'team_two_score' => 2,
+            'serving_team' => 'team_one',
+            'serving_number' => 1,
+        ]);
+
+        app(MatchScoringService::class)->increment($match->fresh(), 'team_two');
+
+        $match = $match->fresh();
+
+        $this->assertSame(3, (int) $match->team_one_score);
+        $this->assertSame(2, (int) $match->team_two_score);
+        $this->assertSame('team_one', $match->serving_team);
+        $this->assertSame(2, (int) $match->serving_number);
     }
 }

@@ -63,7 +63,12 @@ export default function PublicLiveMatch({ match, games, events }: Props) {
                                         {match.court?.branch ?? 'Branch'} · {match.court?.name ?? 'Court'} · Game {match.game_number}
                                     </p>
                                 </div>
-                                <StatusBadge status={match.verification_status ?? 'unverified'} />
+                                <div className="flex shrink-0 flex-col items-end gap-2">
+                                    <StatusBadge status={match.verification_status ?? 'unverified'} />
+                                    <span className="border-primary/35 bg-primary/10 text-primary rounded-full border px-3 py-1 text-xs font-black tracking-[0.16em] uppercase">
+                                        Serve {match.serve_call}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Scores scale with the viewport so this reads on a phone

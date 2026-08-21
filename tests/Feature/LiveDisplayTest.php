@@ -67,6 +67,8 @@ class LiveDisplayTest extends TestCase
             'team_two_name' => $label.' B',
             'team_one_score' => 5,
             'team_two_score' => 3,
+            'serving_team' => 'team_one',
+            'serving_number' => 2,
             'status' => 'live',
             'started_at' => now(),
         ]);
@@ -102,6 +104,7 @@ class LiveDisplayTest extends TestCase
         $this->assertCount(1, $courts);
         $this->assertSame('Alpha Club Court 1', $courts->first()['name']);
         $this->assertSame('Alpha A', $courts->first()['match']['team_one_name']);
+        $this->assertSame('5-3-2', $courts->first()['match']['serve_call']);
 
         /* Nothing of the other club reaches the page at all. */
         $this->assertStringNotContainsString('Beta', json_encode($courts->all()));
@@ -218,6 +221,7 @@ class LiveDisplayTest extends TestCase
         $response->assertOk();
         $response->assertJsonCount(1, 'courts');
         $response->assertJsonPath('courts.0.name', 'Alpha Club Court 1');
+        $response->assertJsonPath('courts.0.match.serve_call', '5-3-2');
         $this->assertStringNotContainsString('Beta', $response->getContent());
     }
 

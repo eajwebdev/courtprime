@@ -21,14 +21,39 @@ class MatchScoringService
         }
 
         return DB::transaction(function () use ($match, $team, $userId) {
-            $teamOneScore = $match->team_one_score + ($team === 'team_one' ? 1 : 0);
-            $teamTwoScore = $match->team_two_score + ($team === 'team_two' ? 1 : 0);
+            $match = ClubMatch::query()->lockForUpdate()->findOrFail($match->id);
+            $servingTeam = $this->servingTeam($match);
+            $servingNumber = $this->servingNumber($match);
+            $previous = $this->state($match);
+
+            $teamOneScore = (int) $match->team_one_score;
+            $teamTwoScore = (int) $match->team_two_score;
+            $nextServingTeam = $servingTeam;
+            $nextServingNumber = $servingNumber;
+            $pointScored = $team === $servingTeam;
+
+            if ($pointScored) {
+                $teamOneScore += $team === 'team_one' ? 1 : 0;
+                $teamTwoScore += $team === 'team_two' ? 1 : 0;
+            } elseif ($this->isDoubles($match)) {
+                if ($servingNumber === 1) {
+                    $nextServingNumber = 2;
+                } else {
+                    $nextServingTeam = $team;
+                    $nextServingNumber = 1;
+                }
+            } else {
+                $nextServingTeam = $team;
+                $nextServingNumber = null;
+            }
+
             $winner = $this->winner($match, $teamOneScore, $teamTwoScore);
 
             $match->update([
                 'team_one_score' => $teamOneScore,
                 'team_two_score' => $teamTwoScore,
-                'serving_team' => $team,
+                'serving_team' => $nextServingTeam,
+                'serving_number' => $this->isDoubles($match) ? $nextServingNumber : null,
                 'status' => $winner ? 'completed' : 'live',
                 'ended_at' => $winner ? now() : null,
             ]);
@@ -44,11 +69,17 @@ class MatchScoringService
                 'organization_id' => $match->organization_id,
                 'club_match_id' => $match->id,
                 'recorded_by' => $userId,
-                'event_type' => $winner ? 'match_point' : 'score_increment',
+                'event_type' => $pointScored ? ($winner ? 'match_point' : 'score_increment') : 'serve_rotation',
                 'team' => $team,
                 'team_one_score' => $teamOneScore,
                 'team_two_score' => $teamTwoScore,
-                'payload' => ['winner_team' => $winner],
+                'payload' => [
+                    'winner_team' => $winner,
+                    'rally_winner' => $team,
+                    'point_scored' => $pointScored,
+                    'previous' => $previous,
+                    'next' => $this->state($match->fresh()),
+                ],
             ]);
 
             return $match->refresh();
@@ -63,19 +94,19 @@ class MatchScoringService
      * them to people who did not win them. The game restarts, which is what
      * happens on the court when partners swap.
      *
-     * The points already scored stay in `score_events` — this adds to that
+     * The points already scored stay in `score_events` - this adds to that
      * history rather than deleting it, so what happened is still answerable.
      */
     public function reset(ClubMatch $match, ?int $userId = null): ClubMatch
     {
         return DB::transaction(function () use ($match, $userId) {
+            $match = ClubMatch::query()->lockForUpdate()->findOrFail($match->id);
+
             $match->update([
                 'team_one_score' => 0,
                 'team_two_score' => 0,
-                /* Back to the first serve of a game, which is the column's own
-                   default — it is not nullable, and a restarted game has to
-                   hand the serve to somebody. */
                 'serving_team' => 'team_one',
+                'serving_number' => $this->isDoubles($match) ? 2 : null,
                 'status' => 'live',
                 'ended_at' => null,
             ]);
@@ -95,7 +126,10 @@ class MatchScoringService
                 'team' => null,
                 'team_one_score' => 0,
                 'team_two_score' => 0,
-                'payload' => ['reason' => 'teams_changed'],
+                'payload' => [
+                    'reason' => 'teams_changed',
+                    'next' => $this->state($match->fresh()),
+                ],
             ]);
 
             return $match->refresh();
@@ -103,40 +137,52 @@ class MatchScoringService
     }
 
     /**
-     * Take back a point.
+     * Take back a rally.
      *
-     * With a team, it takes back that team's last point. Without one, the
-     * match's last point, whoever scored it.
-     *
-     * The team matters. The open play board undoes by double tapping the half
-     * you tapped by mistake, and without this it removed whichever point was
-     * scored most recently: double tapping your own half took a point off the
-     * other side whenever they had scored last.
+     * With a team, it takes back that team's last won rally. Without one, it
+     * takes back the match's last rally, whether it scored a point or only
+     * moved the serve.
      */
     public function undo(ClubMatch $match, ?int $userId = null, ?string $team = null): ClubMatch
     {
         return DB::transaction(function () use ($match, $userId, $team) {
+            $match = ClubMatch::query()->lockForUpdate()->findOrFail($match->id);
+
             $last = ScoreEvent::query()
                 ->where('club_match_id', $match->id)
-                ->whereIn('event_type', ['score_increment', 'match_point'])
+                ->whereIn('event_type', ['score_increment', 'match_point', 'serve_rotation'])
                 ->when($team, fn ($query) => $query->where('team', $team))
-                /* By id, not by timestamp: two points in the same second are
-                   otherwise ordered arbitrarily. */
+                ->latest('id')
+                ->first();
+            $latestRally = ScoreEvent::query()
+                ->where('club_match_id', $match->id)
+                ->whereIn('event_type', ['score_increment', 'match_point', 'serve_rotation'])
                 ->latest('id')
                 ->first();
 
             if (! $last) {
                 throw ValidationException::withMessages([
-                    'match' => $team ? 'That team has no point to take back.' : 'No score event to undo.',
+                    'match' => $team ? 'That team has no rally to take back.' : 'No score event to undo.',
                 ]);
             }
 
-            $teamOneScore = max($match->team_one_score - ($last->team === 'team_one' ? 1 : 0), 0);
-            $teamTwoScore = max($match->team_two_score - ($last->team === 'team_two' ? 1 : 0), 0);
+            $previous = is_array($last->payload) ? ($last->payload['previous'] ?? null) : null;
+            $useSnapshot = is_array($previous) && $latestRally?->id === $last->id;
+            $pointScored = is_array($last->payload) ? (bool) ($last->payload['point_scored'] ?? true) : $last->event_type !== 'serve_rotation';
+            $teamOneScore = $useSnapshot
+                ? (int) $previous['team_one_score']
+                : max((int) $match->team_one_score - ($pointScored && $last->team === 'team_one' ? 1 : 0), 0);
+            $teamTwoScore = $useSnapshot
+                ? (int) $previous['team_two_score']
+                : max((int) $match->team_two_score - ($pointScored && $last->team === 'team_two' ? 1 : 0), 0);
 
             $match->update([
                 'team_one_score' => $teamOneScore,
                 'team_two_score' => $teamTwoScore,
+                'serving_team' => $useSnapshot ? ($previous['serving_team'] ?? $this->servingTeam($match)) : $this->servingTeam($match),
+                'serving_number' => $this->isDoubles($match)
+                    ? ($useSnapshot ? ($previous['serving_number'] ?? $this->servingNumber($match)) : $this->servingNumber($match))
+                    : null,
                 'status' => 'live',
                 'ended_at' => null,
             ]);
@@ -156,7 +202,11 @@ class MatchScoringService
                 'team' => $last->team,
                 'team_one_score' => $teamOneScore,
                 'team_two_score' => $teamTwoScore,
-                'payload' => ['undone_event_id' => $last->id],
+                'payload' => [
+                    'undone_event_id' => $last->id,
+                    'previous' => $previous,
+                    'next' => $this->state($match->fresh()),
+                ],
             ]);
 
             return $match->refresh();
@@ -189,5 +239,51 @@ class MatchScoringService
         }
 
         return $teamOneScore > $teamTwoScore ? 'team_one' : 'team_two';
+    }
+
+    private function servingTeam(ClubMatch $match): string
+    {
+        return in_array($match->serving_team, ['team_one', 'team_two'], true) ? $match->serving_team : 'team_one';
+    }
+
+    private function servingNumber(ClubMatch $match): int
+    {
+        $number = (int) ($match->serving_number ?? 0);
+
+        if (in_array($number, [1, 2], true)) {
+            return $number;
+        }
+
+        return (int) $match->team_one_score === 0 && (int) $match->team_two_score === 0 && $this->servingTeam($match) === 'team_one' ? 2 : 1;
+    }
+
+    private function isDoubles(ClubMatch $match): bool
+    {
+        return $match->match_type !== 'singles';
+    }
+
+    /** @return array<string, int|string|null> */
+    private function state(ClubMatch $match): array
+    {
+        return [
+            'team_one_score' => (int) $match->team_one_score,
+            'team_two_score' => (int) $match->team_two_score,
+            'serving_team' => $this->servingTeam($match),
+            'serving_number' => $this->isDoubles($match) ? $this->servingNumber($match) : null,
+            'serve_call' => $this->serveCall($match),
+        ];
+    }
+
+    private function serveCall(ClubMatch $match): string
+    {
+        $servingTeam = $this->servingTeam($match);
+        $serverScore = $servingTeam === 'team_one' ? (int) $match->team_one_score : (int) $match->team_two_score;
+        $receiverScore = $servingTeam === 'team_one' ? (int) $match->team_two_score : (int) $match->team_one_score;
+
+        if (! $this->isDoubles($match)) {
+            return "{$serverScore}-{$receiverScore}";
+        }
+
+        return "{$serverScore}-{$receiverScore}-{$this->servingNumber($match)}";
     }
 }

@@ -8,7 +8,7 @@ import { currency, currencyCompact } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { CalendarClock, CreditCard, RadioTower, Trophy } from 'lucide-react';
+import { Building2, CalendarClock, ClipboardList, CreditCard, LifeBuoy, RadioTower, Rocket, Settings2, Trophy, Users } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: '/dashboard' }];
@@ -133,6 +133,8 @@ export default function Dashboard({
                         ))}
                     </dl>
                 )}
+
+                {mode === 'superadmin' && <AdminManagementPanel />}
 
                 {mode !== 'player' && (
                     <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
@@ -502,27 +504,93 @@ function PlayerSummary({ playerProfile, reservations, chartData }: { playerProfi
 
 /* -------------------------------------------------------------------------- */
 
+function AdminManagementPanel() {
+    const groups = [
+        {
+            title: 'Platform',
+            actions: [
+                ['/tenant-subscriptions', CreditCard, 'Tenant subscriptions', 'Plans, trials, invoices'],
+                ['/demo-pipeline', Rocket, 'Demo pipeline', 'Leads and conversions'],
+                ['/support-tickets', LifeBuoy, 'Support', 'Open platform tickets'],
+            ],
+        },
+        {
+            title: 'Club operations',
+            actions: [
+                ['/operations', ClipboardList, 'Operations', 'Today across clubs'],
+                ['/branches', Building2, 'Branches', 'Locations and courts'],
+                ['/live-courts', RadioTower, 'Live courts', 'Active court activity'],
+            ],
+        },
+        {
+            title: 'People & setup',
+            actions: [
+                ['/players', Users, 'Players', 'Club player records'],
+                ['/team-roles', Settings2, 'Team & roles', 'Staff access'],
+                ['/payments', CreditCard, 'Payments', 'Collections and balances'],
+            ],
+        },
+    ] as const;
+
+    return (
+        <Section title="Admin management">
+            <div className="grid gap-4 lg:grid-cols-3">
+                {groups.map((group) => (
+                    <section key={group.title} className="border-border bg-surface overflow-hidden rounded-lg border">
+                        <div className="border-border border-b px-4 py-3">
+                            <h2 className="text-h3 text-foreground">{group.title}</h2>
+                        </div>
+                        <div className="divide-border divide-y">
+                            {group.actions.map(([href, Icon, label, detail]) => (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    className="hover:bg-surface-muted/70 flex items-center gap-3 px-4 py-3 transition-colors"
+                                >
+                                    <span className="bg-primary-soft text-primary flex size-9 shrink-0 items-center justify-center rounded-md">
+                                        <Icon className="size-4" />
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="text-label text-foreground block truncate font-medium">{label}</span>
+                                        <span className="text-meta text-muted block truncate">{detail}</span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                ))}
+            </div>
+        </Section>
+    );
+}
+
 function QuickActions({ mode }: { mode: Props['mode'] }) {
     const actions =
-        mode === 'cashier'
+        mode === 'superadmin'
             ? ([
-                  ['/pos', CreditCard, 'Open POS'],
-                  ['/cashier-sessions', CreditCard, 'Till sessions'],
+                  ['/tenant-subscriptions', CreditCard, 'Subscriptions'],
+                  ['/demo-pipeline', Rocket, 'Demo pipeline'],
+                  ['/support-tickets', LifeBuoy, 'Support'],
               ] as const)
-            : mode === 'sports'
+            : mode === 'cashier'
               ? ([
-                    ['/matches', Trophy, 'Live matches'],
-                    ['/live-courts', RadioTower, 'Live courts'],
+                    ['/pos', CreditCard, 'Open POS'],
+                    ['/cashier-sessions', CreditCard, 'Till sessions'],
                 ] as const)
-              : mode === 'player'
+              : mode === 'sports'
                 ? ([
-                      ['/me/book', CalendarClock, 'Book a court'],
-                      ['/rankings', Trophy, 'Rankings'],
-                  ] as const)
-                : ([
-                      ['/reservations', CalendarClock, 'New reservation'],
+                      ['/matches', Trophy, 'Live matches'],
                       ['/live-courts', RadioTower, 'Live courts'],
-                  ] as const);
+                  ] as const)
+                : mode === 'player'
+                  ? ([
+                        ['/me/book', CalendarClock, 'Book a court'],
+                        ['/rankings', Trophy, 'Rankings'],
+                    ] as const)
+                  : ([
+                        ['/reservations', CalendarClock, 'New reservation'],
+                        ['/live-courts', RadioTower, 'Live courts'],
+                    ] as const);
 
     return (
         <div className="flex shrink-0 flex-wrap gap-2">

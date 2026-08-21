@@ -25,6 +25,7 @@ class ClubMatch extends Model
         'team_one_score',
         'team_two_score',
         'serving_team',
+        'serving_number',
         'game_number',
         'status',
         'verification_status',
@@ -44,6 +45,7 @@ class ClubMatch extends Model
             'ended_at' => 'datetime',
             'verified_at' => 'datetime',
             'win_by_two' => 'boolean',
+            'serving_number' => 'integer',
         ];
     }
 

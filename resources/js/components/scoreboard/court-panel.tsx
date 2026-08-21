@@ -10,6 +10,8 @@ export type ScoreboardMatch = {
     team_one_score: number;
     team_two_score: number;
     serving_team: string | null;
+    serving_number: number | null;
+    serve_call: string;
     game_number: number;
     target_score: number;
     match_type: string;
@@ -207,20 +209,25 @@ export function CourtPanel({ court, tick, dense = false }: { court: ScoreboardCo
                     portraitSize={portraitSize}
                 />
 
-                <div className="flex items-center gap-2 sm:gap-4">
-                    <Score
-                        value={match.team_one_score}
-                        serving={match.serving_team === 'team_one' || match.serving_team === 'one'}
-                        lead={match.team_one_score >= match.team_two_score}
-                    />
-                    <span aria-hidden className="text-[clamp(0.75rem,1vw,1.125rem)] font-black text-white/20">
-                        VS
-                    </span>
-                    <Score
-                        value={match.team_two_score}
-                        serving={match.serving_team === 'team_two' || match.serving_team === 'two'}
-                        lead={match.team_two_score >= match.team_one_score}
-                    />
+                <div className="flex flex-col items-center gap-2">
+                    <div className="border-primary/35 bg-primary/10 text-primary rounded-full border px-3 py-1 text-[0.625rem] font-black tracking-[0.18em] uppercase sm:text-xs">
+                        Serve {match.serve_call}
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        <Score
+                            value={match.team_one_score}
+                            serving={match.serving_team === 'team_one' || match.serving_team === 'one'}
+                            lead={match.team_one_score >= match.team_two_score}
+                        />
+                        <span aria-hidden className="text-[clamp(0.75rem,1vw,1.125rem)] font-black text-white/20">
+                            VS
+                        </span>
+                        <Score
+                            value={match.team_two_score}
+                            serving={match.serving_team === 'team_two' || match.serving_team === 'two'}
+                            lead={match.team_two_score >= match.team_one_score}
+                        />
+                    </div>
                 </div>
 
                 <Side

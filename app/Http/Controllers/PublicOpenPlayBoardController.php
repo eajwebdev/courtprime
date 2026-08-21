@@ -1350,7 +1350,7 @@ class PublicOpenPlayBoardController extends Controller
             ->withoutGlobalScope('organization')
             ->where('open_play_session_id', $session->id)
             ->where('status', 'live')
-            ->with(['court:id,name', 'participants.player:id,name', 'clubMatch:id,team_one_score,team_two_score'])
+            ->with(['court:id,name', 'participants.player:id,name', 'clubMatch:id,team_one_score,team_two_score,serving_team,serving_number,match_type'])
             ->orderBy('court_id')
             ->get()
             ->map(fn (OpenPlayMatch $match) => [
@@ -1359,12 +1359,45 @@ class PublicOpenPlayBoardController extends Controller
                 'court' => $match->court?->name,
                 'team_one_score' => $match->clubMatch?->team_one_score ?? 0,
                 'team_two_score' => $match->clubMatch?->team_two_score ?? 0,
+                'serving_team' => $match->clubMatch?->serving_team ?? 'team_one',
+                'serving_number' => $match->clubMatch ? $this->servingNumber($match->clubMatch) : 2,
+                'serve_call' => $match->clubMatch ? $this->serveCall($match->clubMatch) : '0-0-2',
                 'teams' => $match->participants
                     ->groupBy('team')
                     ->map(fn ($group) => $group->map(fn ($entry) => ['id' => $entry->player_id, 'name' => $entry->player?->name])->values())
                     ->all(),
             ])
             ->all();
+    }
+
+    private function servingTeam(ClubMatch $match): string
+    {
+        return in_array($match->serving_team, ['team_one', 'team_two'], true) ? $match->serving_team : 'team_one';
+    }
+
+    private function servingNumber(ClubMatch $match): ?int
+    {
+        if ($match->match_type === 'singles') {
+            return null;
+        }
+
+        $number = (int) ($match->serving_number ?? 0);
+
+        if (in_array($number, [1, 2], true)) {
+            return $number;
+        }
+
+        return (int) $match->team_one_score === 0 && (int) $match->team_two_score === 0 && $this->servingTeam($match) === 'team_one' ? 2 : 1;
+    }
+
+    private function serveCall(ClubMatch $match): string
+    {
+        $servingTeam = $this->servingTeam($match);
+        $serverScore = $servingTeam === 'team_one' ? (int) $match->team_one_score : (int) $match->team_two_score;
+        $receiverScore = $servingTeam === 'team_one' ? (int) $match->team_two_score : (int) $match->team_one_score;
+        $servingNumber = $this->servingNumber($match);
+
+        return $servingNumber ? "{$serverScore}-{$receiverScore}-{$servingNumber}" : "{$serverScore}-{$receiverScore}";
     }
 
     /**

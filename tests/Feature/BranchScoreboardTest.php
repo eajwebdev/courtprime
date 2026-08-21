@@ -158,6 +158,8 @@ class BranchScoreboardTest extends TestCase
                     ->where('courts.0.match.team_one_score', 8)
                     ->where('courts.0.match.team_two_score', 6)
                     ->where('courts.0.match.serving_team', 'team_one')
+                    ->where('courts.0.match.serving_number', 2)
+                    ->where('courts.0.match.serve_call', '8-6-2')
                     /* First name large, initial beside it — never the surname. */
                     ->where('courts.0.match.team_one.0.first_name', 'Maria')
                     ->where('courts.0.match.team_one.0.last_initial', 'C.')
